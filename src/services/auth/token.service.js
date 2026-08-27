@@ -1,52 +1,57 @@
 const jwt = require('jsonwebtoken');
 const moment = require('moment');
+const { Op } = require('sequelize');
 const { Token } = require('../../models');
 const { tokenTypes } = require('../../config/tokens');
 
 /**
- * Generate token
- * @param {ObjectId} userId
- * @param {moment} expires
+ * Sign a JWT.
+ *
+ * The access token embeds the FULL authorization context (role, organization_id,
+ * permissions) so the API can authorize every request without a database lookup.
+ * The refresh token stays minimal — it only identifies the user; the context is
+ * re-resolved from the DB when refreshing, so permission changes take effect on refresh.
+ *
+ * @param {object} claims  identity + optional authorization claims
+ * @param {moment.Moment} expires
  * @param {string} type
  * @param {string} [secret]
- * @returns {string}
  */
-const generateToken = (user, expires, type, secret = process.env.JWT_SECRET) => {
+const generateToken = (claims, expires, type, secret = process.env.JWT_SECRET) => {
   const payload = {
-    user_id: user.id,
-    uuid: user.uuid,
+    sub: claims.userId,
+    uuid: claims.uuid,
+    type,
     iat: moment().unix(),
     exp: expires.unix(),
-    type,
   };
+
+  // Authorization claims (present on access tokens only).
+  if (type === tokenTypes.ACCESS) {
+    payload.role = claims.role;
+    payload.org = claims.organizationId ?? null;
+    payload.perms = claims.permissions || [];
+    payload.sa = !!claims.isSuperAdmin;
+    payload.tv = claims.tokenVersion ?? 0; // session-revocation version
+  }
+
   return jwt.sign(payload, secret);
 };
 
-/**
- * Save a token
- * @param {string} token
- * @param {ObjectId} userId
- * @param {moment} expires
- * @param {string} type
- * @param {boolean} [blacklisted]
- * @returns {Promise<Token>}
- */
+/** Persist a token (used for refresh tokens so they can be revoked). */
 const saveToken = async (token, userId, expires, type, blacklisted = false) => {
-  const tokenDoc = await Token.create({
+  return Token.create({
     token,
     user_id: userId,
     expires: expires.toDate(),
     type,
     blacklisted,
   });
-  return tokenDoc;
 };
 
 /**
- * Verify token and return token doc (or throw an error if it is not valid)
- * @param {string} token
- * @param {string} type
- * @returns {Promise<Token>}
+ * Verify a persisted token (e.g. refresh) is valid and not blacklisted/expired.
+ * Returns the token record or throws.
  */
 const verifyToken = async (token, type) => {
   const payload = jwt.verify(token, process.env.JWT_SECRET);
@@ -56,42 +61,79 @@ const verifyToken = async (token, type) => {
       type,
       user_id: payload.sub,
       blacklisted: false,
+      expires: { [Op.gt]: new Date() },
     },
   });
   if (!tokenDoc) {
-    throw new Error('Token not found');
+    throw new Error('Token not found or expired');
   }
-  return tokenDoc;
+  return { tokenDoc, payload };
+};
+
+/** Revoke a refresh token (blacklist it) — used on logout / rotation. */
+const revokeToken = async (token) => {
+  await Token.update({ blacklisted: true }, { where: { token } });
 };
 
 /**
- * Generate auth tokens
- * @param {User} user
- * @returns {Promise<Object>}
+ * Revoke ALL refresh tokens for a user (blacklist them). Used on password change,
+ * password reset, and forced logout so existing sessions can no longer be refreshed.
  */
-const generateAuthTokens = async (user) => {
-  const accessTokenExpires = moment().add(process.env.JWT_ACCESS_EXPIRATION_MINUTES, 'minutes');
-  const accessToken = generateToken(user, accessTokenExpires, tokenTypes.ACCESS);
+const revokeAllUserTokens = async (userId, type = tokenTypes.REFRESH) => {
+  await Token.update(
+    { blacklisted: true },
+    { where: { user_id: userId, type, blacklisted: false } }
+  );
+};
 
-  const refreshTokenExpires = moment().add(process.env.JWT_REFRESH_EXPIRATION_DAYS, 'days');
-  const refreshToken = generateToken(user, refreshTokenExpires, tokenTypes.REFRESH);
-  await saveToken(refreshToken, user.id, refreshTokenExpires, tokenTypes.REFRESH);
+/**
+ * Issue an access + refresh token pair for the given auth context.
+ * @param {object} authContext  from buildAuthContext()
+ */
+const generateAuthTokens = async (authContext) => {
+  const accessExpires = moment().add(
+    Number(process.env.JWT_ACCESS_EXPIRATION_MINUTES || 30),
+    'minutes'
+  );
+  const accessToken = generateToken(authContext, accessExpires, tokenTypes.ACCESS);
+
+  const refreshExpires = moment().add(
+    Number(process.env.JWT_REFRESH_EXPIRATION_DAYS || 7),
+    'days'
+  );
+  const refreshToken = generateToken(authContext, refreshExpires, tokenTypes.REFRESH);
+  await saveToken(refreshToken, authContext.userId, refreshExpires, tokenTypes.REFRESH);
 
   return {
-    access: {
-      token: accessToken,
-      expires: accessTokenExpires.toDate(),
-    },
-    refresh: {
-      token: refreshToken,
-      expires: refreshTokenExpires.toDate(),
-    },
+    access: { token: accessToken, expires: accessExpires.toDate() },
+    refresh: { token: refreshToken, expires: refreshExpires.toDate() },
   };
+};
+
+/**
+ * Generate + persist a short-lived password reset token for a user.
+ * Stored so it can be one-time (revoked after use) and expiry-checked.
+ */
+const generateResetPasswordToken = async (user) => {
+  const expires = moment().add(
+    Number(process.env.JWT_RESET_PASSWORD_EXPIRATION_MINUTES || 10),
+    'minutes'
+  );
+  const token = generateToken(
+    { userId: user.id, uuid: user.uuid },
+    expires,
+    tokenTypes.RESET_PASSWORD
+  );
+  await saveToken(token, user.id, expires, tokenTypes.RESET_PASSWORD);
+  return { token, expires: expires.toDate() };
 };
 
 module.exports = {
   generateToken,
   saveToken,
   verifyToken,
+  revokeToken,
+  revokeAllUserTokens,
   generateAuthTokens,
+  generateResetPasswordToken,
 };

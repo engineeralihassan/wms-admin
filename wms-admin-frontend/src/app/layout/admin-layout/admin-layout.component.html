@@ -1,0 +1,62 @@
+<div class="layout" [class.layout--collapsed]="!sidebarOpen()">
+  <!-- Global loading bar -->
+  @if (loading.isLoading()) {
+    <div class="layout__progress" role="progressbar" aria-label="Loading"></div>
+  }
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <span class="sidebar__logo">W</span>
+      @if (sidebarOpen()) {
+        <span class="sidebar__name">{{ appName }}</span>
+      }
+    </div>
+
+    <nav class="sidebar__nav">
+      @for (item of navItems(); track item.route) {
+        <a
+          class="nav-item"
+          [routerLink]="item.route"
+          routerLinkActive="nav-item--active"
+        >
+          <svg class="nav-item__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path [attr.d]="item.icon" />
+          </svg>
+          @if (sidebarOpen()) {
+            <span class="nav-item__label">{{ item.label }}</span>
+          }
+        </a>
+      }
+    </nav>
+  </aside>
+
+  <!-- Main column -->
+  <div class="main">
+    <header class="topbar">
+      <button class="topbar__toggle" type="button" (click)="toggleSidebar()" aria-label="Toggle sidebar">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+          <path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z" />
+        </svg>
+      </button>
+
+      <div class="topbar__spacer"></div>
+
+      @if (user(); as u) {
+        <div class="topbar__user">
+          <div class="avatar">{{ userInitials() }}</div>
+          <div class="topbar__user-meta">
+            <span class="topbar__user-name">{{ u.first_name }} {{ u.last_name }}</span>
+            <span class="topbar__user-email">{{ u.email }}</span>
+          </div>
+        </div>
+      }
+
+      <button class="topbar__logout" type="button" (click)="logout()">Logout</button>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+  </div>
+</div>

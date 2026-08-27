@@ -1,0 +1,100 @@
+<header class="page-header">
+  <div>
+    <h1 class="page-header__title">Organizations</h1>
+    <p class="page-header__subtitle">Create and manage tenant organizations.</p>
+  </div>
+  <app-button variant="primary" (clicked)="toggleForm()">
+    {{ showForm() ? 'Cancel' : 'New organization' }}
+  </app-button>
+</header>
+
+@if (showForm()) {
+  <app-card title="Create organization">
+    <form class="create-form" [formGroup]="form" (ngSubmit)="submit()">
+      <label class="field field--full">
+        <span class="field__label">Organization name</span>
+        <input class="field__input" type="text" formControlName="name" />
+      </label>
+      <label class="field">
+        <span class="field__label">Admin first name</span>
+        <input class="field__input" type="text" formControlName="first_name" />
+      </label>
+      <label class="field">
+        <span class="field__label">Admin last name</span>
+        <input class="field__input" type="text" formControlName="last_name" />
+      </label>
+      <label class="field">
+        <span class="field__label">Admin email</span>
+        <input class="field__input" type="email" formControlName="email" />
+      </label>
+      <label class="field">
+        <span class="field__label">Admin password</span>
+        <input class="field__input" type="password" formControlName="password" />
+      </label>
+      <div class="field__actions">
+        <app-button type="submit" variant="primary" [loading]="submitting()">Create</app-button>
+      </div>
+    </form>
+  </app-card>
+}
+
+<app-card title="All organizations">
+  <div card-actions class="toolbar">
+    <input
+      class="search"
+      type="search"
+      placeholder="Search name or slug…"
+      (input)="onSearchInput($event)"
+      aria-label="Search organizations"
+    />
+  </div>
+
+  @if (list.loading()) {
+    <div class="centered"><app-spinner /></div>
+  } @else if (list.isEmpty()) {
+    <p class="empty">No organizations match your search.</p>
+  } @else {
+    <table class="table">
+      <thead>
+        <tr>
+          <th>
+            <app-sort-header column="name" label="Name"
+              [activeColumn]="list.sortBy()" [direction]="list.sortDir()"
+              (sort)="list.toggleSort($event)" />
+          </th>
+          <th>
+            <app-sort-header column="slug" label="Slug"
+              [activeColumn]="list.sortBy()" [direction]="list.sortDir()"
+              (sort)="list.toggleSort($event)" />
+          </th>
+          <th>
+            <app-sort-header column="is_active" label="Status"
+              [activeColumn]="list.sortBy()" [direction]="list.sortDir()"
+              (sort)="list.toggleSort($event)" />
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (org of list.items(); track org.uuid) {
+          <tr>
+            <td>{{ org.name }}</td>
+            <td>{{ org.slug }}</td>
+            <td>
+              <span class="badge" [class.badge--active]="org.is_active" [class.badge--inactive]="!org.is_active">
+                {{ org.is_active ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <app-pagination
+      [page]="list.page()"
+      [totalPages]="list.totalPages()"
+      [total]="list.total()"
+      [limit]="list.limit()"
+      (pageChange)="list.setPage($event)"
+    />
+  }
+</app-card>

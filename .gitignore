@@ -11,3 +11,4 @@ config.PRODUCTION.env
 
 # Logs
 *.log
+/logs

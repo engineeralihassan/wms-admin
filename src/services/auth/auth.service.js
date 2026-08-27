@@ -1,56 +1,194 @@
 const httpStatus = require('http-status');
+const moment = require('moment');
+const crypto = require('crypto');
 const { User } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const Encrypter = require('../../helper/encrypter');
+const { buildAuthContext } = require('./auth-context.service');
+const tokenService = require('./token.service');
+const { tokenTypes } = require('../../config/tokens');
+const { enqueueSafe } = require('../email/email.service');
 
-const signUp = async (body, res) => {
-  const { first_name, last_name, email, password, password_again } = body;
-  const user = await checkUserByEmail(email);
-  if (user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, res.__('email_already_exist'));
-  }
-  if (password !== password_again) {
-    throw new ApiError(httpStatus.BAD_REQUEST, res.__('password_not_match'));
-  }
-  const pass = await Encrypter.password_enc(password);
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_MINUTES = 15;
 
-  const createUser = await User.create({
-    first_name,
-    last_name,
-    email,
-    password: pass.encr,
-    salt: pass.salt,
-  });
-  if (!createUser) {
-    throw new ApiError(httpStatus.BAD_REQUEST, res.__('something_wrong'));
-  }
-  return createUser;
-};
-
+/**
+ * Authenticate a user by email/password and return { authContext, tokens, user }.
+ *
+ * Security behaviors:
+ *  - Uniform error for "no such user" vs "wrong password" (no user enumeration).
+ *  - Account lockout after repeated failures.
+ *  - Only 'active' users may sign in.
+ *  - Tokens embed role/org/permissions (resolved via buildAuthContext).
+ */
 const signIn = async (body, res) => {
   const { email, password } = body;
-  const user = await checkUserByEmail(email);
-  if (!user) {
-    throw new ApiError(httpStatus.BAD_REQUEST, res.__('user_not_found'));
+  const user = await User.findOne({ where: { email } });
+
+  // Uniform failure to avoid revealing whether the email exists.
+  const invalidCreds = () =>
+    new ApiError(httpStatus.UNAUTHORIZED, res.__('invalid_credentials'));
+
+  if (!user || !user.salt) {
+    throw invalidCreds();
   }
-  if (user.salt === null) {
-    throw new ApiError(httpStatus.FORBIDDEN, res.__('user_not_found'));
+
+  // Locked account?
+  if (user.locked_until && moment(user.locked_until).isAfter(moment())) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('account_locked'));
   }
-  const pass = await Encrypter.password_dec(password, user.salt);
-  if (pass !== user.password) {
-    throw new ApiError(httpStatus.FORBIDDEN, res.__('incorrect_password'));
+
+  // Disabled / not-yet-active account?
+  if (user.status !== 'active') {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('account_inactive'));
   }
+
+  const hashed = await Encrypter.password_dec(password, user.salt);
+  if (!constantTimeEquals(hashed, user.password)) {
+    await registerFailedAttempt(user);
+    throw invalidCreds();
+  }
+
+  // Success: reset counters, mark login.
+  user.failed_login_attempts = 0;
+  user.locked_until = null;
   user.is_login = true;
   await user.save();
-  return user;
+
+  const authContext = await buildAuthContext(user.id);
+  if (!authContext) {
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, res.__('something_went_wrong'));
+  }
+
+  const tokens = await tokenService.generateAuthTokens(authContext);
+  return { authContext, tokens, user };
 };
 
-const checkUserByEmail = async (email) => {
+/** Timing-safe string comparison to avoid leaking match length via response time. */
+const constantTimeEquals = (a, b) => {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+};
+
+/** Increment failure counter and lock the account when the threshold is hit. */
+const registerFailedAttempt = async (user) => {
+  const attempts = (user.failed_login_attempts || 0) + 1;
+  user.failed_login_attempts = attempts;
+  if (attempts >= MAX_FAILED_ATTEMPTS) {
+    user.locked_until = moment().add(LOCK_MINUTES, 'minutes').toDate();
+    user.failed_login_attempts = 0;
+  }
+  await user.save();
+};
+
+/**
+ * Exchange a valid refresh token for a fresh access+refresh pair (rotation).
+ * Re-resolves the auth context from the DB so permission changes propagate.
+ */
+const refreshTokens = async (refreshToken, res) => {
+  if (!refreshToken) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, res.__('invalid_token'));
+  }
+  let payload;
+  try {
+    ({ payload } = await tokenService.verifyToken(refreshToken, tokenTypes.REFRESH));
+  } catch {
+    throw new ApiError(httpStatus.UNAUTHORIZED, res.__('invalid_token'));
+  }
+
+  const authContext = await buildAuthContext(payload.sub);
+  if (!authContext) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, res.__('invalid_token'));
+  }
+
+  // Rotate: revoke the used refresh token, issue a new pair.
+  await tokenService.revokeToken(refreshToken);
+  const tokens = await tokenService.generateAuthTokens(authContext);
+  return { authContext, tokens };
+};
+
+/** Invalidate the given refresh token. */
+const logout = async (refreshToken) => {
+  if (refreshToken) {
+    await tokenService.revokeToken(refreshToken);
+  }
+};
+
+/**
+ * Request a password reset.
+ *
+ * Privacy: ALWAYS resolves successfully whether or not the email exists, so an
+ * attacker can't use this endpoint to discover which emails are registered.
+ * If the user exists and is active, a reset email is enqueued (fire-and-forget).
+ */
+const requestPasswordReset = async (email) => {
   const user = await User.findOne({ where: { email } });
-  return user;
+  if (user && user.status === 'active') {
+    const { token } = await tokenService.generateResetPasswordToken(user);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:4200';
+    const resetUrl = `${frontendUrl}/auth/reset-password?token=${encodeURIComponent(token)}`;
+    enqueueSafe('password_reset', user.email, {
+      firstName: user.first_name,
+      resetUrl,
+      expiresInMinutes: Number(process.env.JWT_RESET_PASSWORD_EXPIRATION_MINUTES || 10),
+    });
+  }
+  // Uniform response regardless of existence.
+  return true;
+};
+
+/**
+ * Complete a password reset using a valid reset token + new password.
+ * The token is one-time: it's revoked after a successful reset.
+ */
+const resetPassword = async (token, newPassword, res) => {
+  let payload;
+  let tokenDoc;
+  try {
+    ({ payload, tokenDoc } = await tokenService.verifyToken(token, tokenTypes.RESET_PASSWORD));
+  } catch {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('invalid_token'));
+  }
+
+  const user = await User.findByPk(payload.sub);
+  if (!user) {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('invalid_token'));
+  }
+
+  const enc = await Encrypter.password_enc(newPassword);
+  user.password = enc.encr;
+  user.salt = enc.salt;
+  // Reset security counters on password change.
+  user.failed_login_attempts = 0;
+  user.locked_until = null;
+  // Bump token_version: instantly invalidates all existing ACCESS tokens.
+  user.token_version = (user.token_version || 0) + 1;
+  await user.save();
+
+  // Invalidate every existing session:
+  //  - one-time reset token,
+  //  - all refresh tokens (so an attacker's session cannot be refreshed after reset).
+  await tokenService.revokeToken(tokenDoc.token);
+  await tokenService.revokeAllUserTokens(user.id);
+  return true;
+};
+
+/** Load the safe profile fields for the authenticated user (used by /auth/me). */
+const getProfile = async (userId) => {
+  return User.findByPk(userId, {
+    attributes: ['id', 'uuid', 'first_name', 'last_name', 'email', 'organization_id'],
+  });
 };
 
 module.exports = {
-  signUp,
   signIn,
+  refreshTokens,
+  logout,
+  requestPasswordReset,
+  resetPassword,
+  getProfile,
 };

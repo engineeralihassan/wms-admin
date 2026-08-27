@@ -1,0 +1,39 @@
+<header class="page-header">
+  <a class="back-link" [routerLink]="backLink">&larr; Back to users</a>
+  <h1 class="page-header__title">User details</h1>
+</header>
+
+<app-card>
+  @if (loading()) {
+    <div class="centered"><app-spinner /></div>
+  } @else if (user(); as u) {
+    <dl class="details">
+      <div class="details__row">
+        <dt>ID</dt>
+        <dd>{{ u.id }}</dd>
+      </div>
+      <div class="details__row">
+        <dt>UUID</dt>
+        <dd>{{ u.uuid }}</dd>
+      </div>
+      <div class="details__row">
+        <dt>Name</dt>
+        <dd>{{ u.first_name }} {{ u.last_name }}</dd>
+      </div>
+      <div class="details__row">
+        <dt>Email</dt>
+        <dd>{{ u.email }}</dd>
+      </div>
+      <div class="details__row">
+        <dt>Role</dt>
+        <dd>{{ u.role?.name }}</dd>
+      </div>
+      <div class="details__row">
+        <dt>Status</dt>
+        <dd>{{ u.status }}</dd>
+      </div>
+    </dl>
+  } @else {
+    <p class="empty">User not found.</p>
+  }
+</app-card>

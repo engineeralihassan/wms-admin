@@ -1,0 +1,77 @@
+<header class="page-header">
+  <h1 class="page-header__title">Users</h1>
+  <p class="page-header__subtitle">Manage admin users of the WMS platform.</p>
+</header>
+
+<app-card title="All users">
+  <div card-actions class="toolbar">
+    <input
+      class="search"
+      type="search"
+      placeholder="Search name or email…"
+      (input)="onSearchInput($event)"
+      aria-label="Search users"
+    />
+  </div>
+
+  @if (list.loading()) {
+    <div class="centered"><app-spinner /></div>
+  } @else if (list.isEmpty()) {
+    <p class="empty">No users match your search.</p>
+  } @else {
+    <table class="table">
+      <thead>
+        <tr>
+          <th>
+            <app-sort-header
+              column="first_name"
+              label="Name"
+              [activeColumn]="list.sortBy()"
+              [direction]="list.sortDir()"
+              (sort)="list.toggleSort($event)"
+            />
+          </th>
+          <th>
+            <app-sort-header
+              column="email"
+              label="Email"
+              [activeColumn]="list.sortBy()"
+              [direction]="list.sortDir()"
+              (sort)="list.toggleSort($event)"
+            />
+          </th>
+          <th>Role</th>
+          <th>
+            <app-sort-header
+              column="status"
+              label="Status"
+              [activeColumn]="list.sortBy()"
+              [direction]="list.sortDir()"
+              (sort)="list.toggleSort($event)"
+            />
+          </th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (user of list.items(); track user.uuid) {
+          <tr>
+            <td>{{ user.first_name }} {{ user.last_name }}</td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.role?.name }}</td>
+            <td><span class="status status--{{ user.status }}">{{ user.status }}</span></td>
+            <td class="table__actions"><a [routerLink]="[user.uuid]">View</a></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <app-pagination
+      [page]="list.page()"
+      [totalPages]="list.totalPages()"
+      [total]="list.total()"
+      [limit]="list.limit()"
+      (pageChange)="list.setPage($event)"
+    />
+  }
+</app-card>

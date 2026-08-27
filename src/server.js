@@ -77,12 +77,44 @@ app.use((req, res, next) => {
   });
 });
 
+const emailWorker = require('./services/email/email.worker');
+
 db.sequelize.sync({ force: false }).then(() => {
   console.log('Database connected');
+  emailWorker.start();
 });
 
 // Start server
 const port = process.env.PORT || 8080;
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${port}`);
 });
+
+/**
+ * Graceful shutdown (important under Docker/PM2/Kubernetes): stop accepting new
+ * connections, let the email worker finish in-flight sends and close its SMTP pool,
+ * then exit. A hard timeout guards against a hang.
+ */
+const shutdown = async (signal) => {
+  console.log(`${signal} received — shutting down gracefully...`);
+  const forceExit = setTimeout(() => {
+    console.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 30000);
+  forceExit.unref();
+
+  server.close(async () => {
+    try {
+      await emailWorker.stop();
+      await db.sequelize.close();
+    } catch (err) {
+      console.error('Error during shutdown:', err.message);
+    } finally {
+      clearTimeout(forceExit);
+      process.exit(0);
+    }
+  });
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

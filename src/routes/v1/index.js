@@ -3,6 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 const authRoute = require('./auth.route');
+const organizationRoute = require('./organization.route');
+const userRoute = require('./user.route');
 const docsRoute = require('./docs.route');
 
 const devRoutes = [
@@ -12,13 +14,13 @@ const devRoutes = [
   },
 ];
 
-const userRoutes = [
-  {
-    path: '/auth',
-    route: authRoute,
-  },
+const routes = [
+  { path: '/auth', route: authRoute },
+  { path: '/organizations', route: organizationRoute },
+  { path: '/users', route: userRoute },
 ];
-userRoutes.forEach((route) => {
+
+routes.forEach((route) => {
   router.use(route.path, route.route);
 });
 

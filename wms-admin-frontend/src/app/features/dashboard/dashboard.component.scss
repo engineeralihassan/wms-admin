@@ -1,0 +1,47 @@
+:host {
+  display: block;
+}
+
+.page-header {
+  margin-bottom: 1.5rem;
+
+  &__title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text, #0f172a);
+  }
+  &__subtitle {
+    margin: 0.35rem 0 0;
+    color: var(--color-text-muted, #64748b);
+  }
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  &__label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  &__value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-text, #0f172a);
+  }
+  &__hint {
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #94a3b8);
+  }
+}
