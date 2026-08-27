@@ -1,0 +1,13 @@
+/node_modules
+/package-lock.json
+# Environment varibales
+config.DEVELOPMENT.env
+
+# macOS
+.DS_Store
+
+# Production env
+config.PRODUCTION.env
+
+# Logs
+*.log
