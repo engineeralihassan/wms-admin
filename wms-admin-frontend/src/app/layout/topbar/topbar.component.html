@@ -1,0 +1,180 @@
+<header class="topbar">
+  <button
+    class="topbar__toggle"
+    type="button"
+    (click)="toggleSidebar.emit()"
+    [attr.aria-expanded]="sidebarOpen()"
+    aria-label="Toggle navigation sidebar"
+  >
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22" aria-hidden="true">
+      <path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z" />
+    </svg>
+  </button>
+
+  <div class="topbar__spacer"></div>
+
+  @if (openPanel() !== 'none') {
+    <button class="backdrop" type="button" aria-label="Close menu" (click)="closePanel()"></button>
+  }
+
+  <div class="topbar__actions">
+    <!-- Messages -->
+    <div class="menu">
+      <button
+        class="icon-btn"
+        type="button"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="openPanel() === 'messages'"
+        aria-label="Messages"
+        (click)="togglePanel('messages')"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+          <path d="M20 2H4a2 2 0 0 0-2 2v18l4-4h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Zm0 14H5.2L4 17.2V4h16v12Z" />
+        </svg>
+        <span class="icon-btn__badge">2</span>
+      </button>
+
+      @if (openPanel() === 'messages') {
+        <div class="dropdown dropdown--wide" role="menu" aria-label="Messages">
+          <header class="dropdown__header">
+            <h3 class="dropdown__title">Messages</h3>
+            <a class="dropdown__link" routerLink="." (click)="closePanel()">View all</a>
+          </header>
+          <ul class="msg-list" role="list">
+            <li class="msg">
+              <span class="msg__avatar" aria-hidden="true">JD</span>
+              <span class="msg__body">
+                <span class="msg__name">Jane Doe</span>
+                <span class="msg__preview">Can you review the latest order batch?</span>
+              </span>
+              <span class="msg__time">2m</span>
+            </li>
+            <li class="msg">
+              <span class="msg__avatar" aria-hidden="true">MK</span>
+              <span class="msg__body">
+                <span class="msg__name">Mark K.</span>
+                <span class="msg__preview">Consultant onboarding is done.</span>
+              </span>
+              <span class="msg__time">1h</span>
+            </li>
+          </ul>
+        </div>
+      }
+    </div>
+
+    <!-- Notifications -->
+    <div class="menu">
+      <button
+        class="icon-btn"
+        type="button"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="openPanel() === 'notifications'"
+        aria-label="Notifications"
+        (click)="togglePanel('notifications')"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+          <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6-6v-5a6 6 0 0 0-5-5.91V4a1 1 0 0 0-2 0v1.09A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z" />
+        </svg>
+        <span class="icon-btn__badge">3</span>
+      </button>
+
+      @if (openPanel() === 'notifications') {
+        <div class="dropdown dropdown--wide" role="menu" aria-label="Notifications">
+          <header class="dropdown__header">
+            <h3 class="dropdown__title">Notifications</h3>
+            <a class="dropdown__link" routerLink="." (click)="closePanel()">Mark all read</a>
+          </header>
+          <ul class="notif-list" role="list">
+            <li class="notif notif--unread">
+              <span class="notif__dot" aria-hidden="true"></span>
+              <span class="notif__body">
+                <span class="notif__text">New vendor <strong>Acme Corp</strong> was created.</span>
+                <span class="notif__time">Just now</span>
+              </span>
+            </li>
+            <li class="notif notif--unread">
+              <span class="notif__dot" aria-hidden="true"></span>
+              <span class="notif__body">
+                <span class="notif__text">Password reset requested for a user.</span>
+                <span class="notif__time">10m ago</span>
+              </span>
+            </li>
+            <li class="notif">
+              <span class="notif__dot" aria-hidden="true"></span>
+              <span class="notif__body">
+                <span class="notif__text">Weekly report is ready.</span>
+                <span class="notif__time">Yesterday</span>
+              </span>
+            </li>
+          </ul>
+        </div>
+      }
+    </div>
+
+    <!-- User menu (avatar only) -->
+    @if (user(); as u) {
+      <div class="menu">
+        <button
+          class="avatar-btn"
+          type="button"
+          aria-haspopup="menu"
+          [attr.aria-expanded]="openPanel() === 'user'"
+          [attr.aria-label]="'Account menu for ' + u.first_name + ' ' + u.last_name"
+          (click)="togglePanel('user')"
+        >
+          <span class="avatar" aria-hidden="true">{{ userInitials() }}</span>
+        </button>
+
+        @if (openPanel() === 'user') {
+          <div class="dropdown dropdown--user" role="menu" aria-label="Account">
+            <div class="user-card">
+              <span class="avatar avatar--lg" aria-hidden="true">{{ userInitials() }}</span>
+              <span class="user-card__info">
+                <span class="user-card__name">{{ u.first_name }} {{ u.last_name }}</span>
+                <span class="user-card__email">{{ u.email }}</span>
+                <span class="user-card__role">{{ roleLabel() }}</span>
+              </span>
+            </div>
+
+            <ul class="menu-list" role="list">
+              <li>
+                <a class="menu-list__item" role="menuitem" routerLink="." (click)="closePanel()">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
+                    <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8.94 4a7.9 7.9 0 0 0-.15-1.5l2-1.55-2-3.46-2.36.95a8 8 0 0 0-2.6-1.5L15.5 2h-4l-.33 2.44a8 8 0 0 0-2.6 1.5L6.2 5 4.2 8.45l2 1.55a8 8 0 0 0 0 3l-2 1.55 2 3.46 2.37-.95a8 8 0 0 0 2.6 1.5L11.5 22h4l.33-2.44a8 8 0 0 0 2.6-1.5l2.37.95 2-3.46-2-1.55c.1-.5.15-1 .14-1.5Z" />
+                  </svg>
+                  <span>Settings</span>
+                </a>
+              </li>
+              <li>
+                <a class="menu-list__item" role="menuitem" routerLink="." (click)="closePanel()">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
+                    <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm6.9 6h-2.95a15.7 15.7 0 0 0-1.38-3.56A8 8 0 0 1 18.9 8ZM12 4c.83 1.2 1.48 2.53 1.91 4h-3.82C10.52 6.53 11.17 5.2 12 4ZM4.26 14a7.8 7.8 0 0 1 0-4h3.38a16.5 16.5 0 0 0 0 4H4.26Zm.84 2h2.95c.35 1.26.82 2.47 1.38 3.56A8 8 0 0 1 5.1 16Zm2.95-8H5.1a8 8 0 0 1 4.33-3.56A15.7 15.7 0 0 0 8.05 8ZM12 20c-.83-1.2-1.48-2.53-1.91-4h3.82c-.43 1.47-1.08 2.8-1.91 4Zm2.36-6H9.64a14.3 14.3 0 0 1 0-4h4.72a14.3 14.3 0 0 1 0 4Zm.59 5.56c.56-1.09 1.03-2.3 1.38-3.56h2.95a8 8 0 0 1-4.33 3.56ZM16.36 14a16.5 16.5 0 0 0 0-4h3.38a7.8 7.8 0 0 1 0 4h-3.38Z" />
+                  </svg>
+                  <span>Language</span>
+                  <span class="menu-list__meta">EN</span>
+                </a>
+              </li>
+              <li>
+                <a class="menu-list__item" role="menuitem" routerLink="." (click)="closePanel()">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
+                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v3h16v-3c0-2.76-3.58-5-8-5Z" />
+                  </svg>
+                  <span>My profile</span>
+                </a>
+              </li>
+            </ul>
+
+            <div class="menu-list menu-list--footer">
+              <button class="menu-list__item menu-list__item--danger" type="button" role="menuitem" (click)="onLogout()">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" aria-hidden="true">
+                  <path d="M16 17v-3H9v-4h7V7l5 5-5 5ZM14 2a2 2 0 0 1 2 2v2h-2V4H5v16h9v-2h2v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9Z" />
+                </svg>
+                <span>Sign out</span>
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</header>

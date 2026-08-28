@@ -1,0 +1,44 @@
+@use 'abstractions' as *;
+
+.pager {
+  @include flex(row, center, space-between, spacing('4'));
+  padding-top: spacing('4');
+  flex-wrap: wrap;
+
+  &__summary {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+  }
+
+  &__controls {
+    @include flex(row, center, flex-start, spacing('1'));
+  }
+
+  &__btn {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 spacing('2');
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    border-radius: radius('md');
+    font-size: font-size('sm');
+    color: var(--color-text);
+    transition: background $transition-fast;
+    @include focus-ring;
+
+    &:hover:not(:disabled) {
+      background: var(--color-hover);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &--active {
+      background: var(--color-primary);
+      color: var(--color-on-primary);
+      border-color: var(--color-primary);
+    }
+  }
+}

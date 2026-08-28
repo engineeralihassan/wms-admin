@@ -5,12 +5,13 @@
 
 <app-card title="All users">
   <div card-actions class="toolbar">
+    <label class="visually-hidden" for="users-search">Search users by name or email</label>
     <input
+      id="users-search"
       class="search"
       type="search"
       placeholder="Search name or email…"
       (input)="onSearchInput($event)"
-      aria-label="Search users"
     />
   </div>
 

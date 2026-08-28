@@ -1,30 +1,36 @@
+<a class="skip-link" href="#main-content">Skip to content</a>
+
 <div class="layout" [class.layout--collapsed]="!sidebarOpen()">
   <!-- Global loading bar -->
   @if (loading.isLoading()) {
-    <div class="layout__progress" role="progressbar" aria-label="Loading"></div>
+    <div class="layout__progress" role="progressbar" aria-label="Loading" aria-live="polite"></div>
   }
 
   <!-- Sidebar -->
-  <aside class="sidebar">
+  <aside class="sidebar" aria-label="Primary">
     <div class="sidebar__brand">
-      <span class="sidebar__logo">W</span>
+      <span class="sidebar__logo" aria-hidden="true">W</span>
       @if (sidebarOpen()) {
         <span class="sidebar__name">{{ appName }}</span>
       }
     </div>
 
-    <nav class="sidebar__nav">
+    <nav class="sidebar__nav" aria-label="Main navigation">
       @for (item of navItems(); track item.route) {
         <a
           class="nav-item"
           [routerLink]="item.route"
           routerLinkActive="nav-item--active"
+          #rla="routerLinkActive"
+          [attr.aria-current]="rla.isActive ? 'page' : null"
         >
           <svg class="nav-item__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path [attr.d]="item.icon" />
           </svg>
           @if (sidebarOpen()) {
             <span class="nav-item__label">{{ item.label }}</span>
+          } @else {
+            <span class="visually-hidden">{{ item.label }}</span>
           }
         </a>
       }
@@ -33,29 +39,14 @@
 
   <!-- Main column -->
   <div class="main">
-    <header class="topbar">
-      <button class="topbar__toggle" type="button" (click)="toggleSidebar()" aria-label="Toggle sidebar">
-        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-          <path d="M3 6h18v2H3V6Zm0 5h18v2H3v-2Zm0 5h18v2H3v-2Z" />
-        </svg>
-      </button>
+    <app-topbar
+      [user]="user()"
+      [sidebarOpen]="sidebarOpen()"
+      (toggleSidebar)="toggleSidebar()"
+      (logout)="logout()"
+    />
 
-      <div class="topbar__spacer"></div>
-
-      @if (user(); as u) {
-        <div class="topbar__user">
-          <div class="avatar">{{ userInitials() }}</div>
-          <div class="topbar__user-meta">
-            <span class="topbar__user-name">{{ u.first_name }} {{ u.last_name }}</span>
-            <span class="topbar__user-email">{{ u.email }}</span>
-          </div>
-        </div>
-      }
-
-      <button class="topbar__logout" type="button" (click)="logout()">Logout</button>
-    </header>
-
-    <main class="content">
+    <main id="main-content" class="content" tabindex="-1">
       <router-outlet />
     </main>
   </div>

@@ -40,12 +40,13 @@
 
 <app-card title="All organizations">
   <div card-actions class="toolbar">
+    <label class="visually-hidden" for="orgs-search">Search organizations by name or slug</label>
     <input
+      id="orgs-search"
       class="search"
       type="search"
       placeholder="Search name or slug…"
       (input)="onSearchInput($event)"
-      aria-label="Search organizations"
     />
   </div>
 

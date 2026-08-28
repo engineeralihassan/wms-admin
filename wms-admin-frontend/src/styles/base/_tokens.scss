@@ -1,0 +1,30 @@
+// =============================================================================
+// Runtime design tokens — CSS custom properties on :root.
+//
+// Generated FROM the SCSS palette so there's one source of truth. Components use
+// these var(--*) tokens (never raw hex), which makes runtime theming — e.g. a
+// dark theme by overriding :root under [data-theme='dark'] — a single-file change.
+// =============================================================================
+
+@use '../abstractions/variables' as v;
+@use 'sass:map';
+
+:root {
+  // Colors — emitted from the SCSS palette map.
+  @each $name, $value in v.$palette {
+    --color-#{$name}: #{$value};
+  }
+
+  // Spacing
+  @each $name, $value in v.$spacing {
+    --space-#{$name}: #{$value};
+  }
+
+  // Radii
+  @each $name, $value in v.$radius {
+    --radius-#{$name}: #{$value};
+  }
+
+  // Typography
+  --font-sans: #{v.$font-family-sans};
+}

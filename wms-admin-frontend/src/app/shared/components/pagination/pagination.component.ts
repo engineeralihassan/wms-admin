@@ -10,56 +10,28 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (totalPages() > 1 || total() > 0) {
-      <div class="pager">
+      <nav class="pager" aria-label="Pagination">
         <span class="pager__summary">{{ rangeStart() }}–{{ rangeEnd() }} of {{ total() }}</span>
         <div class="pager__controls">
-          <button class="pager__btn" [disabled]="page() <= 1" (click)="go(1)" aria-label="First">«</button>
-          <button class="pager__btn" [disabled]="page() <= 1" (click)="go(page() - 1)" aria-label="Previous">‹</button>
+          <button class="pager__btn" type="button" [disabled]="page() <= 1" (click)="go(1)" aria-label="First page">«</button>
+          <button class="pager__btn" type="button" [disabled]="page() <= 1" (click)="go(page() - 1)" aria-label="Previous page">‹</button>
           @for (p of pages(); track p) {
             <button
               class="pager__btn"
+              type="button"
               [class.pager__btn--active]="p === page()"
+              [attr.aria-current]="p === page() ? 'page' : null"
+              [attr.aria-label]="'Page ' + p"
               (click)="go(p)"
             >{{ p }}</button>
           }
-          <button class="pager__btn" [disabled]="page() >= totalPages()" (click)="go(page() + 1)" aria-label="Next">›</button>
-          <button class="pager__btn" [disabled]="page() >= totalPages()" (click)="go(totalPages())" aria-label="Last">»</button>
+          <button class="pager__btn" type="button" [disabled]="page() >= totalPages()" (click)="go(page() + 1)" aria-label="Next page">›</button>
+          <button class="pager__btn" type="button" [disabled]="page() >= totalPages()" (click)="go(totalPages())" aria-label="Last page">»</button>
         </div>
-      </div>
+      </nav>
     }
   `,
-  styles: [
-    `
-      .pager {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        padding-top: 1rem;
-        flex-wrap: wrap;
-      }
-      .pager__summary { font-size: 0.8rem; color: var(--color-text-muted, #64748b); }
-      .pager__controls { display: flex; gap: 0.25rem; }
-      .pager__btn {
-        min-width: 34px;
-        height: 34px;
-        padding: 0 0.5rem;
-        border: 1px solid var(--color-border, #e2e8f0);
-        background: #fff;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        cursor: pointer;
-        color: var(--color-text, #0f172a);
-      }
-      .pager__btn:hover:not(:disabled) { background: var(--color-hover, #f1f5f9); }
-      .pager__btn:disabled { opacity: 0.5; cursor: not-allowed; }
-      .pager__btn--active {
-        background: var(--color-primary, #2563eb);
-        color: #fff;
-        border-color: var(--color-primary, #2563eb);
-      }
-    `,
-  ],
+  styleUrl: './pagination.component.scss',
 })
 export class PaginationComponent {
   readonly page = input.required<number>();

@@ -1,0 +1,25 @@
+@use 'abstractions' as *;
+
+.auth {
+  min-height: 100dvh;
+  @include flex(row, center, center);
+  padding: spacing('6');
+  background: linear-gradient(135deg, var(--color-primary-900) 0%, var(--color-primary) 100%);
+
+  &__panel {
+    width: 100%;
+    max-width: 420px;
+    background: var(--color-surface);
+    border-radius: radius('xl');
+    padding: spacing('8');
+    box-shadow: shadow('lg');
+  }
+
+  &__brand {
+    font-size: font-size('xl');
+    font-weight: font-weight('bold');
+    color: var(--color-primary-900);
+    text-align: center;
+    margin-bottom: spacing('6');
+  }
+}

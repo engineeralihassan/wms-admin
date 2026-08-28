@@ -1,0 +1,54 @@
+// =============================================================================
+// Functions — typed accessors for the design tokens.
+// Using these instead of map.get directly gives clear errors on typos.
+// =============================================================================
+
+@use 'sass:map';
+@use 'variables' as v;
+
+/// Spacing accessor: spacing('4') -> 1rem
+@function spacing($key) {
+  @if not map.has-key(v.$spacing, $key) {
+    @error 'Unknown spacing key "#{$key}".';
+  }
+  @return map.get(v.$spacing, $key);
+}
+
+/// Radius accessor: radius('md') -> 8px
+@function radius($key) {
+  @if not map.has-key(v.$radius, $key) {
+    @error 'Unknown radius key "#{$key}".';
+  }
+  @return map.get(v.$radius, $key);
+}
+
+/// Font-size accessor.
+@function font-size($key) {
+  @return map.get(v.$font-size, $key);
+}
+
+/// Font-weight accessor.
+@function font-weight($key) {
+  @return map.get(v.$font-weight, $key);
+}
+
+/// Shadow accessor.
+@function shadow($key) {
+  @return map.get(v.$shadow, $key);
+}
+
+/// Z-index accessor: z('modal') -> 1000
+@function z($key) {
+  @if not map.has-key(v.$z-layers, $key) {
+    @error 'Unknown z-layer "#{$key}".';
+  }
+  @return map.get(v.$z-layers, $key);
+}
+
+/// Breakpoint accessor.
+@function breakpoint($key) {
+  @if not map.has-key(v.$breakpoints, $key) {
+    @error 'Unknown breakpoint "#{$key}".';
+  }
+  @return map.get(v.$breakpoints, $key);
+}

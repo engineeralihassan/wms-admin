@@ -17,23 +17,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       aria-label="Loading"
     ></span>
   `,
-  styles: [
-    `
-      .spinner {
-        display: inline-block;
-        border-radius: 50%;
-        border-style: solid;
-        border-color: var(--color-border, #e2e8f0);
-        border-top-color: var(--color-primary, #2563eb);
-        animation: spin 0.6s linear infinite;
-      }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-    `,
-  ],
+  styleUrl: './spinner.component.scss',
 })
 export class SpinnerComponent {
   readonly size = input(24);

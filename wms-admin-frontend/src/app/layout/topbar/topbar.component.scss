@@ -1,0 +1,338 @@
+@use 'abstractions' as *;
+
+:host {
+  display: block;
+}
+
+.topbar {
+  @include flex(row, center, flex-start, spacing('4'));
+  padding: spacing('3') spacing('5');
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+
+  &__toggle {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: radius('md');
+    color: var(--color-text);
+    @include focus-ring;
+
+    &:hover {
+      background: var(--color-hover);
+    }
+  }
+
+  &__spacer {
+    flex: 1;
+  }
+
+  &__actions {
+    @include flex(row, center, flex-start, spacing('2'));
+  }
+}
+
+// Backdrop capturing outside clicks to close a dropdown.
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: z('dropdown');
+  background: transparent;
+  border: 0;
+  cursor: default;
+}
+
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: radius('circle');
+  color: var(--color-text-muted);
+  transition: background $transition-fast, color $transition-fast;
+  @include focus-ring;
+
+  &:hover {
+    background: var(--color-hover);
+    color: var(--color-text);
+  }
+
+  &__badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: radius('pill');
+    background: var(--color-danger);
+    color: var(--color-on-primary);
+    font-size: 0.625rem;
+    font-weight: font-weight('bold');
+    line-height: 16px;
+    text-align: center;
+  }
+}
+
+.avatar-btn {
+  border-radius: radius('circle');
+  @include focus-ring;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: radius('circle');
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: font-size('sm');
+  font-weight: font-weight('bold');
+
+  &--lg {
+    width: 44px;
+    height: 44px;
+    font-size: font-size('md');
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Dropdown panels
+// -----------------------------------------------------------------------------
+.dropdown {
+  position: absolute;
+  top: calc(100% + #{spacing('2')});
+  right: 0;
+  z-index: z('dropdown');
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: radius('lg');
+  box-shadow: shadow('md');
+  overflow: hidden;
+  animation: dropdown-in $transition-fast;
+
+  @include reduced-motion {
+    animation: none;
+  }
+
+  &--wide {
+    width: 320px;
+  }
+
+  &--user {
+    width: 260px;
+  }
+
+  &__header {
+    @include flex(row, center, space-between, spacing('2'));
+    padding: spacing('3') spacing('4');
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  &__title {
+    font-size: font-size('sm');
+    font-weight: font-weight('semibold');
+    color: var(--color-text);
+  }
+
+  &__link {
+    font-size: font-size('xs');
+    font-weight: font-weight('semibold');
+    color: var(--color-primary);
+    @include focus-ring;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+// ---- User card + menu list ----
+.user-card {
+  @include flex(row, center, flex-start, spacing('3'));
+  padding: spacing('4');
+  border-bottom: 1px solid var(--color-border);
+
+  &__info {
+    @include flex(column, flex-start, center);
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: font-size('sm');
+    font-weight: font-weight('semibold');
+    color: var(--color-text);
+    @include truncate;
+    max-width: 170px;
+  }
+
+  &__email {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+    @include truncate;
+    max-width: 170px;
+  }
+
+  &__role {
+    margin-top: spacing('1');
+    font-size: 0.625rem;
+    font-weight: font-weight('semibold');
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-primary);
+  }
+}
+
+.menu-list {
+  padding: spacing('1') 0;
+
+  &--footer {
+    border-top: 1px solid var(--color-border);
+  }
+
+  &__item {
+    @include flex(row, center, flex-start, spacing('3'));
+    width: 100%;
+    padding: spacing('3') spacing('4');
+    font-size: font-size('sm');
+    color: var(--color-text);
+    text-align: left;
+    transition: background $transition-fast;
+    @include focus-ring($offset: -2px);
+
+    svg {
+      color: var(--color-text-muted);
+      flex: none;
+    }
+
+    &:hover {
+      background: var(--color-hover);
+    }
+
+    &--danger {
+      color: var(--color-danger);
+
+      svg {
+        color: var(--color-danger);
+      }
+    }
+  }
+
+  &__meta {
+    margin-left: auto;
+    font-size: font-size('xs');
+    font-weight: font-weight('semibold');
+    color: var(--color-text-muted);
+  }
+}
+
+// ---- Lists ----
+.notif-list,
+.msg-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.notif {
+  @include flex(row, flex-start, flex-start, spacing('3'));
+  padding: spacing('3') spacing('4');
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &--unread {
+    background: var(--color-primary-050);
+  }
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 6px;
+    border-radius: radius('circle');
+    background: var(--color-border);
+    flex: none;
+  }
+
+  &--unread &__dot {
+    background: var(--color-primary);
+  }
+
+  &__body {
+    @include flex(column, flex-start, center, spacing('1'));
+    min-width: 0;
+  }
+
+  &__text {
+    font-size: font-size('sm');
+    color: var(--color-text);
+    line-height: 1.4;
+  }
+
+  &__time {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+  }
+}
+
+.msg {
+  @include flex(row, center, flex-start, spacing('3'));
+  padding: spacing('3') spacing('4');
+  border-bottom: 1px solid var(--color-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__avatar {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: radius('circle');
+    background: var(--color-surface-alt);
+    color: var(--color-text-muted);
+    font-size: font-size('xs');
+    font-weight: font-weight('bold');
+    flex: none;
+  }
+
+  &__body {
+    @include flex(column, flex-start, center);
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__name {
+    font-size: font-size('sm');
+    font-weight: font-weight('semibold');
+    color: var(--color-text);
+  }
+
+  &__preview {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+    @include truncate;
+    max-width: 200px;
+  }
+
+  &__time {
+    font-size: font-size('xs');
+    color: var(--color-text-subtle);
+    flex: none;
+  }
+}

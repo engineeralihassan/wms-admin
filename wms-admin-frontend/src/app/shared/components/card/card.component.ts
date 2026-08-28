@@ -20,33 +20,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       </div>
     </section>
   `,
-  styles: [
-    `
-      .card {
-        background: var(--color-surface, #fff);
-        border: 1px solid var(--color-border, #e2e8f0);
-        border-radius: 12px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-        overflow: hidden;
-      }
-      .card__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1rem 1.25rem;
-        border-bottom: 1px solid var(--color-border, #e2e8f0);
-      }
-      .card__title {
-        margin: 0;
-        font-size: 1rem;
-        font-weight: 600;
-        color: var(--color-text, #0f172a);
-      }
-      .card__body {
-        padding: 1.25rem;
-      }
-    `,
-  ],
+  styleUrl: './card.component.scss',
 })
 export class CardComponent {
   readonly title = input<string>('');
