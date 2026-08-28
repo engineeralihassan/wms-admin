@@ -25,6 +25,15 @@
     }
   }
 
+  &--accent {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+
+    &:hover:not(:disabled) {
+      background: var(--color-accent-dark);
+    }
+  }
+
   &--secondary {
     background: var(--color-surface);
     color: var(--color-text);

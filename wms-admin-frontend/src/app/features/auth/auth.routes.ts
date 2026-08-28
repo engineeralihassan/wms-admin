@@ -33,6 +33,12 @@ export const AUTH_ROUTES: Routes = [
         loadComponent: () =>
           import('./reset-password/reset-password.component').then((m) => m.ResetPasswordComponent),
       },
+      {
+        path: 'activate',
+        title: 'Activate account',
+        loadComponent: () =>
+          import('./activate/activate.component').then((m) => m.ActivateComponent),
+      },
     ],
   },
 ];

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { SpinnerComponent } from '../spinner/spinner.component';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'danger' | 'ghost';
 export type ButtonType = 'button' | 'submit' | 'reset';
 
 /**

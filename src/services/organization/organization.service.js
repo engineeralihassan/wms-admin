@@ -2,12 +2,11 @@ const httpStatus = require('http-status');
 const { Op } = require('sequelize');
 const { sequelize, Organization, User } = require('../../models');
 const ApiError = require('../../utils/ApiError');
-const Encrypter = require('../../helper/encrypter');
 const { getSystemRoleByKey } = require('../role/role.service');
 const { ROLES } = require('../../config/rbac');
-const { enqueueSafe } = require('../email/email.service');
 const { paginate } = require('../../utils/query/paginate');
 const { ORGANIZATION_QUERY_CONFIG } = require('../../config/query-configs');
+const { buildUnusablePassword, sendActivation } = require('../auth/invitation.service');
 
 /** Turn a name into a URL-safe slug (letters, numbers, hyphens). */
 const slugify = (name) =>
@@ -21,7 +20,10 @@ const slugify = (name) =>
  * Create an organization AND its first org_admin in a single transaction.
  * Either both succeed or neither does — no orphan orgs, no admin-less tenants.
  *
- * @param {object} body { name, admin: { first_name, last_name, email, password } }
+ * The org_admin is created as 'invited' with no usable password; they receive an
+ * activation email to set their own password (the super admin never sets it).
+ *
+ * @param {object} body { name, admin: { first_name, last_name, email } }
  */
 const createOrganizationWithAdmin = async (body, res) => {
   const { name, admin } = body;
@@ -36,7 +38,7 @@ const createOrganizationWithAdmin = async (body, res) => {
   }
 
   const orgAdminRole = await getSystemRoleByKey(ROLES.ORG_ADMIN);
-  const enc = await Encrypter.password_enc(admin.password);
+  const enc = await buildUnusablePassword();
 
   const result = await sequelize.transaction(async (transaction) => {
     const organization = await Organization.create(
@@ -53,7 +55,7 @@ const createOrganizationWithAdmin = async (body, res) => {
         salt: enc.salt,
         organization_id: organization.id,
         role_id: orgAdminRole.id,
-        status: 'active',
+        status: 'invited',
       },
       { transaction }
     );
@@ -62,10 +64,7 @@ const createOrganizationWithAdmin = async (body, res) => {
   });
 
   // Only email AFTER the transaction commits (never for a rolled-back org).
-  enqueueSafe('organization_welcome', result.adminUser.email, {
-    firstName: result.adminUser.first_name,
-    organizationName: result.organization.name,
-  });
+  await sendActivation(result.adminUser, result.organization.name);
 
   return result;
 };

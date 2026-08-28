@@ -14,38 +14,46 @@
 
 // ---- Color palette (raw scale) ----
 $palette: (
-  'primary': #2563eb,
-  'primary-dark': #1d4ed8,
-  'primary-900': #1e3a8a,
-  'primary-050': #eff6ff,
-  'danger': #dc2626,
-  'danger-050': #fee2e2,
-  'danger-700': #991b1b,
-  'success': #16a34a,
-  'success-050': #dcfce7,
-  'success-700': #166534,
-  'warning': #d97706,
-  'warning-050': #fef9c3,
-  'warning-700': #854d0e,
-  'info': #2563eb,
+  // Brand: indigo / periwinkle (PlatForm dashboard scheme).
+  'primary': #5a6acf,
+  'primary-dark': #4553bd,
+  'primary-900': #2f3a8f,
+  'primary-050': #eef0fb,
+
+  // Accent: warm amber/orange (used for highlights / attention).
+  'accent': #f7a325,
+  'accent-dark': #dd8b12,
+  'accent-050': #fdf1dc,
+
+  'danger': #e5484d,
+  'danger-050': #fdeaea,
+  'danger-700': #b32328,
+  'success': #2fb968,
+  'success-050': #e4f7ed,
+  'success-700': #1c8248,
+  'warning': #f7a325,
+  'warning-050': #fdf1dc,
+  'warning-700': #8a5a06,
+  'info': #5a6acf,
 
   // On-color text (foreground used on top of filled/brand backgrounds).
   'on-primary': #ffffff,
+  'on-accent': #ffffff,
 
-  // Neutrals
-  'bg': #f8fafc,
+  // Neutrals (light, lavender-tinted UI)
+  'bg': #f4f5fd,
   'surface': #ffffff,
-  'surface-alt': #f1f5f9,
-  'border': #e2e8f0,
-  'hover': #f1f5f9,
-  'text': #0f172a,
-  'text-muted': #64748b,
-  'text-subtle': #94a3b8,
-  'overlay': rgba(15, 23, 42, 0.5),
+  'surface-alt': #f4f5fd,
+  'border': #e6e8f5,
+  'hover': #eef0fb,
+  'text': #2b2f3a,
+  'text-muted': #7c809b,
+  'text-subtle': #a8acc4,
+  'overlay': rgba(43, 47, 58, 0.5),
 
-  // Sidebar (dark surface)
-  'sidebar-bg': #0f172a,
-  'sidebar-text': #cbd5e1,
+  // Sidebar: LIGHT rail (white) to match this scheme.
+  'sidebar-bg': #ffffff,
+  'sidebar-text': #7c809b,
 );
 
 @function palette($name) {

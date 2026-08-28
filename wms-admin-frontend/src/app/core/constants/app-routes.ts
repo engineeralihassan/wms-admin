@@ -5,6 +5,7 @@ export const APP_ROUTES = {
   login: '/auth/login',
   forgotPassword: '/auth/forgot-password',
   resetPassword: '/auth/reset-password',
+  activate: '/auth/activate',
   dashboard: '/dashboard',
   users: '/users',
   organizations: '/organizations',

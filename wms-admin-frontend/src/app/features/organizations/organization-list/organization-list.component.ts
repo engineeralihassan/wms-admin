@@ -47,7 +47,6 @@ export class OrganizationListComponent {
     first_name: ['', [Validators.required]],
     last_name: ['', [Validators.required]],
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]],
   });
 
   constructor() {
@@ -76,7 +75,6 @@ export class OrganizationListComponent {
           first_name: v.first_name,
           last_name: v.last_name,
           email: v.email,
-          password: v.password,
         },
       })
       .subscribe({

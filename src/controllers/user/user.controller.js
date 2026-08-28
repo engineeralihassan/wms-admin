@@ -39,4 +39,13 @@ const getOne = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('userFound'), data: toDto(user) });
 });
 
-module.exports = { create, list, getOne };
+/**
+ * POST /users/:uuid/resend-invite  (requires user.create)
+ * Re-sends the activation email for an invited user. Tenant + ownership scoped.
+ */
+const resendInvite = catchAsync(async (req, res) => {
+  await userService.resendInvite(req.params.uuid, req, res);
+  res.status(httpStatus.OK).send({ message: res.__('invite_resent'), data: null });
+});
+
+module.exports = { create, list, getOne, resendInvite };

@@ -38,7 +38,11 @@ const signIn = async (body, res) => {
     throw new ApiError(httpStatus.FORBIDDEN, res.__('account_locked'));
   }
 
-  // Disabled / not-yet-active account?
+  // Invited but not yet activated?
+  if (user.status === 'invited') {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('account_not_activated'));
+  }
+  // Disabled / any other non-active state?
   if (user.status !== 'active') {
     throw new ApiError(httpStatus.FORBIDDEN, res.__('account_inactive'));
   }
@@ -177,6 +181,60 @@ const resetPassword = async (token, newPassword, res) => {
   return true;
 };
 
+/**
+ * Validate an activation (invite) token WITHOUT consuming it. Used by the frontend
+ * to decide whether to render the set-password form or a friendly error.
+ * Returns minimal, safe info; never reveals whether an email exists beyond the token.
+ */
+const verifyActivationToken = async (token, res) => {
+  let payload;
+  try {
+    ({ payload } = await tokenService.verifyToken(token, tokenTypes.INVITE));
+  } catch {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('invalid_token'));
+  }
+  // Single indexed PK lookup — scales fine at millions of users.
+  const user = await User.findByPk(payload.sub, {
+    attributes: ['id', 'email', 'first_name', 'status'],
+  });
+  if (!user || user.status !== 'invited') {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('invalid_token'));
+  }
+  return { email: user.email, firstName: user.first_name };
+};
+
+/**
+ * Activate an invited account: set the chosen password, flip status to 'active',
+ * consume the invite token (one-time), and revoke any other outstanding tokens.
+ */
+const activateAccount = async (token, newPassword, res) => {
+  let payload;
+  let tokenDoc;
+  try {
+    ({ payload, tokenDoc } = await tokenService.verifyToken(token, tokenTypes.INVITE));
+  } catch {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('invalid_token'));
+  }
+
+  const user = await User.findByPk(payload.sub);
+  if (!user || user.status !== 'invited') {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('invalid_token'));
+  }
+
+  const enc = await Encrypter.password_enc(newPassword);
+  user.password = enc.encr;
+  user.salt = enc.salt;
+  user.status = 'active';
+  user.failed_login_attempts = 0;
+  user.locked_until = null;
+  await user.save();
+
+  // Consume this invite token and clear any other invite tokens for the user.
+  await tokenService.revokeToken(tokenDoc.token);
+  await tokenService.revokeAllUserTokens(user.id, tokenTypes.INVITE);
+  return true;
+};
+
 /** Load the safe profile fields for the authenticated user (used by /auth/me). */
 const getProfile = async (userId) => {
   return User.findByPk(userId, {
@@ -190,5 +248,7 @@ module.exports = {
   logout,
   requestPasswordReset,
   resetPassword,
+  verifyActivationToken,
+  activateAccount,
   getProfile,
 };

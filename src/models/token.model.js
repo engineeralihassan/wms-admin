@@ -1,7 +1,12 @@
 const { DataTypes } = require('sequelize');
 const { tokenTypes } = require('../config/tokens');
 
-const token_type = [tokenTypes.REFRESH, tokenTypes.RESET_PASSWORD, tokenTypes.VERIFY_EMAIL];
+const token_type = [
+  tokenTypes.REFRESH,
+  tokenTypes.RESET_PASSWORD,
+  tokenTypes.VERIFY_EMAIL,
+  tokenTypes.INVITE,
+];
 
 module.exports = (sequelize) => {
   const Token = sequelize.define(
@@ -26,8 +31,9 @@ module.exports = (sequelize) => {
           key: 'id',
         },
       },
+      // TEXT (not STRING/varchar255): JWTs with embedded claims can exceed 255 chars.
       token: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
         allowNull: false,
       },
       type: {
@@ -54,6 +60,10 @@ module.exports = (sequelize) => {
           unique: true,
           fields: [{ name: 'id' }],
         },
+        // Hot lookup path: verify/revoke tokens for a user by type quickly at scale.
+        { fields: ['user_id', 'type', 'blacklisted'] },
+        // Supports pruning expired tokens without a full scan.
+        { fields: ['expires'] },
       ],
     }
   );

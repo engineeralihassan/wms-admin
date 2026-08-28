@@ -19,6 +19,20 @@ router.post(
 );
 router.post('/reset-password', validate(authValidation.resetPassword), authController.resetPassword);
 
+// Account activation (invite flow): verify the token, then set password + activate.
+router.get(
+  '/activate/verify',
+  loginRateLimiter,
+  validate(authValidation.verifyActivation),
+  authController.verifyActivation
+);
+router.post(
+  '/activate',
+  loginRateLimiter,
+  validate(authValidation.activate),
+  authController.activate
+);
+
 // Protected: returns the current user + resolved authorization context.
 router.get('/me', authVerify, authController.getMe);
 

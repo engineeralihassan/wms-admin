@@ -33,3 +33,15 @@ export interface ResetPasswordRequest {
   token: string;
   password: string;
 }
+
+/** Response of GET /auth/activate/verify. */
+export interface ActivationInfo {
+  email: string;
+  firstName: string;
+}
+
+/** Request body for POST /auth/activate. */
+export interface ActivateRequest {
+  token: string;
+  password: string;
+}

@@ -23,13 +23,10 @@
         <span class="field__label">Admin last name</span>
         <input class="field__input" type="text" formControlName="last_name" />
       </label>
-      <label class="field">
+      <label class="field field--full">
         <span class="field__label">Admin email</span>
         <input class="field__input" type="email" formControlName="email" />
-      </label>
-      <label class="field">
-        <span class="field__label">Admin password</span>
-        <input class="field__input" type="password" formControlName="password" />
+        <span class="field__hint">An activation link will be emailed to the admin to set their own password.</span>
       </label>
       <div class="field__actions">
         <app-button type="submit" variant="primary" [loading]="submitting()">Create</app-button>

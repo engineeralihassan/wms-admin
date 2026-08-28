@@ -11,6 +11,8 @@ import type {
   RefreshData,
   ForgotPasswordRequest,
   ResetPasswordRequest,
+  ActivationInfo,
+  ActivateRequest,
   User,
 } from '../models';
 
@@ -80,6 +82,16 @@ export class AuthService {
     return this.api.post<null>(API_ENDPOINTS.auth.resetPassword, payload, {
       withCredentials: true,
     });
+  }
+
+  /** Validate an invite token before showing the set-password form. */
+  verifyActivation(token: string): Observable<ActivationInfo> {
+    return this.api.get<ActivationInfo>(API_ENDPOINTS.auth.verifyActivation, { token });
+  }
+
+  /** Set the password and activate the account. */
+  activate(payload: ActivateRequest): Observable<null> {
+    return this.api.post<null>(API_ENDPOINTS.auth.activate, payload);
   }
 
   /** Revoke the session server-side (clears the cookie), then clear local state. */

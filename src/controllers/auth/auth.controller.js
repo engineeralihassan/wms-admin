@@ -100,6 +100,24 @@ const resetPassword = catchAsync(async (req, res) => {
 });
 
 /**
+ * GET /auth/activate/verify?token=...
+ * Validates an invite token so the SPA can render the set-password form or an error.
+ */
+const verifyActivation = catchAsync(async (req, res) => {
+  const data = await authService.verifyActivationToken(req.query.token, res);
+  res.status(httpStatus.OK).send({ message: res.__('token_valid'), data });
+});
+
+/**
+ * POST /auth/activate  { token, password }
+ * Sets the password and activates the account (one-time).
+ */
+const activate = catchAsync(async (req, res) => {
+  await authService.activateAccount(req.body.token, req.body.password, res);
+  res.status(httpStatus.OK).send({ message: res.__('account_activated'), data: null });
+});
+
+/**
  * GET /auth/me  (protected)
  * Returns the authenticated user + their resolved authorization context.
  */
@@ -126,5 +144,7 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
+  verifyActivation,
+  activate,
   getMe,
 };

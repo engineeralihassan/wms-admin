@@ -1,11 +1,12 @@
 const httpStatus = require('http-status');
 const { User, Role, Organization } = require('../../models');
 const ApiError = require('../../utils/ApiError');
-const Encrypter = require('../../helper/encrypter');
 const { ROLES, ASSIGNABLE_ROLES_BY_ROLE } = require('../../config/rbac');
-const { enqueueSafe } = require('../email/email.service');
 const { paginate } = require('../../utils/query/paginate');
 const { USER_QUERY_CONFIG } = require('../../config/query-configs');
+const { buildUnusablePassword, sendActivation } = require('../auth/invitation.service');
+const { revokeAllUserTokens } = require('../auth/token.service');
+const { tokenTypes } = require('../../config/tokens');
 
 /** Columns returned for user list/detail (never password/salt). */
 const USER_PUBLIC_ATTRIBUTES = [
@@ -79,7 +80,7 @@ const resolveCreationRules = (auth) => {
  * Role must be permitted for the caller's role. Vendors stamp manager_id = self.
  */
 const createUser = async (body, auth, res) => {
-  const { first_name, last_name, email, password, role: roleKey } = body;
+  const { first_name, last_name, email, role: roleKey } = body;
 
   const { allowedRoles, setManagerToCaller } = resolveCreationRules(auth);
   if (allowedRoles && !allowedRoles.includes(roleKey)) {
@@ -106,7 +107,8 @@ const createUser = async (body, auth, res) => {
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, res.__('something_went_wrong'));
   }
 
-  const enc = await Encrypter.password_enc(password);
+  // Invited users get an unusable password until they activate and set their own.
+  const enc = await buildUnusablePassword();
   let user;
   try {
     user = await User.create({
@@ -118,7 +120,7 @@ const createUser = async (body, auth, res) => {
       organization_id: organizationId,
       role_id: role.id,
       manager_id: setManagerToCaller ? auth.userId : null,
-      status: 'active',
+      status: 'invited',
     });
   } catch (err) {
     // Authoritative guard against the email-uniqueness race: two concurrent creates
@@ -129,11 +131,8 @@ const createUser = async (body, auth, res) => {
     throw err;
   }
 
-  // Fire-and-forget welcome email; never blocks or fails the API response.
-  enqueueSafe('welcome', user.email, {
-    firstName: user.first_name,
-    organizationName: organization.name,
-  });
+  // Fire-and-forget activation email (queued; never blocks the API response).
+  await sendActivation(user, organization.name);
 
   return user;
 };
@@ -165,9 +164,33 @@ const getUserByUuid = async (uuid, req, res) => {
   return user;
 };
 
+/**
+ * Resend the activation invite for an 'invited' user (the secure fallback for giving
+ * someone access — the admin never sets a password directly). Tenant + ownership
+ * scoped, so an org_admin/vendor can only resend for users they can see.
+ * Re-issues a fresh invite token (old ones are revoked) and enqueues the email.
+ */
+const resendInvite = async (uuid, req, res) => {
+  const user = await User.findOne({
+    where: { uuid, ...buildUserScope(req) },
+    include: [{ model: Organization, as: 'organization', attributes: ['name'] }],
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('user_not_found'));
+  }
+  if (user.status !== 'invited') {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('user_already_active'));
+  }
+  // Invalidate any previous invite tokens, then issue + email a fresh one.
+  await revokeAllUserTokens(user.id, tokenTypes.INVITE);
+  await sendActivation(user, user.organization ? user.organization.name : '');
+  return true;
+};
+
 module.exports = {
   createUser,
   listUsers,
   getUserByUuid,
+  resendInvite,
   buildUserScope,
 };

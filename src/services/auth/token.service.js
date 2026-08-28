@@ -128,6 +128,18 @@ const generateResetPasswordToken = async (user) => {
   return { token, expires: expires.toDate() };
 };
 
+/**
+ * Generate + persist a longer-lived account-activation (invite) token.
+ * Longer expiry than a reset (default 7 days) since an invitee may not check
+ * email immediately. One-time use — consumed when the password is set.
+ */
+const generateInviteToken = async (user) => {
+  const expires = moment().add(Number(process.env.JWT_INVITE_EXPIRATION_DAYS || 7), 'days');
+  const token = generateToken({ userId: user.id, uuid: user.uuid }, expires, tokenTypes.INVITE);
+  await saveToken(token, user.id, expires, tokenTypes.INVITE);
+  return { token, expires: expires.toDate() };
+};
+
 module.exports = {
   generateToken,
   saveToken,
@@ -136,4 +148,5 @@ module.exports = {
   revokeAllUserTokens,
   generateAuthTokens,
   generateResetPasswordToken,
+  generateInviteToken,
 };

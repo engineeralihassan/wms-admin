@@ -39,4 +39,25 @@ const resetPassword = {
   }),
 };
 
-module.exports = { signIn, refresh, logout, forgotPassword, resetPassword };
+const verifyActivation = {
+  query: Joi.object().keys({
+    token: Joi.string().required(),
+  }),
+};
+
+const activate = {
+  body: Joi.object().keys({
+    token: Joi.string().required(),
+    password: Joi.string().required().custom(password),
+  }),
+};
+
+module.exports = {
+  signIn,
+  refresh,
+  logout,
+  forgotPassword,
+  resetPassword,
+  verifyActivation,
+  activate,
+};

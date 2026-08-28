@@ -36,4 +36,16 @@ router
     userController.getOne
   );
 
+// Secure fallback for granting access: resend the activation invite (never set a
+// password on behalf of the user). Requires user.create + tenant/ownership scope.
+router
+  .route('/:uuid/resend-invite')
+  .post(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_CREATE),
+    validate(userValidation.getUser),
+    userController.resendInvite
+  );
+
 module.exports = router;

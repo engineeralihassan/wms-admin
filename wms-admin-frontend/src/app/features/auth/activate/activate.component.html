@@ -1,0 +1,64 @@
+@switch (phase()) {
+  @case ('verifying') {
+    <div class="auth-form" style="align-items: center;">
+      <app-spinner [size]="32" />
+      <p class="auth-form__subtitle">Verifying your invitation…</p>
+    </div>
+  }
+
+  @case ('invalid') {
+    <div class="auth-form">
+      <h1 class="auth-form__title">Invitation link invalid</h1>
+      <p class="auth-form__subtitle">
+        This activation link is invalid or has expired. Please ask your administrator to
+        resend the invitation.
+      </p>
+      <p class="auth-form__footer"><a [routerLink]="loginLink">Back to sign in</a></p>
+    </div>
+  }
+
+  @case ('ready') {
+    <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <h1 class="auth-form__title">Welcome{{ firstName() ? ', ' + firstName() : '' }}!</h1>
+      <p class="auth-form__subtitle">Set a password to activate your account.</p>
+
+      <div class="field">
+        <label class="field__label" for="activate-password">Password</label>
+        <input
+          id="activate-password"
+          class="field__input"
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+          [class.field__input--error]="isInvalid('password')"
+          [attr.aria-invalid]="isInvalid('password')"
+          [attr.aria-describedby]="isInvalid('password') ? 'activate-password-error' : null"
+        />
+        @if (isInvalid('password')) {
+          <span id="activate-password-error" class="field__error" role="alert">{{ errorFor('password', 'Password') }}</span>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="activate-confirm">Confirm password</label>
+        <input
+          id="activate-confirm"
+          class="field__input"
+          type="password"
+          formControlName="confirm"
+          autocomplete="new-password"
+          [class.field__input--error]="mismatch"
+          [attr.aria-invalid]="mismatch"
+          [attr.aria-describedby]="mismatch ? 'activate-confirm-error' : null"
+        />
+        @if (mismatch) {
+          <span id="activate-confirm-error" class="field__error" role="alert">Passwords do not match.</span>
+        }
+      </div>
+
+      <app-button type="submit" variant="secondary" [loading]="submitting()">Activate account</app-button>
+
+      <p class="auth-form__footer"><a [routerLink]="loginLink">Back to sign in</a></p>
+    </form>
+  }
+}

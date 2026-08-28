@@ -40,6 +40,7 @@
 .sidebar {
   background: var(--color-sidebar-bg);
   color: var(--color-sidebar-text);
+  border-right: 1px solid var(--color-border);
   @include flex(column, stretch, flex-start, spacing('6'));
   padding: spacing('4') spacing('3');
 
@@ -62,7 +63,7 @@
 
   &__name {
     font-weight: font-weight('bold');
-    color: var(--color-on-primary);
+    color: var(--color-text);
     white-space: nowrap;
   }
 
@@ -79,7 +80,7 @@
   font-size: font-size('sm');
   font-weight: font-weight('medium');
   transition: background $transition-fast, color $transition-fast;
-  @include focus-ring(var(--color-on-primary));
+  @include focus-ring;
 
   &__icon {
     width: 20px;
@@ -92,8 +93,8 @@
   }
 
   &:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--color-on-primary);
+    background: var(--color-hover);
+    color: var(--color-text);
   }
 
   &--active {

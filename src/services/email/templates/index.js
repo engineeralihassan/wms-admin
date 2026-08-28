@@ -61,6 +61,45 @@ const TEMPLATES = {
     };
   },
 
+  /**
+   * Sent when an account is created for someone (org_admin, vendor, consultant).
+   * Contains a tokenized activation link where they set their password.
+   */
+  account_activation: (data) => {
+    const {
+      firstName = 'there',
+      organizationName = '',
+      activationUrl = '#',
+      expiresInDays = 7,
+      appName,
+    } = data;
+    const orgLine = organizationName
+      ? `<p style="margin:0 0 12px;">You've been added to <strong>${escapeHtml(
+          organizationName
+        )}</strong> on ${escapeHtml(appName)}.</p>`
+      : '';
+    return {
+      subject: `Activate your ${appName} account`,
+      html: wrap({
+        appName,
+        title: `Welcome, ${escapeHtml(firstName)}!`,
+        bodyHtml: `
+          ${orgLine}
+          <p style="margin:0 0 16px;">To get started, set your password and activate your account. This link expires in ${Number(
+            expiresInDays
+          )} days.</p>
+          <p style="margin:0 0 20px;">
+            <a href="${escapeHtml(
+              activationUrl
+            )}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:bold;">Set your password</a>
+          </p>
+          <p style="margin:0;color:#64748b;font-size:13px;">If you weren't expecting this, you can safely ignore this email.</p>
+        `,
+      }),
+      text: `Welcome, ${firstName}! Activate your ${appName} account and set your password (link expires in ${expiresInDays} days): ${activationUrl}`,
+    };
+  },
+
   /** Sent to the first admin when a new organization is created. */
   organization_welcome: (data) => {
     const { firstName = 'there', organizationName = 'your organization', appName } = data;
