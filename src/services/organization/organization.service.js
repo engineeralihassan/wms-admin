@@ -75,8 +75,19 @@ const createOrganizationWithAdmin = async (body, res) => {
  */
 const listOrganizations = async (rawQuery) => {
   return paginate(Organization, rawQuery, ORGANIZATION_QUERY_CONFIG, {
-    attributes: ['id', 'uuid', 'name', 'slug', 'is_active', 'created_at'],
+    attributes: ['id', 'uuid', 'name', 'slug', 'is_active', 'createdAt'],
   });
+};
+
+/** Enable or disable a tenant. Route authorization limits this to super admins. */
+const updateOrganizationStatus = async (uuid, isActive, res) => {
+  const organization = await Organization.findOne({ where: { uuid } });
+  if (!organization) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('organization_not_found'));
+  }
+  organization.is_active = isActive;
+  await organization.save();
+  return organization;
 };
 
 /**
@@ -101,4 +112,5 @@ const uniqueSlug = async (base) => {
 module.exports = {
   createOrganizationWithAdmin,
   listOrganizations,
+  updateOrganizationStatus,
 };

@@ -48,12 +48,14 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       const isAuthCall =
         req.url.includes(API_ENDPOINTS.auth.signIn) ||
         req.url.includes(API_ENDPOINTS.auth.refresh);
+      const isSignInCall = req.url.includes(API_ENDPOINTS.auth.signIn);
 
       if (error.status === 401 && !isAuthCall) {
         return handle401(req, next, auth, router, notify);
       }
       if (error.status === 401) {
         auth.clearSession();
+        if (isSignInCall) notify.error(extractMessage(error));
         void router.navigate([APP_ROUTES.login]);
       } else if (error.status === 0) {
         notify.error('Cannot reach the server. Check your connection.');

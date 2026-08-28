@@ -3,10 +3,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { OrganizationsService } from '../services/organizations.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { CardComponent } from '../../../shared/components/card/card.component';
-import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
-import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
-import { SortHeaderComponent } from '../../../shared/components/sort-header/sort-header.component';
+import { DataTableComponent, type DataTableAction, type DataTableColumn, type DataTableDateRangeFilter, type DataTableFilter } from '../../../shared/components/data-table/data-table.component';
 import { markAllAsTouched } from '../../../shared/utils/form.utils';
 import { createListState } from '../../../shared/list/list-state';
 import type { Organization } from '../models/organization.model';
@@ -21,10 +19,8 @@ import type { Organization } from '../models/organization.model';
   imports: [
     ReactiveFormsModule,
     CardComponent,
-    SpinnerComponent,
     ButtonComponent,
-    PaginationComponent,
-    SortHeaderComponent,
+    DataTableComponent,
   ],
   templateUrl: './organization-list.component.html',
   styleUrl: './organization-list.component.scss',
@@ -42,6 +38,27 @@ export class OrganizationListComponent {
     { sortBy: 'created_at', sortDir: 'desc', limit: 10 },
   );
 
+  protected readonly columns: ReadonlyArray<DataTableColumn<Organization>> = [
+    { key: 'name', label: 'Organization', sortable: true, value: (o) => o.name },
+    { key: 'slug', label: 'Slug', sortable: true, value: (o) => o.slug, tone: 'code' },
+    { key: 'is_active', label: 'Status', sortable: true, value: (o) => o.is_active ? 'Active' : 'Inactive', tone: 'status' },
+    { key: 'created_at', label: 'Created', sortable: true, value: (o) => this.formatDate(o.created_at), tone: 'muted' },
+  ];
+  protected readonly filters: ReadonlyArray<DataTableFilter> = [
+    { key: 'is_active', label: 'Status', options: [
+      { label: 'All statuses', value: '' }, { label: 'Active', value: 'true' }, { label: 'Inactive', value: 'false' },
+    ] },
+  ];
+  protected readonly dateRangeFilter: DataTableDateRangeFilter = {
+    label: 'Created date', fromKey: 'created_at_from', toKey: 'created_at_to',
+  };
+  protected readonly actions: ReadonlyArray<DataTableAction<Organization>> = [
+    {
+      id: 'toggle-status', label: 'Change status', icon: '↻',
+    },
+  ];
+  protected readonly searchValue = signal('');
+
   protected readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.minLength(2)]],
     first_name: ['', [Validators.required]],
@@ -57,8 +74,28 @@ export class OrganizationListComponent {
     this.showForm.update((v) => !v);
   }
 
-  protected onSearchInput(event: Event): void {
-    this.list.onSearch((event.target as HTMLInputElement).value);
+  protected formatDate(value?: string): string {
+    return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value)) : '—';
+  }
+
+  protected onSearch(value: string): void {
+    this.searchValue.set(value);
+    this.list.onSearch(value);
+  }
+
+  protected onAction(event: { actionId: string; row: Organization }): void {
+    if (event.actionId !== 'toggle-status') return;
+
+    const nextStatus = !event.row.is_active;
+    const action = nextStatus ? 'activate' : 'deactivate';
+    if (!globalThis.confirm(`Are you sure you want to ${action} ${event.row.name}?`)) return;
+
+    this.orgs.updateStatus(event.row.uuid, nextStatus).subscribe({
+      next: () => {
+        this.notify.success(`${event.row.name} ${nextStatus ? 'activated' : 'deactivated'}.`);
+        this.list.reload();
+      },
+    });
   }
 
   protected submit(): void {

@@ -1,4 +1,4 @@
-const { User, Role, Permission } = require('../../models');
+const { User, Role, Permission, Organization } = require('../../models');
 const { ROLES } = require('../../config/rbac');
 
 /**
@@ -19,10 +19,11 @@ const buildAuthContext = async (userId) => {
         as: 'role',
         include: [{ model: Permission, as: 'permissions', attributes: ['key'], through: { attributes: [] } }],
       },
+      { model: Organization, as: 'organization', attributes: ['is_active'] },
     ],
   });
 
-  if (!user || !user.role) {
+  if (!user || !user.role || (user.organization && !user.organization.is_active)) {
     return null;
   }
 

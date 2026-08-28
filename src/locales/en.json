@@ -27,6 +27,7 @@
   "forbidden": "You do not have permission to perform this action",
   "account_locked": "Account temporarily locked due to too many failed attempts",
   "account_inactive": "This account is not active",
+  "organization_inactive": "This organization is currently inactive",
   "too_many_attempts": "Too many attempts. Please try again later.",
   "organization_required": "An organization is required",
   "organization_not_found": "Organization not found",

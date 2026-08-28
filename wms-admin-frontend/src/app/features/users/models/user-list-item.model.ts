@@ -10,5 +10,7 @@ export interface UserListItem {
   status: string;
   organization_id: number | null;
   manager_id: number | null;
+  created_at?: string;
   role?: { key: string; name: string };
+  organization?: { id: number; uuid: string; name: string; slug: string };
 }

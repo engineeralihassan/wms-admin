@@ -55,6 +55,14 @@
     }
   }
 
+  &__password-control {
+    position: relative;
+    display: block;
+
+    .field__input { padding-right: 3rem; }
+    app-password-visibility-toggle { position: absolute; top: 50%; right: spacing('1'); transform: translateY(-50%); }
+  }
+
   &__error {
     font-size: font-size('xs');
     color: var(--color-danger);

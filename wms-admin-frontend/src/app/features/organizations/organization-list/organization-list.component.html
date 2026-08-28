@@ -36,63 +36,31 @@
 }
 
 <app-card title="All organizations">
-  <div card-actions class="toolbar">
-    <label class="visually-hidden" for="orgs-search">Search organizations by name or slug</label>
-    <input
-      id="orgs-search"
-      class="search"
-      type="search"
-      placeholder="Search name or slug…"
-      (input)="onSearchInput($event)"
-    />
-  </div>
-
-  @if (list.loading()) {
-    <div class="centered"><app-spinner /></div>
-  } @else if (list.isEmpty()) {
-    <p class="empty">No organizations match your search.</p>
-  } @else {
-    <table class="table">
-      <thead>
-        <tr>
-          <th>
-            <app-sort-header column="name" label="Name"
-              [activeColumn]="list.sortBy()" [direction]="list.sortDir()"
-              (sort)="list.toggleSort($event)" />
-          </th>
-          <th>
-            <app-sort-header column="slug" label="Slug"
-              [activeColumn]="list.sortBy()" [direction]="list.sortDir()"
-              (sort)="list.toggleSort($event)" />
-          </th>
-          <th>
-            <app-sort-header column="is_active" label="Status"
-              [activeColumn]="list.sortBy()" [direction]="list.sortDir()"
-              (sort)="list.toggleSort($event)" />
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (org of list.items(); track org.uuid) {
-          <tr>
-            <td>{{ org.name }}</td>
-            <td>{{ org.slug }}</td>
-            <td>
-              <span class="badge" [class.badge--active]="org.is_active" [class.badge--inactive]="!org.is_active">
-                {{ org.is_active ? 'Active' : 'Inactive' }}
-              </span>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-
-    <app-pagination
-      [page]="list.page()"
-      [totalPages]="list.totalPages()"
-      [total]="list.total()"
-      [limit]="list.limit()"
-      (pageChange)="list.setPage($event)"
-    />
-  }
+  <app-data-table
+    caption="Organizations"
+    [columns]="columns"
+    [rows]="list.items()"
+    [rowId]="org => org.uuid"
+    [loading]="list.loading()"
+    emptyMessage="No organizations match the current search and filters."
+    searchLabel="Search organizations by name or slug"
+    searchPlaceholder="Search name or slug…"
+    [searchValue]="searchValue()"
+    [filters]="filters"
+    [dateRangeFilter]="dateRangeFilter"
+    [filterValues]="list.filters()"
+    [actions]="actions"
+    [page]="list.page()"
+    [totalPages]="list.totalPages()"
+    [total]="list.total()"
+    [limit]="list.limit()"
+    [sortBy]="list.sortBy()"
+    [sortDir]="list.sortDir()"
+    (searchChange)="onSearch($event)"
+    (filterChange)="list.setFilter($event.key, $event.value)"
+    (sortChange)="list.toggleSort($event)"
+    (pageChange)="list.setPage($event)"
+    (pageSizeChange)="list.setLimit($event)"
+    (action)="onAction($event)"
+  />
 </app-card>

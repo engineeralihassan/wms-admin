@@ -23,4 +23,10 @@ export class OrganizationsService {
   create(payload: CreateOrganizationRequest): Observable<CreateOrganizationResponse> {
     return this.api.post<CreateOrganizationResponse>(API_ENDPOINTS.organizations.root, payload);
   }
+
+  updateStatus(uuid: string, isActive: boolean): Observable<Organization> {
+    return this.api.patch<Organization>(API_ENDPOINTS.organizations.status(uuid), {
+      is_active: isActive,
+    });
+  }
 }

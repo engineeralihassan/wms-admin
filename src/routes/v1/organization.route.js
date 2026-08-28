@@ -24,4 +24,12 @@ router
     organizationController.list
   );
 
+router.patch(
+  '/:uuid/status',
+  authVerify,
+  requirePermission(PERMISSIONS.ORG_UPDATE),
+  validate(organizationValidation.updateOrganizationStatus),
+  organizationController.updateStatus
+);
+
 module.exports = router;

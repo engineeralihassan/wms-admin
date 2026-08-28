@@ -18,7 +18,7 @@ const USER_PUBLIC_ATTRIBUTES = [
   'status',
   'organization_id',
   'manager_id',
-  'created_at',
+  'createdAt',
 ];
 
 /**
@@ -147,7 +147,10 @@ const listUsers = async (req) => {
   return paginate(User, req.query, USER_QUERY_CONFIG, {
     scopeWhere: buildUserScope(req),
     attributes: USER_PUBLIC_ATTRIBUTES,
-    include: [{ model: Role, as: 'role', attributes: ['key', 'name'] }],
+    include: [
+      { model: Role, as: 'role', attributes: ['key', 'name'] },
+      { model: Organization, as: 'organization', attributes: ['id', 'uuid', 'name', 'slug'] },
+    ],
   });
 };
 
@@ -156,7 +159,10 @@ const getUserByUuid = async (uuid, req, res) => {
   const user = await User.findOne({
     where: { uuid, ...buildUserScope(req) },
     attributes: USER_PUBLIC_ATTRIBUTES,
-    include: [{ model: Role, as: 'role', attributes: ['key', 'name'] }],
+    include: [
+      { model: Role, as: 'role', attributes: ['key', 'name'] },
+      { model: Organization, as: 'organization', attributes: ['id', 'uuid', 'name', 'slug'] },
+    ],
   });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, res.__('user_not_found'));

@@ -45,10 +45,30 @@ const list = catchAsync(async (req, res) => {
       name: o.name,
       slug: o.slug,
       is_active: o.is_active,
-      created_at: o.created_at,
+      created_at: o.createdAt,
     })),
     meta,
   });
 });
 
-module.exports = { create, list };
+/** PATCH /organizations/:uuid/status — super admin enables or disables a tenant. */
+const updateStatus = catchAsync(async (req, res) => {
+  const organization = await organizationService.updateOrganizationStatus(
+    req.params.uuid,
+    req.body.is_active,
+    res
+  );
+  res.status(httpStatus.OK).send({
+    message: res.__('success'),
+    data: {
+      id: organization.id,
+      uuid: organization.uuid,
+      name: organization.name,
+      slug: organization.slug,
+      is_active: organization.is_active,
+      created_at: organization.createdAt,
+    },
+  });
+});
+
+module.exports = { create, list, updateStatus };

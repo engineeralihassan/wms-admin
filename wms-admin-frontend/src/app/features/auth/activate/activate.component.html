@@ -24,16 +24,19 @@
 
       <div class="field">
         <label class="field__label" for="activate-password">Password</label>
-        <input
-          id="activate-password"
-          class="field__input"
-          type="password"
-          formControlName="password"
-          autocomplete="new-password"
-          [class.field__input--error]="isInvalid('password')"
-          [attr.aria-invalid]="isInvalid('password')"
-          [attr.aria-describedby]="isInvalid('password') ? 'activate-password-error' : null"
-        />
+        <div class="field__password-control">
+          <input
+            id="activate-password"
+            class="field__input"
+            [type]="passwordVisible() ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="new-password"
+            [class.field__input--error]="isInvalid('password')"
+            [attr.aria-invalid]="isInvalid('password')"
+            [attr.aria-describedby]="isInvalid('password') ? 'activate-password-error' : null"
+          />
+          <app-password-visibility-toggle [visible]="passwordVisible()" (toggled)="togglePasswordVisibility('password')" />
+        </div>
         @if (isInvalid('password')) {
           <span id="activate-password-error" class="field__error" role="alert">{{ errorFor('password', 'Password') }}</span>
         }
@@ -41,16 +44,19 @@
 
       <div class="field">
         <label class="field__label" for="activate-confirm">Confirm password</label>
-        <input
-          id="activate-confirm"
-          class="field__input"
-          type="password"
-          formControlName="confirm"
-          autocomplete="new-password"
-          [class.field__input--error]="mismatch"
-          [attr.aria-invalid]="mismatch"
-          [attr.aria-describedby]="mismatch ? 'activate-confirm-error' : null"
-        />
+        <div class="field__password-control">
+          <input
+            id="activate-confirm"
+            class="field__input"
+            [type]="confirmVisible() ? 'text' : 'password'"
+            formControlName="confirm"
+            autocomplete="new-password"
+            [class.field__input--error]="mismatch"
+            [attr.aria-invalid]="mismatch"
+            [attr.aria-describedby]="mismatch ? 'activate-confirm-error' : null"
+          />
+          <app-password-visibility-toggle [visible]="confirmVisible()" (toggled)="togglePasswordVisibility('confirm')" />
+        </div>
         @if (mismatch) {
           <span id="activate-confirm-error" class="field__error" role="alert">Passwords do not match.</span>
         }

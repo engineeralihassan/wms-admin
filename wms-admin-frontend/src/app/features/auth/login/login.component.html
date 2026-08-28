@@ -22,17 +22,20 @@
 
   <div class="field">
     <label class="field__label" for="login-password">Password</label>
-    <input
-      id="login-password"
-      class="field__input"
-      type="password"
-      formControlName="password"
-      autocomplete="current-password"
-      placeholder="••••••••"
-      [class.field__input--error]="isInvalid('password')"
-      [attr.aria-invalid]="isInvalid('password')"
-      [attr.aria-describedby]="isInvalid('password') ? 'login-password-error' : null"
-    />
+    <div class="field__password-control">
+      <input
+        id="login-password"
+        class="field__input"
+        [type]="passwordVisible() ? 'text' : 'password'"
+        formControlName="password"
+        autocomplete="current-password"
+        placeholder="••••••••"
+        [class.field__input--error]="isInvalid('password')"
+        [attr.aria-invalid]="isInvalid('password')"
+        [attr.aria-describedby]="isInvalid('password') ? 'login-password-error' : null"
+      />
+      <app-password-visibility-toggle [visible]="passwordVisible()" (toggled)="togglePasswordVisibility()" />
+    </div>
     @if (isInvalid('password')) {
       <span id="login-password-error" class="field__error" role="alert">{{ errorFor('password', 'Password') }}</span>
     }

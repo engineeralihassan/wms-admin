@@ -4,6 +4,7 @@ import { Router, RouterLink, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
+import { PasswordVisibilityToggleComponent } from '../../../shared/components/password-visibility-toggle/password-visibility-toggle.component';
 import { APP_ROUTES } from '../../../core/constants/app-routes';
 import { firstErrorMessage, isControlInvalid, markAllAsTouched } from '../../../shared/utils/form.utils';
 
@@ -15,7 +16,7 @@ import { firstErrorMessage, isControlInvalid, markAllAsTouched } from '../../../
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, ButtonComponent],
+  imports: [ReactiveFormsModule, RouterLink, ButtonComponent, PasswordVisibilityToggleComponent],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
@@ -28,6 +29,7 @@ export class LoginComponent {
 
   protected readonly forgotLink = APP_ROUTES.forgotPassword;
   protected readonly submitting = signal(false);
+  protected readonly passwordVisible = signal(false);
 
   protected readonly form = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email]],
@@ -40,6 +42,10 @@ export class LoginComponent {
 
   protected errorFor(name: 'email' | 'password', label: string): string {
     return firstErrorMessage(this.form.get(name), label);
+  }
+
+  protected togglePasswordVisibility(): void {
+    this.passwordVisible.update((visible) => !visible);
   }
 
   protected submit(): void {

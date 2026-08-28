@@ -11,6 +11,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+import { PasswordVisibilityToggleComponent } from '../../../shared/components/password-visibility-toggle/password-visibility-toggle.component';
 import { APP_ROUTES } from '../../../core/constants/app-routes';
 import { firstErrorMessage, isControlInvalid, markAllAsTouched } from '../../../shared/utils/form.utils';
 
@@ -28,7 +29,7 @@ type Phase = 'verifying' | 'ready' | 'invalid';
 @Component({
   selector: 'app-activate',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, ButtonComponent, SpinnerComponent],
+  imports: [ReactiveFormsModule, RouterLink, ButtonComponent, SpinnerComponent, PasswordVisibilityToggleComponent],
   templateUrl: './activate.component.html',
   styleUrl: '../login/login.component.scss',
 })
@@ -45,6 +46,8 @@ export class ActivateComponent {
   protected readonly phase = signal<Phase>('verifying');
   protected readonly submitting = signal(false);
   protected readonly firstName = signal('');
+  protected readonly passwordVisible = signal(false);
+  protected readonly confirmVisible = signal(false);
 
   protected readonly form = this.fb.nonNullable.group(
     {
@@ -82,6 +85,10 @@ export class ActivateComponent {
 
   protected get mismatch(): boolean {
     return this.form.hasError('mismatch') && !!this.form.get('confirm')?.touched;
+  }
+
+  protected togglePasswordVisibility(field: 'password' | 'confirm'): void {
+    (field === 'password' ? this.passwordVisible : this.confirmVisible).update((visible) => !visible);
   }
 
   protected submit(): void {

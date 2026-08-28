@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const ApiError = require('../utils/ApiError');
 const { isTokenIncluded, getAccessTokenFromHeader } = require('../helper/auth');
 const { tokenTypes } = require('../config/tokens');
-const { User } = require('../models');
+const { User, Organization } = require('../models');
 
 /**
  * authVerify — authenticates the request from the JWT access token.
@@ -44,12 +44,18 @@ const authVerify = async (req, res, next) => {
   try {
     user = await User.findByPk(decoded.sub, {
       attributes: ['id', 'token_version', 'status'],
+      include: [{ model: Organization, as: 'organization', attributes: ['is_active'] }],
     });
   } catch (dbErr) {
     return next(dbErr);
   }
 
-  if (!user || user.status !== 'active' || user.token_version !== (decoded.tv ?? 0)) {
+  if (
+    !user ||
+    user.status !== 'active' ||
+    user.token_version !== (decoded.tv ?? 0) ||
+    (user.organization && !user.organization.is_active)
+  ) {
     return next(new ApiError(httpStatus.UNAUTHORIZED, res.__('session_revoked')));
   }
 

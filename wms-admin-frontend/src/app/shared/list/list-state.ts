@@ -47,6 +47,7 @@ export function createListState<T>(
   const sortBy = signal(options.sortBy ?? 'created_at');
   const sortDir = signal<SortDirection>(options.sortDir ?? 'desc');
   const search = signal('');
+  const filters = signal<Record<string, string>>({});
 
   const hasNext = computed(() => page() < totalPages());
   const hasPrev = computed(() => page() > 1);
@@ -98,6 +99,7 @@ export function createListState<T>(
       sortBy: sortBy(),
       sortDir: sortDir(),
       search: search() || undefined,
+      filters: Object.keys(filters()).length ? filters() : undefined,
     };
   }
 
@@ -116,6 +118,7 @@ export function createListState<T>(
     sortBy,
     sortDir,
     search,
+    filters,
     hasNext,
     hasPrev,
     isEmpty,
@@ -160,6 +163,18 @@ export function createListState<T>(
     /** Pipe raw search input here (debounced internally). */
     onSearch(value: string): void {
       searchInput$.next(value);
+    },
+
+
+    setFilter(key: string, value: string): void {
+      filters.update((current) => {
+        const next = { ...current };
+        if (value === '') delete next[key];
+        else next[key] = value;
+        return next;
+      });
+      page.set(1);
+      emit();
     },
 
     reload(): void {

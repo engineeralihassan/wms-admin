@@ -1,7 +1,7 @@
 const httpStatus = require('http-status');
 const moment = require('moment');
 const crypto = require('crypto');
-const { User } = require('../../models');
+const { User, Organization } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const Encrypter = require('../../helper/encrypter');
 const { buildAuthContext } = require('./auth-context.service');
@@ -23,7 +23,10 @@ const LOCK_MINUTES = 15;
  */
 const signIn = async (body, res) => {
   const { email, password } = body;
-  const user = await User.findOne({ where: { email } });
+  const user = await User.findOne({
+    where: { email },
+    include: [{ model: Organization, as: 'organization', attributes: ['is_active'] }],
+  });
 
   // Uniform failure to avoid revealing whether the email exists.
   const invalidCreds = () =>
@@ -45,6 +48,9 @@ const signIn = async (body, res) => {
   // Disabled / any other non-active state?
   if (user.status !== 'active') {
     throw new ApiError(httpStatus.FORBIDDEN, res.__('account_inactive'));
+  }
+  if (user.organization && !user.organization.is_active) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('organization_inactive'));
   }
 
   const hashed = await Encrypter.password_dec(password, user.salt);

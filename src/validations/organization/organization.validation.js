@@ -20,4 +20,9 @@ const createOrganization = {
   }),
 };
 
-module.exports = { createOrganization, listOrganizations };
+const updateOrganizationStatus = {
+  params: Joi.object().keys({ uuid: Joi.string().uuid().required() }),
+  body: Joi.object().keys({ is_active: Joi.boolean().required() }),
+};
+
+module.exports = { createOrganization, listOrganizations, updateOrganizationStatus };

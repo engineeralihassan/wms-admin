@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
   },
   organizations: {
     root: '/organizations',
+    status: (uuid: string) => `/organizations/${uuid}/status`,
   },
   users: {
     root: '/users',

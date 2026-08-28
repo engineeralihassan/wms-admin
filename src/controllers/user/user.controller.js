@@ -11,7 +11,14 @@ const toDto = (user) => ({
   status: user.status,
   organization_id: user.organization_id,
   manager_id: user.manager_id,
+  created_at: user.createdAt,
   role: user.role ? { key: user.role.key, name: user.role.name } : undefined,
+  organization: user.organization
+    ? {
+        uuid: user.organization.uuid,
+        name: user.organization.name,
+      }
+    : undefined,
 });
 
 /**

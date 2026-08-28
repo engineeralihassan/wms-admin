@@ -52,7 +52,7 @@ const parseQueryOptions = (rawQuery = {}, config = {}) => {
   const searchWhere = buildSearchWhere(searchTerm, searchable);
 
   // ---- Filters (exact match, allow-listed) ----
-  const filterWhere = buildFilterWhere(rawQuery.filters, filterable);
+  const filterWhere = buildFilterWhere(rawQuery.filters, filterable, config.rangeFilterable || []);
 
   // ---- Keyset cursor (opaque base64 of the last row's sort key + id) ----
   const cursor = mode === 'keyset' ? decodeCursor(rawQuery.cursor) : null;
@@ -82,15 +82,30 @@ const buildSearchWhere = (term, searchable) => {
 };
 
 /** Exact-match filters, only for allow-listed columns. */
-const buildFilterWhere = (filters, filterable) => {
-  if (!filters || typeof filters !== 'object' || filterable.length === 0) return null;
+const buildFilterWhere = (filters, filterable, rangeFilterable = []) => {
+  if (!filters || typeof filters !== 'object' || (filterable.length === 0 && rangeFilterable.length === 0)) return null;
   const clauses = {};
   for (const col of filterable) {
     if (filters[col] !== undefined && filters[col] !== '') {
       clauses[col] = filters[col];
     }
   }
+  for (const column of rangeFilterable) {
+    const from = filters[`${column}_from`];
+    const to = filters[`${column}_to`];
+    const range = {};
+    if (isIsoDate(from)) range[Op.gte] = new Date(`${from}T00:00:00.000Z`);
+    if (isIsoDate(to)) range[Op.lt] = nextUtcDay(to);
+    if (Reflect.ownKeys(range).length > 0) clauses[column] = range;
+  }
   return Object.keys(clauses).length ? clauses : null;
+};
+
+const isIsoDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const nextUtcDay = (date) => {
+  const result = new Date(`${date}T00:00:00.000Z`);
+  result.setUTCDate(result.getUTCDate() + 1);
+  return result;
 };
 
 const mergeAnd = (...fragments) => {
