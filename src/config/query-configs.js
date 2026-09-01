@@ -57,9 +57,29 @@ const EXPENSE_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
+const PROJECT_QUERY_CONFIG = Object.freeze({
+  sortable: [
+    'created_at',
+    'updated_at',
+    'project_code',
+    'name',
+    'status',
+    'priority',
+    'start_date',
+    'end_date',
+  ],
+  searchable: ['name', 'project_code'],
+  filterable: ['status', 'priority'],
+  rangeFilterable: ['created_at', 'start_date', 'end_date'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
 module.exports = {
   USER_QUERY_CONFIG,
   ORGANIZATION_QUERY_CONFIG,
   TICKET_QUERY_CONFIG,
   EXPENSE_QUERY_CONFIG,
+  PROJECT_QUERY_CONFIG,
 };

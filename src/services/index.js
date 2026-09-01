@@ -6,4 +6,5 @@ module.exports.userService = require('./user/user.service');
 module.exports.roleService = require('./role/role.service');
 module.exports.ticketService = require('./tickets/ticket.service');
 module.exports.expenseService = require('./expenses/expense.service');
+module.exports.projectService = require('./projects/project.service');
 module.exports.emailService = require('./email/email.service');

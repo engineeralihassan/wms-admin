@@ -56,6 +56,14 @@ export const routes: Routes = [
             (m) => m.EXPENSES_ROUTES,
           ),
       },
+      {
+        path: 'projects',
+        canActivate: [permissionGuard('project.read')],
+        loadChildren: () =>
+          import('./features/projects/projects.routes').then(
+            (m) => m.PROJECTS_ROUTES,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

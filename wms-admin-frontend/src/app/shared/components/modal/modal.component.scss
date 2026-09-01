@@ -36,6 +36,7 @@
 
   &__header {
     @include flex(row, center, space-between, spacing('4'));
+    gap: spacing('3');
     padding: spacing('4') spacing('5');
     border-bottom: 1px solid var(--color-border);
   }

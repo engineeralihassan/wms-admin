@@ -34,4 +34,12 @@ export const API_ENDPOINTS = {
     submit: (uuid: string) => `/expenses/${uuid}/submit`,
     review: (uuid: string) => `/expenses/${uuid}/review`,
   },
+  projects: {
+    root: '/projects',
+    mine: '/projects/mine',
+    byUuid: (uuid: string) => `/projects/${uuid}`,
+    members: (uuid: string) => `/projects/${uuid}/members`,
+    member: (uuid: string, userUuid: string) => `/projects/${uuid}/members/${userUuid}`,
+    assignableUsers: (uuid: string) => `/projects/${uuid}/assignable-users`,
+  },
 } as const;

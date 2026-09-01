@@ -56,5 +56,17 @@
   "expense_not_reviewable": "Only submitted expenses can be approved or rejected",
   "expense_not_deletable": "Only draft or rejected expenses can be deleted",
   "expense_attachment_required": "At least one attachment is required to submit an expense",
-  "expense_self_review": "You cannot approve or reject your own expense"
+  "expense_self_review": "You cannot approve or reject your own expense",
+
+  "project_created": "Project created successfully",
+  "project_updated": "Project updated successfully",
+  "project_deleted": "Project deleted successfully",
+  "project_found": "Project found successfully",
+  "project_not_found": "Project not found",
+  "project_members_added": "Members added to the project successfully",
+  "project_member_updated": "Project member updated successfully",
+  "project_member_removed": "Member removed from the project successfully",
+  "project_member_not_found": "The selected user was not found in this organization",
+  "project_lead_not_member": "The project lead must be a member of the project",
+  "project_owner_not_removable": "The project owner cannot be removed from the project"
 }

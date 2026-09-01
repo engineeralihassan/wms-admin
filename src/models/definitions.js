@@ -7,6 +7,8 @@ const RolePermission = require('./role-permission.model');
 const EmailJob = require('./email-job.model');
 const Ticket = require('./ticket.model');
 const Expense = require('./expense.model');
+const Project = require('./project.model');
+const ProjectMember = require('./project-member.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -24,6 +26,10 @@ const Expense = require('./expense.model');
  *   Organization 1───* Expense       (tenant-scoped expense claims)
  *   User         1───* Expense       (creator/claimant: created_by_id)
  *   User         1───* Expense       (reviewer: reviewed_by_id, nullable)
+ *   Organization 1───* Project       (tenant-scoped projects)
+ *   User         1───* Project       (creator: created_by_id)
+ *   User         1───* Project       (lead: lead_id, nullable)
+ *   Project      *───* User          (members, through project_members)
  */
 const definitions = (sequelize, Sequelize) => {
   const db = {};
@@ -39,6 +45,8 @@ const definitions = (sequelize, Sequelize) => {
   db.EmailJob = EmailJob(sequelize);
   db.Ticket = Ticket(sequelize);
   db.Expense = Expense(sequelize);
+  db.Project = Project(sequelize);
+  db.ProjectMember = ProjectMember(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -93,6 +101,37 @@ const definitions = (sequelize, Sequelize) => {
   db.Expense.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
   db.User.hasMany(db.Expense, { foreignKey: 'reviewed_by_id', as: 'reviewedExpenses' });
   db.Expense.belongsTo(db.User, { foreignKey: 'reviewed_by_id', as: 'reviewer' });
+
+  // Organization <-> Project (tenant scope)
+  db.Organization.hasMany(db.Project, { foreignKey: 'organization_id', as: 'projects' });
+  db.Project.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // User <-> Project (creator + lead, two distinct associations)
+  db.User.hasMany(db.Project, { foreignKey: 'created_by_id', as: 'createdProjects' });
+  db.Project.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+  db.User.hasMany(db.Project, { foreignKey: 'lead_id', as: 'ledProjects' });
+  db.Project.belongsTo(db.User, { foreignKey: 'lead_id', as: 'lead' });
+
+  // Project <-> User (many-to-many membership through project_members)
+  db.Project.belongsToMany(db.User, {
+    through: db.ProjectMember,
+    foreignKey: 'project_id',
+    otherKey: 'user_id',
+    as: 'members',
+  });
+  db.User.belongsToMany(db.Project, {
+    through: db.ProjectMember,
+    foreignKey: 'user_id',
+    otherKey: 'project_id',
+    as: 'projects',
+  });
+
+  // Direct access to the join rows (needed to read member_role / audit fields).
+  db.Project.hasMany(db.ProjectMember, { foreignKey: 'project_id', as: 'memberships' });
+  db.ProjectMember.belongsTo(db.Project, { foreignKey: 'project_id', as: 'project' });
+  db.User.hasMany(db.ProjectMember, { foreignKey: 'user_id', as: 'projectMemberships' });
+  db.ProjectMember.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  db.ProjectMember.belongsTo(db.User, { foreignKey: 'added_by_id', as: 'addedBy' });
 
   return db;
 };

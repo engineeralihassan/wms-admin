@@ -1,0 +1,194 @@
+@use 'abstractions' as *;
+
+:host { display: block; }
+
+.page-header {
+  @include flex(row, flex-start, space-between, spacing('4'));
+  margin-bottom: spacing('6');
+  flex-wrap: wrap;
+
+  &__title {
+    font-size: font-size('xl');
+    font-weight: font-weight('bold');
+    color: var(--color-text);
+  }
+
+  &__subtitle {
+    margin-top: spacing('1');
+    color: var(--color-text-muted);
+  }
+}
+
+// Form used inside the create/edit modals.
+.project-form {
+  @include flex(column, stretch, flex-start, spacing('4'));
+
+  .field {
+    @include flex(column, stretch, flex-start, spacing('1'));
+
+    &__label {
+      font-size: font-size('sm');
+      font-weight: font-weight('semibold');
+      color: var(--color-primary);
+    }
+
+    &__input {
+      @include form-input;
+    }
+  }
+}
+
+// Two fields side by side (dates, budget/currency), collapsing on narrow screens.
+.field-row {
+  @include flex(row, stretch, flex-start, spacing('4'));
+  flex-wrap: wrap;
+
+  .field {
+    flex: 1 1 45%;
+    min-width: 160px;
+    @include flex(column, stretch, flex-start, spacing('1'));
+
+    &__label {
+      font-size: font-size('sm');
+      font-weight: font-weight('semibold');
+      color: var(--color-primary);
+    }
+
+    &__input {
+      @include form-input;
+    }
+  }
+}
+
+// Member management modal.
+.members {
+  @include flex(column, stretch, flex-start, spacing('5'));
+
+  &__section {
+    @include flex(column, stretch, flex-start, spacing('2'));
+  }
+
+  &__heading {
+    font-size: font-size('sm');
+    font-weight: font-weight('bold');
+    color: var(--color-text);
+  }
+
+  &__state {
+    color: var(--color-text-muted);
+    font-size: font-size('sm');
+  }
+
+  .field {
+    @include flex(column, stretch, flex-start, spacing('1'));
+
+    &__label {
+      font-size: font-size('sm');
+      font-weight: font-weight('semibold');
+      color: var(--color-primary);
+    }
+
+    &__input {
+      @include form-input;
+    }
+  }
+}
+
+.member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: radius('md');
+  max-height: 260px;
+  overflow-y: auto;
+
+  &__item {
+    @include flex(row, center, space-between, spacing('3'));
+    padding: spacing('3') spacing('4');
+    border-bottom: 1px solid var(--color-border);
+
+    &:last-child { border-bottom: none; }
+  }
+
+  &__who {
+    @include flex(column, stretch, center, 0);
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: font-size('sm');
+    font-weight: font-weight('medium');
+    color: var(--color-text);
+  }
+
+  &__email {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+  }
+
+  &__controls {
+    @include flex(row, center, flex-end, spacing('2'));
+  }
+
+  &__role {
+    max-width: 130px;
+  }
+
+  &__remove {
+    background: transparent;
+    color: var(--color-danger, #c0392b);
+    font-size: font-size('lg');
+    line-height: 1;
+    @include focus-ring;
+  }
+}
+
+// Searchable add-member picker (typeahead scoped to the project's organization).
+.assignee-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: radius('md');
+
+  &__state {
+    padding: spacing('3') spacing('4');
+    color: var(--color-text-muted);
+    font-size: font-size('sm');
+  }
+
+  &__item {
+    width: 100%;
+    text-align: left;
+    padding: spacing('3') spacing('4');
+    background: transparent;
+    @include flex(row, center, space-between, spacing('2'));
+    border-bottom: 1px solid var(--color-border);
+
+    &:hover {
+      background: var(--color-hover);
+    }
+  }
+
+  &__name {
+    font-size: font-size('sm');
+    font-weight: font-weight('medium');
+    color: var(--color-text);
+  }
+
+  &__email {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+    flex: 1 1 auto;
+    margin-left: spacing('2');
+  }
+
+  &__add {
+    font-size: font-size('xs');
+    font-weight: font-weight('semibold');
+    color: var(--color-primary);
+  }
+}

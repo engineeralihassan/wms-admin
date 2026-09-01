@@ -7,6 +7,7 @@ const organizationRoute = require('./organization.route');
 const userRoute = require('./user.route');
 const ticketRoute = require('./ticket.route');
 const expenseRoute = require('./expense.route');
+const projectRoute = require('./project.route');
 const docsRoute = require('./docs.route');
 
 const devRoutes = [
@@ -22,6 +23,7 @@ const routes = [
   { path: '/users', route: userRoute },
   { path: '/tickets', route: ticketRoute },
   { path: '/expenses', route: expenseRoute },
+  { path: '/projects', route: projectRoute },
 ];
 
 routes.forEach((route) => {

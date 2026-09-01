@@ -70,6 +70,16 @@ const PERMISSIONS = Object.freeze({
   // expenses and approve/reject submitted ones (analogous to ticket.assign).
   EXPENSE_REVIEW: 'expense.review',
 
+  // Projects
+  PROJECT_CREATE: 'project.create',
+  PROJECT_READ: 'project.read',
+  PROJECT_UPDATE: 'project.update',
+  PROJECT_DELETE: 'project.delete',
+  // The manager-distinguishing capability: holders see ALL of their org's projects
+  // and can add/remove members and set the project lead (analogous to ticket.assign
+  // and expense.review). Normal members only see projects they're assigned to.
+  PROJECT_MANAGE: 'project.manage',
+
   // Example domain resource (warehouse/orders will follow this pattern)
   ORDER_CREATE: 'order.create',
   ORDER_READ: 'order.read',
@@ -107,6 +117,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.EXPENSE_UPDATE,
     PERMISSIONS.EXPENSE_DELETE,
     PERMISSIONS.EXPENSE_REVIEW,
+    PERMISSIONS.PROJECT_CREATE,
+    PERMISSIONS.PROJECT_READ,
+    PERMISSIONS.PROJECT_UPDATE,
+    PERMISSIONS.PROJECT_DELETE,
+    PERMISSIONS.PROJECT_MANAGE,
     PERMISSIONS.ORDER_CREATE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_UPDATE,
@@ -128,6 +143,8 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.EXPENSE_READ,
     PERMISSIONS.EXPENSE_UPDATE,
     PERMISSIONS.EXPENSE_DELETE,
+    // Vendors see only the projects they are assigned to (member visibility).
+    PERMISSIONS.PROJECT_READ,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_CREATE,
   ],
@@ -147,6 +164,8 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.EXPENSE_READ,
     PERMISSIONS.EXPENSE_UPDATE,
     PERMISSIONS.EXPENSE_DELETE,
+    // Consultants see only the projects they are assigned to (member visibility).
+    PERMISSIONS.PROJECT_READ,
   ],
 
   [ROLES.CONSULTANT_C2C]: [
@@ -160,6 +179,8 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.EXPENSE_READ,
     PERMISSIONS.EXPENSE_UPDATE,
     PERMISSIONS.EXPENSE_DELETE,
+    // Consultants see only the projects they are assigned to (member visibility).
+    PERMISSIONS.PROJECT_READ,
   ],
 });
 
