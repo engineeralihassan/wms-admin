@@ -1,0 +1,242 @@
+<header class="page-header">
+  <div>
+    <h1 class="page-header__title">Expense Management</h1>
+    <p class="page-header__subtitle">Submit expenses, track approvals, and manage claims.</p>
+  </div>
+  @if (canCreate()) {
+    <app-button variant="primary" (clicked)="openCreate()">Add Expense</app-button>
+  }
+</header>
+
+<app-card title="All Expenses">
+  <app-data-table
+    caption="Expenses"
+    [columns]="columns"
+    [rows]="list.items()"
+    [rowId]="expense => expense.uuid"
+    [loading]="list.loading()"
+    emptyMessage="No expenses match the current search and filters."
+    searchLabel="Search expenses by title or expense number"
+    searchPlaceholder="Search title or expense #…"
+    [searchValue]="searchValue()"
+    [filters]="filters"
+    [dateRangeFilter]="dateRangeFilter"
+    [filterValues]="list.filters()"
+    [actions]="actions()"
+    [iconOnlyActions]="true"
+    [page]="list.page()"
+    [totalPages]="list.totalPages()"
+    [total]="list.total()"
+    [limit]="list.limit()"
+    [sortBy]="list.sortBy()"
+    [sortDir]="list.sortDir()"
+    (searchChange)="onSearch($event)"
+    (filterChange)="list.setFilter($event.key, $event.value)"
+    (sortChange)="list.toggleSort($event)"
+    (pageChange)="list.setPage($event)"
+    (pageSizeChange)="list.setLimit($event)"
+    (action)="onAction($event)"
+  />
+</app-card>
+
+<!-- Create expense -->
+<app-modal [open]="openModal() === 'create'" title="Create Expense" (closed)="closeModal()">
+  <form class="expense-form" [formGroup]="createForm">
+    <label class="field">
+      <span class="field__label">Title</span>
+      <input class="field__input" type="text" formControlName="title" maxlength="500" placeholder="Add title" />
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Category</span>
+        <select class="field__input" formControlName="category">
+          @for (c of categoryOptions; track c) { <option [value]="c">{{ categoryLabels[c] }}</option> }
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Expense Date</span>
+        <input class="field__input" type="date" formControlName="expense_date" />
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="field__label">Notes</span>
+      <textarea class="field__input" rows="4" formControlName="notes" maxlength="5000" placeholder="Add notes"></textarea>
+    </label>
+
+    <div class="field-row">
+      <label class="field field--amount">
+        <span class="field__label">Amount</span>
+        <div class="amount-input">
+          <select class="amount-input__currency" formControlName="currency">
+            @for (cur of currencyOptions; track cur) { <option [value]="cur">{{ cur }}</option> }
+          </select>
+          <input class="field__input" type="number" formControlName="amount" min="0.01" step="0.01" placeholder="0.00" />
+        </div>
+      </label>
+    </div>
+  </form>
+
+  <app-file-upload
+    [config]="attachmentConfig"
+    label="Attachments"
+    (filesChange)="attachments.set($event)"
+  />
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Discard</app-button>
+    <app-button variant="secondary" [loading]="submitting()" (clicked)="submitCreate('draft')">
+      Save as Draft
+    </app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitCreate('submit')">
+      Save and Submit
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- Edit expense (draft / rejected, owner only) -->
+<app-modal
+  [open]="openModal() === 'edit'"
+  [title]="'Edit ' + (activeExpense()?.expense_number ?? 'expense')"
+  (closed)="closeModal()"
+>
+  <form class="expense-form" [formGroup]="editForm">
+    <label class="field">
+      <span class="field__label">Title</span>
+      <input class="field__input" type="text" formControlName="title" maxlength="500" />
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Category</span>
+        <select class="field__input" formControlName="category">
+          @for (c of categoryOptions; track c) { <option [value]="c">{{ categoryLabels[c] }}</option> }
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Expense Date</span>
+        <input class="field__input" type="date" formControlName="expense_date" />
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="field__label">Notes</span>
+      <textarea class="field__input" rows="4" formControlName="notes" maxlength="5000"></textarea>
+    </label>
+
+    <div class="field-row">
+      <label class="field field--amount">
+        <span class="field__label">Amount</span>
+        <div class="amount-input">
+          <select class="amount-input__currency" formControlName="currency">
+            @for (cur of currencyOptions; track cur) { <option [value]="cur">{{ cur }}</option> }
+          </select>
+          <input class="field__input" type="number" formControlName="amount" min="0.01" step="0.01" />
+        </div>
+      </label>
+    </div>
+  </form>
+
+  @if (activeExpense()?.attachments?.length) {
+    <p class="attachments-hint">
+      Current attachments: {{ activeExpense()?.attachments?.length }}. Add files below to replace them.
+    </p>
+  }
+  <app-file-upload
+    [config]="attachmentConfig"
+    label="Attachments"
+    (filesChange)="attachments.set($event)"
+  />
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
+    <app-button variant="secondary" [loading]="submitting()" (clicked)="submitEdit('draft')">
+      Save as Draft
+    </app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitEdit('submit')">
+      Save and Submit
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- Review (approve / reject) — reviewers only -->
+<app-modal
+  [open]="openModal() === 'review'"
+  size="sm"
+  [title]="'Review · ' + (activeExpense()?.expense_number ?? '')"
+  (closed)="closeModal()"
+>
+  <form class="expense-form" [formGroup]="reviewForm">
+    <label class="field">
+      <span class="field__label">Decision</span>
+      <select class="field__input" formControlName="decision">
+        <option value="approve">Approve</option>
+        <option value="reject">Reject</option>
+      </select>
+    </label>
+
+    @if (reviewForm.controls.decision.value === 'reject') {
+      <label class="field">
+        <span class="field__label">Rejection reason</span>
+        <textarea
+          class="field__input"
+          rows="3"
+          formControlName="rejection_reason"
+          maxlength="1000"
+          placeholder="Explain why this expense is rejected…"
+        ></textarea>
+        @if (reviewForm.controls.rejection_reason.touched && reviewForm.controls.rejection_reason.errors) {
+          <span class="field__error">A reason is required to reject.</span>
+        }
+      </label>
+    }
+  </form>
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitReview()">
+      Submit decision
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- View details -->
+<app-modal
+  [open]="openModal() === 'view'"
+  [title]="activeExpense()?.expense_number ?? 'Expense'"
+  (closed)="closeModal()"
+>
+  @if (activeExpense(); as e) {
+    <dl class="expense-details">
+      <div class="expense-details__row"><dt>Title</dt><dd>{{ e.title }}</dd></div>
+      <div class="expense-details__row"><dt>Category</dt><dd>{{ categoryLabels[e.category] }}</dd></div>
+      <div class="expense-details__row"><dt>Expense date</dt><dd>{{ formatDate(e.expense_date) }}</dd></div>
+      <div class="expense-details__row"><dt>Amount</dt><dd>{{ formatMoney(e.amount, e.currency) }}</dd></div>
+      <div class="expense-details__row"><dt>Status</dt><dd>{{ statusLabels[e.status] }}</dd></div>
+      <div class="expense-details__row"><dt>Submitted by</dt><dd>{{ userName(e.created_by) }}</dd></div>
+      @if (e.reviewed_by) {
+        <div class="expense-details__row"><dt>Reviewed by</dt><dd>{{ userName(e.reviewed_by) }}</dd></div>
+      }
+      @if (e.notes) {
+        <div class="expense-details__row"><dt>Notes</dt><dd>{{ e.notes }}</dd></div>
+      }
+      @if (e.status === 'rejected' && e.rejection_reason) {
+        <div class="expense-details__row"><dt>Rejection reason</dt><dd>{{ e.rejection_reason }}</dd></div>
+      }
+      @if (e.attachments.length) {
+        <div class="expense-details__row">
+          <dt>Attachments</dt>
+          <dd>
+            <ul class="expense-details__files">
+              @for (a of e.attachments; track a.name) { <li>{{ a.name }}</li> }
+            </ul>
+          </dd>
+        </div>
+      }
+    </dl>
+  }
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Close</app-button>
+  </div>
+</app-modal>

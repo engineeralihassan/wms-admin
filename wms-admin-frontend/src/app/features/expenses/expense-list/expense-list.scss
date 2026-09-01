@@ -1,0 +1,113 @@
+@use 'abstractions' as *;
+
+:host { display: block; }
+
+.page-header {
+  @include flex(row, flex-start, space-between, spacing('4'));
+  margin-bottom: spacing('6');
+  flex-wrap: wrap;
+
+  &__title {
+    font-size: font-size('xl');
+    font-weight: font-weight('bold');
+    color: var(--color-text);
+  }
+
+  &__subtitle {
+    margin-top: spacing('1');
+    color: var(--color-text-muted);
+  }
+}
+
+// Single-column form used inside the create/edit/review modals.
+.expense-form {
+  @include flex(column, stretch, flex-start, spacing('4'));
+
+  .field {
+    @include flex(column, stretch, flex-start, spacing('1'));
+
+    &__label {
+      font-size: font-size('sm');
+      font-weight: font-weight('semibold');
+      color: var(--color-primary);
+    }
+
+    &__input {
+      @include form-input;
+    }
+
+    &__error {
+      font-size: font-size('xs');
+      color: var(--color-danger, #dc2626);
+    }
+  }
+}
+
+// Two fields side by side (Category + Expense Date, etc.), stacking on small screens.
+.field-row {
+  @include flex(row, stretch, flex-start, spacing('4'));
+  flex-wrap: wrap;
+
+  .field {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+}
+
+// Amount with a leading currency selector, styled as one control.
+.amount-input {
+  @include flex(row, stretch, flex-start, 0);
+
+  &__currency {
+    @include form-input;
+    width: auto;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+    background: var(--color-hover);
+    font-weight: font-weight('semibold');
+  }
+
+  .field__input {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    flex: 1 1 auto;
+  }
+}
+
+.attachments-hint {
+  margin: spacing('2') 0 0;
+  font-size: font-size('sm');
+  color: var(--color-text-muted);
+}
+
+// Read-only details shown in the "View" modal.
+.expense-details {
+  @include flex(column, stretch, flex-start, spacing('3'));
+  margin: 0;
+
+  &__row {
+    @include flex(row, flex-start, flex-start, spacing('4'));
+
+    dt {
+      flex: 0 0 140px;
+      font-size: font-size('sm');
+      font-weight: font-weight('semibold');
+      color: var(--color-text-muted);
+    }
+
+    dd {
+      margin: 0;
+      flex: 1 1 auto;
+      color: var(--color-text);
+      word-break: break-word;
+    }
+  }
+
+  &__files {
+    list-style: disc;
+    margin: 0;
+    padding-left: spacing('4');
+    color: var(--color-text);
+  }
+}

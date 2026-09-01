@@ -91,6 +91,8 @@ async function ensureSearchIndexes() {
     'CREATE INDEX IF NOT EXISTS organizations_slug_trgm ON organizations USING gin (slug gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS tickets_subject_trgm ON tickets USING gin (subject gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS tickets_ticket_number_trgm ON tickets USING gin (ticket_number gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS expenses_title_trgm ON expenses USING gin (title gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS expenses_expense_number_trgm ON expenses USING gin (expense_number gin_trgm_ops)',
   ];
   for (const sql of statements) {
     // eslint-disable-next-line no-await-in-loop

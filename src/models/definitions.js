@@ -6,6 +6,7 @@ const Permission = require('./permission.model');
 const RolePermission = require('./role-permission.model');
 const EmailJob = require('./email-job.model');
 const Ticket = require('./ticket.model');
+const Expense = require('./expense.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -20,6 +21,9 @@ const Ticket = require('./ticket.model');
  *   Organization 1───* Ticket        (tenant-scoped tickets)
  *   User         1───* Ticket        (creator: created_by_id)
  *   User         1───* Ticket        (assignee: assigned_to_id, nullable)
+ *   Organization 1───* Expense       (tenant-scoped expense claims)
+ *   User         1───* Expense       (creator/claimant: created_by_id)
+ *   User         1───* Expense       (reviewer: reviewed_by_id, nullable)
  */
 const definitions = (sequelize, Sequelize) => {
   const db = {};
@@ -34,6 +38,7 @@ const definitions = (sequelize, Sequelize) => {
   db.RolePermission = RolePermission(sequelize);
   db.EmailJob = EmailJob(sequelize);
   db.Ticket = Ticket(sequelize);
+  db.Expense = Expense(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -78,6 +83,16 @@ const definitions = (sequelize, Sequelize) => {
   db.Ticket.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
   db.User.hasMany(db.Ticket, { foreignKey: 'assigned_to_id', as: 'assignedTickets' });
   db.Ticket.belongsTo(db.User, { foreignKey: 'assigned_to_id', as: 'assignee' });
+
+  // Organization <-> Expense (tenant scope)
+  db.Organization.hasMany(db.Expense, { foreignKey: 'organization_id', as: 'expenses' });
+  db.Expense.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // User <-> Expense (creator/claimant + reviewer, two distinct associations)
+  db.User.hasMany(db.Expense, { foreignKey: 'created_by_id', as: 'createdExpenses' });
+  db.Expense.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+  db.User.hasMany(db.Expense, { foreignKey: 'reviewed_by_id', as: 'reviewedExpenses' });
+  db.Expense.belongsTo(db.User, { foreignKey: 'reviewed_by_id', as: 'reviewer' });
 
   return db;
 };

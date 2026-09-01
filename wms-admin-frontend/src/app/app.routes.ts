@@ -48,6 +48,14 @@ export const routes: Routes = [
             (m) => m.TICKETS_ROUTES,
           ),
       },
+      {
+        path: 'expenses',
+        canActivate: [permissionGuard('expense.read')],
+        loadChildren: () =>
+          import('./features/expenses/expenses.routes').then(
+            (m) => m.EXPENSES_ROUTES,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

@@ -10,4 +10,5 @@ export const APP_ROUTES = {
   users: '/users',
   organizations: '/organizations',
   tickets: '/tickets',
+  expenses: '/expenses',
 } as const;

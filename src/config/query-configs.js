@@ -38,4 +38,28 @@ const TICKET_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
-module.exports = { USER_QUERY_CONFIG, ORGANIZATION_QUERY_CONFIG, TICKET_QUERY_CONFIG };
+const EXPENSE_QUERY_CONFIG = Object.freeze({
+  sortable: [
+    'created_at',
+    'updated_at',
+    'expense_number',
+    'expense_date',
+    'amount',
+    'status',
+    'category',
+    'submitted_at',
+  ],
+  searchable: ['title', 'expense_number'],
+  filterable: ['status', 'category', 'currency'],
+  rangeFilterable: ['created_at', 'expense_date'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+module.exports = {
+  USER_QUERY_CONFIG,
+  ORGANIZATION_QUERY_CONFIG,
+  TICKET_QUERY_CONFIG,
+  EXPENSE_QUERY_CONFIG,
+};

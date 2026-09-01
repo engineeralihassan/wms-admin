@@ -61,6 +61,15 @@ const PERMISSIONS = Object.freeze({
   TICKET_STATUS_UPDATE: 'ticket.status_update',
   TICKET_DELETE: 'ticket.delete',
 
+  // Expenses
+  EXPENSE_CREATE: 'expense.create',
+  EXPENSE_READ: 'expense.read',
+  EXPENSE_UPDATE: 'expense.update',
+  EXPENSE_DELETE: 'expense.delete',
+  // The manager-distinguishing capability: holders can see ALL of their org's
+  // expenses and approve/reject submitted ones (analogous to ticket.assign).
+  EXPENSE_REVIEW: 'expense.review',
+
   // Example domain resource (warehouse/orders will follow this pattern)
   ORDER_CREATE: 'order.create',
   ORDER_READ: 'order.read',
@@ -93,6 +102,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.TICKET_ASSIGN,
     PERMISSIONS.TICKET_STATUS_UPDATE,
     PERMISSIONS.TICKET_DELETE,
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
+    PERMISSIONS.EXPENSE_REVIEW,
     PERMISSIONS.ORDER_CREATE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_UPDATE,
@@ -109,6 +123,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.TICKET_READ,
     PERMISSIONS.TICKET_UPDATE,
     PERMISSIONS.TICKET_STATUS_UPDATE,
+    // Vendors submit their own expense claims; approval stays with org admins.
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_CREATE,
   ],
@@ -123,6 +142,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.TICKET_READ,
     PERMISSIONS.TICKET_UPDATE,
     PERMISSIONS.TICKET_STATUS_UPDATE,
+    // Consultants submit and manage their OWN expenses (no review capability).
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
   ],
 
   [ROLES.CONSULTANT_C2C]: [
@@ -131,6 +155,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.TICKET_READ,
     PERMISSIONS.TICKET_UPDATE,
     PERMISSIONS.TICKET_STATUS_UPDATE,
+    // Consultants submit and manage their OWN expenses (no review capability).
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
   ],
 });
 
