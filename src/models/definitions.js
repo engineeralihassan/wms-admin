@@ -5,6 +5,7 @@ const Role = require('./role.model');
 const Permission = require('./permission.model');
 const RolePermission = require('./role-permission.model');
 const EmailJob = require('./email-job.model');
+const Ticket = require('./ticket.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -16,6 +17,9 @@ const EmailJob = require('./email-job.model');
  *   Role         *───* Permission    (via role_permissions)
  *   User         1───* Token         (refresh tokens etc.)
  *   User         1───* User          (manager owns managed users; vendor -> consultants)
+ *   Organization 1───* Ticket        (tenant-scoped tickets)
+ *   User         1───* Ticket        (creator: created_by_id)
+ *   User         1───* Ticket        (assignee: assigned_to_id, nullable)
  */
 const definitions = (sequelize, Sequelize) => {
   const db = {};
@@ -29,6 +33,7 @@ const definitions = (sequelize, Sequelize) => {
   db.Permission = Permission(sequelize);
   db.RolePermission = RolePermission(sequelize);
   db.EmailJob = EmailJob(sequelize);
+  db.Ticket = Ticket(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -63,6 +68,16 @@ const definitions = (sequelize, Sequelize) => {
   // User <-> User (ownership hierarchy: a manager owns many managed users)
   db.User.hasMany(db.User, { foreignKey: 'manager_id', as: 'managedUsers' });
   db.User.belongsTo(db.User, { foreignKey: 'manager_id', as: 'manager' });
+
+  // Organization <-> Ticket (tenant scope)
+  db.Organization.hasMany(db.Ticket, { foreignKey: 'organization_id', as: 'tickets' });
+  db.Ticket.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // User <-> Ticket (creator + assignee, two distinct associations)
+  db.User.hasMany(db.Ticket, { foreignKey: 'created_by_id', as: 'createdTickets' });
+  db.Ticket.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+  db.User.hasMany(db.Ticket, { foreignKey: 'assigned_to_id', as: 'assignedTickets' });
+  db.Ticket.belongsTo(db.User, { foreignKey: 'assigned_to_id', as: 'assignee' });
 
   return db;
 };

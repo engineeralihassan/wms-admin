@@ -4,4 +4,5 @@ module.exports.authContextService = require('./auth/auth-context.service');
 module.exports.organizationService = require('./organization/organization.service');
 module.exports.userService = require('./user/user.service');
 module.exports.roleService = require('./role/role.service');
+module.exports.ticketService = require('./tickets/ticket.service');
 module.exports.emailService = require('./email/email.service');

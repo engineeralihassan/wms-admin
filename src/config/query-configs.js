@@ -28,4 +28,14 @@ const ORGANIZATION_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
-module.exports = { USER_QUERY_CONFIG, ORGANIZATION_QUERY_CONFIG };
+const TICKET_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'ticket_number', 'priority', 'status'],
+  searchable: ['subject', 'ticket_number'],
+  filterable: ['status', 'priority'],
+  rangeFilterable: ['created_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+module.exports = { USER_QUERY_CONFIG, ORGANIZATION_QUERY_CONFIG, TICKET_QUERY_CONFIG };

@@ -27,5 +27,45 @@
   &__value { display: inline-block; &--muted { color: var(--color-text-muted); } &--code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: font-size('xs'); } &--status { padding: spacing('1') spacing('2'); border-radius: radius('pill'); font-size: font-size('xs'); font-weight: font-weight('semibold'); &-active { background: var(--color-success-050); color: var(--color-success-700); } &-invited { background: var(--color-warning-050); color: var(--color-warning-700); } &-disabled, &-inactive { background: var(--color-danger-050); color: var(--color-danger-700); } } }
   &__actions-heading, &__actions { text-align: right; white-space: nowrap; }
   &__actions { @include flex(row, center, flex-end, spacing('2')); }
-  &__action { padding: spacing('2') spacing('3'); border: 1px solid var(--color-border); border-radius: radius('sm'); color: var(--color-primary); font-size: font-size('xs'); font-weight: font-weight('semibold'); @include focus-ring; &:hover:not(:disabled) { background: var(--color-primary-050); } &:disabled { cursor: not-allowed; opacity: .55; } }
+  &__action {
+    @include flex(row, center, center, spacing('1'));
+    min-height: 2rem;
+    padding: spacing('2') spacing('3');
+    border: 1px solid var(--color-border);
+    border-radius: radius('md');
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: font-size('xs');
+    font-weight: font-weight('semibold');
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+    @include focus-ring;
+    &:hover:not(:disabled) { background: var(--color-primary-050); border-color: var(--color-primary); color: var(--color-primary); }
+    &:disabled { cursor: not-allowed; opacity: .5; }
+    // Danger-styled actions (e.g. Delete) read as destructive on hover.
+    &--danger { color: var(--color-danger); &:hover:not(:disabled) { background: var(--color-danger-050); border-color: var(--color-danger); color: var(--color-danger-700); } }
+    // Compact square icon button (labels preserved for a11y/tooltip).
+    &--icon { width: 2rem; min-width: 2rem; padding: 0; font-size: font-size('sm'); }
+  }
+
+  // ---- Generic semantic pill/badge (feature-driven via column.badge) ----
+  &__badge {
+    @include flex(row, center, center, spacing('1'));
+    display: inline-flex;
+    padding: spacing('1') spacing('3');
+    border-radius: radius('pill');
+    font-size: font-size('xs');
+    font-weight: font-weight('semibold');
+    line-height: 1.4;
+    white-space: nowrap;
+    border: 1px solid transparent;
+
+    &-dot { width: .5rem; height: .5rem; border-radius: radius('circle'); background: currentColor; }
+
+    &--neutral { background: var(--color-surface-alt); color: var(--color-text-muted); border-color: var(--color-border); }
+    &--success { background: var(--color-success-050); color: var(--color-success-700); }
+    &--warning { background: var(--color-warning-050); color: var(--color-warning-700); }
+    &--danger  { background: var(--color-danger-050);  color: var(--color-danger-700); }
+    &--info    { background: var(--color-primary-050); color: var(--color-primary-900); }
+    &--primary { background: var(--color-primary-050); color: var(--color-primary-900); }
+  }
 }

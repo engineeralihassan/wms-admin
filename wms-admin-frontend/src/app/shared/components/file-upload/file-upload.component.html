@@ -1,0 +1,68 @@
+<div class="file-upload" [class.file-upload--disabled]="disabled()">
+  @if (label()) {
+    <span class="file-upload__label">{{ label() }}</span>
+  }
+
+  <!-- Dropzone -->
+  <label
+    class="file-upload__dropzone"
+    [class.is-dragging]="isDragging()"
+    [class.is-disabled]="disabled() || !canAddMore()"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+  >
+    <input
+      class="file-upload__input"
+      type="file"
+      [accept]="acceptAttr()"
+      [multiple]="allowMultiple()"
+      [disabled]="disabled() || !canAddMore()"
+      (change)="onInputChange($event)"
+    />
+    <span class="file-upload__icon" aria-hidden="true">⬆</span>
+    <span class="file-upload__cta">
+      @if (canAddMore()) {
+        <strong>Click to upload</strong> or drag and drop
+      } @else {
+        Maximum number of files reached
+      }
+    </span>
+    <span class="file-upload__hint">
+      {{ allowedLabel() }} · up to {{ maxSizeLabel() }} · max {{ config().maxFiles }} file(s)
+    </span>
+  </label>
+
+  <!-- Validation errors -->
+  @if (errors().length) {
+    <ul class="file-upload__errors" role="alert">
+      @for (err of errors(); track err.name + err.reason) {
+        <li>{{ err.message }}</li>
+      }
+    </ul>
+  }
+
+  <!-- Selected files -->
+  @if (selected().length) {
+    <ul class="file-upload__list">
+      @for (f of selected(); track f.id) {
+        <li class="file-upload__item">
+          <span class="file-upload__file-icon" aria-hidden="true">📄</span>
+          <span class="file-upload__file-meta">
+            <span class="file-upload__file-name" [title]="f.name">{{ f.name }}</span>
+            <span class="file-upload__file-size">{{ formatFileSize(f.sizeBytes) }}</span>
+          </span>
+          <button
+            type="button"
+            class="file-upload__remove"
+            [disabled]="disabled()"
+            (click)="remove(f.id)"
+            [attr.aria-label]="'Remove ' + f.name"
+          >
+            &times;
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</div>

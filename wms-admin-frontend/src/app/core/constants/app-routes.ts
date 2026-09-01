@@ -9,4 +9,5 @@ export const APP_ROUTES = {
   dashboard: '/dashboard',
   users: '/users',
   organizations: '/organizations',
+  tickets: '/tickets',
 } as const;

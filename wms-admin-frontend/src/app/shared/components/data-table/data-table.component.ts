@@ -2,6 +2,23 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { PaginationComponent } from '../pagination/pagination.component';
 import type { SortDirection } from '../../../core/models/pagination.model';
 
+/** Semantic pill variants a column can render via the `badge` hook. */
+export type BadgeVariant =
+  | 'neutral'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'primary';
+
+/** A rendered badge/pill: its text and semantic color. */
+export interface BadgeCell {
+  label: string;
+  variant: BadgeVariant;
+  /** Optional leading dot indicator (e.g. status). */
+  dot?: boolean;
+}
+
 /** A column is deliberately data-only; side effects stay in the owning feature. */
 export interface DataTableColumn<T> {
   key: string;
@@ -10,6 +27,12 @@ export interface DataTableColumn<T> {
   sortable?: boolean;
   tone?: 'default' | 'status' | 'muted' | 'code';
   className?: string;
+  /**
+   * Optional: render this cell as a colored pill. The feature controls the label
+   * and semantic color from the raw row (stable), so pill styling never depends on
+   * parsing a display string. When set, it takes precedence over `tone`.
+   */
+  badge?: (row: T) => BadgeCell;
 }
 
 export interface DataTableFilter {
@@ -28,6 +51,8 @@ export interface DataTableAction<T> {
   id: string;
   label: string;
   icon?: string;
+  /** Visual emphasis. 'danger' styles destructive actions (e.g. Delete). */
+  variant?: 'default' | 'danger';
   isDisabled?: (row: T) => boolean;
   disabledLabel?: (row: T) => string;
 }
@@ -63,6 +88,8 @@ export class DataTableComponent<T> {
   readonly dateRangeFilter = input<DataTableDateRangeFilter | null>(null);
   readonly filterValues = input<Record<string, string>>({});
   readonly actions = input<ReadonlyArray<DataTableAction<T>>>([]);
+  /** Render row actions as compact icon-only buttons (labels kept for a11y/tooltip). */
+  readonly iconOnlyActions = input(false);
   readonly page = input(1);
   readonly totalPages = input(1);
   readonly total = input(0);

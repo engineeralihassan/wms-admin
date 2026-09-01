@@ -40,6 +40,14 @@ export const routes: Routes = [
             (m) => m.ORGANIZATIONS_ROUTES,
           ),
       },
+       {
+        path: 'tickets',
+        canActivate: [permissionGuard('ticket.read')],
+        loadChildren: () =>
+          import('./features/tickets/tickets.routes').then(
+            (m) => m.TICKETS_ROUTES,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

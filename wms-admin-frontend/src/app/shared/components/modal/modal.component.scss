@@ -1,0 +1,82 @@
+@use 'abstractions' as *;
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: z('modal');
+  background: var(--color-overlay);
+  @include flex(row, center, center);
+  padding: spacing('4');
+  animation: modal-overlay-in $transition-fast;
+
+  @include reduced-motion {
+    animation: none;
+  }
+}
+
+.modal {
+  @include card-surface;
+  width: 100%;
+  max-height: calc(100vh - #{spacing('8')});
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: shadow('lg');
+  animation: modal-in $transition-base;
+
+  @include focus-ring;
+
+  @include reduced-motion {
+    animation: none;
+  }
+
+  &--sm { max-width: 420px; }
+  &--md { max-width: 560px; }
+  &--lg { max-width: 760px; }
+
+  &__header {
+    @include flex(row, center, space-between, spacing('4'));
+    padding: spacing('4') spacing('5');
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  &__title {
+    font-size: font-size('lg');
+    font-weight: font-weight('semibold');
+    color: var(--color-text);
+  }
+
+  &__close {
+    font-size: font-size('xl');
+    line-height: 1;
+    color: var(--color-text-muted);
+    background: transparent;
+    @include focus-ring;
+
+    &:hover {
+      color: var(--color-text);
+    }
+  }
+
+  &__body {
+    padding: spacing('5');
+    overflow-y: auto;
+  }
+
+  // Footer only takes space when the parent projects footer content.
+  &__footer:not(:empty) {
+    @include flex(row, center, flex-end, spacing('3'));
+    padding: spacing('4') spacing('5');
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-in {
+  from { transform: translateY(8px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}

@@ -89,12 +89,35 @@ async function ensureSearchIndexes() {
     'CREATE INDEX IF NOT EXISTS users_last_name_trgm ON users USING gin (last_name gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS organizations_name_trgm ON organizations USING gin (name gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS organizations_slug_trgm ON organizations USING gin (slug gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS tickets_subject_trgm ON tickets USING gin (subject gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS tickets_ticket_number_trgm ON tickets USING gin (ticket_number gin_trgm_ops)',
   ];
   for (const sql of statements) {
     // eslint-disable-next-line no-await-in-loop
     await sequelize.query(sql);
   }
   console.log(`  search indexes: ${statements.length - 1} trigram indexes ensured`);
+}
+
+/**
+ * Idempotent schema top-ups for columns added AFTER a table already exists.
+ *
+ * `sequelize.sync()` (without { alter }) creates MISSING tables but never adds new
+ * columns to an existing one — so a column introduced later (e.g. tickets.attachments)
+ * must be added explicitly. Postgres `ADD COLUMN IF NOT EXISTS` makes this safe to run
+ * repeatedly. Prefer this narrow, reviewable statement over sync({ alter: true }),
+ * which can make surprising changes to unrelated columns.
+ */
+async function ensureSchemaColumns() {
+  const statements = [
+    // Ticket attachments: JSONB array of { name } (metadata only for now).
+    `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]'::jsonb`,
+  ];
+  for (const sql of statements) {
+    // eslint-disable-next-line no-await-in-loop
+    await sequelize.query(sql);
+  }
+  console.log(`  schema columns: ${statements.length} ensured`);
 }
 
 async function seedSuperAdmin(roles) {
@@ -142,6 +165,8 @@ async function run() {
   try {
     // Ensure tables exist without dropping data.
     await sequelize.sync();
+    // Add any columns introduced after a table already existed (idempotent).
+    await ensureSchemaColumns();
 
     const permissions = await seedPermissions();
     const roles = await seedRoles();

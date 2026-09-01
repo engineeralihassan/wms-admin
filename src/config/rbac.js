@@ -53,6 +53,14 @@ const PERMISSIONS = Object.freeze({
   ROLE_READ: 'role.read',
   ROLE_MANAGE: 'role.manage',
 
+    // Tickets
+  TICKET_CREATE: 'ticket.create',
+  TICKET_READ: 'ticket.read',
+  TICKET_UPDATE: 'ticket.update',
+  TICKET_ASSIGN: 'ticket.assign',
+  TICKET_STATUS_UPDATE: 'ticket.status_update',
+  TICKET_DELETE: 'ticket.delete',
+
   // Example domain resource (warehouse/orders will follow this pattern)
   ORDER_CREATE: 'order.create',
   ORDER_READ: 'order.read',
@@ -79,6 +87,12 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.USER_DELETE,
     PERMISSIONS.ROLE_READ,
     PERMISSIONS.ROLE_MANAGE,
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_ASSIGN,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
+    PERMISSIONS.TICKET_DELETE,
     PERMISSIONS.ORDER_CREATE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_UPDATE,
@@ -91,13 +105,33 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.USER_CREATE,
     PERMISSIONS.USER_READ,
     PERMISSIONS.USER_UPDATE,
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_CREATE,
   ],
 
-  [ROLES.CONSULTANT_1099]: [PERMISSIONS.ORDER_READ],
+  // "Normal User" tier for tickets: may create, read (scoped to their own
+  // submitted/assigned tickets by the service), update their OWN ticket, and change
+  // the status of tickets assigned to them. They intentionally do NOT get
+  // ticket.assign or ticket.delete (see the permission matrix).
+  [ROLES.CONSULTANT_1099]: [
+    PERMISSIONS.ORDER_READ,
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
+  ],
 
-  [ROLES.CONSULTANT_C2C]: [PERMISSIONS.ORDER_READ],
+  [ROLES.CONSULTANT_C2C]: [
+    PERMISSIONS.ORDER_READ,
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
+  ],
 });
 
 /** Metadata for seeding roles (display name + scope). */

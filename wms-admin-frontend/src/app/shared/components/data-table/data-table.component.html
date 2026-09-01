@@ -66,16 +66,30 @@
             <tr>
               @for (column of visibleColumns(); track column.key) {
                 <td [class]="column.className ?? ''">
-                  <span [class]="'data-table__value data-table__value--' + (column.tone ?? 'default') + (column.tone === 'status' ? ' data-table__value--status-' + column.value(row).toLowerCase() : '')">{{ column.value(row) }}</span>
+                  @if (column.badge; as badge) {
+                    @let cell = badge(row);
+                    <span class="data-table__badge data-table__badge--{{ cell.variant }}">
+                      @if (cell.dot) { <span class="data-table__badge-dot" aria-hidden="true"></span> }
+                      {{ cell.label }}
+                    </span>
+                  } @else {
+                    <span [class]="'data-table__value data-table__value--' + (column.tone ?? 'default') + (column.tone === 'status' ? ' data-table__value--status-' + column.value(row).toLowerCase() : '')">{{ column.value(row) }}</span>
+                  }
                 </td>
               }
               @if (hasActions()) {
                 <td class="data-table__actions">
                   @for (item of actions(); track item.id) {
-                    <button type="button" class="data-table__action" (click)="action.emit({ actionId: item.id, row })"
-                      [disabled]="item.isDisabled?.(row) ?? false" [attr.aria-label]="item.label + ' for this row'"
-                      [attr.title]="item.isDisabled?.(row) ? item.disabledLabel?.(row) : null">
-                      @if (item.icon) { <span aria-hidden="true">{{ item.icon }}</span> } {{ item.label }}
+                    <button type="button"
+                      class="data-table__action"
+                      [class.data-table__action--danger]="item.variant === 'danger'"
+                      [class.data-table__action--icon]="iconOnlyActions()"
+                      (click)="action.emit({ actionId: item.id, row })"
+                      [disabled]="item.isDisabled?.(row) ?? false"
+                      [attr.aria-label]="item.label"
+                      [attr.title]="item.isDisabled?.(row) ? item.disabledLabel?.(row) : item.label">
+                      @if (item.icon) { <span aria-hidden="true">{{ item.icon }}</span> }
+                      @if (!iconOnlyActions()) { {{ item.label }} }
                     </button>
                   }
                 </td>
