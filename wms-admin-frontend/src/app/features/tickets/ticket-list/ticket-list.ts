@@ -193,23 +193,23 @@ export class TicketList {
       {
         id: 'edit',
         label: 'Edit',
-        icon: '✎',
+        icon: 'edit',
         isDisabled: (t) => !this.canEdit(t),
         disabledLabel: () => 'You can only edit your own ticket',
       },
       {
         id: 'status',
         label: 'Change status',
-        icon: '↻',
+        icon: 'status',
         isDisabled: (t) => !this.canChangeStatus(t),
         disabledLabel: () => 'You can only change the status of tickets assigned to you',
       },
     ];
     if (this.isManager()) {
-      acts.push({ id: 'assign', label: 'Assign / Unassign', icon: '👤' });
+      acts.push({ id: 'assign', label: 'Assign / Unassign', icon: 'assign' });
     }
     if (this.canDelete()) {
-      acts.push({ id: 'delete', label: 'Delete', icon: '🗑', variant: 'danger' });
+      acts.push({ id: 'delete', label: 'Delete', icon: 'delete', variant: 'danger' });
     }
     return acts;
   });
@@ -304,6 +304,12 @@ export class TicketList {
   protected onSearch(value: string): void {
     this.searchValue.set(value);
     this.list.onSearch(value);
+  }
+
+  /** "Clear all": wipe the search box + every filter. */
+  protected onClearFilters(): void {
+    this.searchValue.set('');
+    this.list.clearFilters();
   }
 
   // ---- Open modals ----

@@ -58,6 +58,7 @@
     [sortDir]="list.sortDir()"
     (searchChange)="onSearch($event)"
     (filterChange)="list.setFilter($event.key, $event.value)"
+    (resetFilters)="onClearFilters()"
     (sortChange)="list.toggleSort($event)"
     (pageChange)="list.setPage($event)"
     (pageSizeChange)="list.setLimit($event)"

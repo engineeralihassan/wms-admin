@@ -177,6 +177,14 @@ export function createListState<T>(
       emit();
     },
 
+    /** Clear the search term AND every active filter, then reload from page 1. */
+    clearFilters(): void {
+      search.set('');
+      filters.set({});
+      page.set(1);
+      emit();
+    },
+
     reload(): void {
       emit();
     },

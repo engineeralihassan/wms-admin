@@ -48,7 +48,7 @@ export class UserListComponent {
     label: 'Created date', fromKey: 'created_at_from', toKey: 'created_at_to',
   };
   protected readonly actions: ReadonlyArray<DataTableAction<UserListItem>> = [
-    { id: 'view', label: 'View', icon: '↗' },
+    { id: 'view', label: 'View', icon: 'view' },
   ];
   protected readonly searchValue = signal('');
 
@@ -63,6 +63,12 @@ export class UserListComponent {
   protected onSearch(value: string): void {
     this.searchValue.set(value);
     this.list.onSearch(value);
+  }
+
+  /** "Clear all": wipe the search box + every filter. */
+  protected onClearFilters(): void {
+    this.searchValue.set('');
+    this.list.clearFilters();
   }
 
   protected formatDate(value?: string): string {

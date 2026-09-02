@@ -52,4 +52,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['project.read'],
     icon: 'M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2Z',
   },
+  {
+    label: 'Leave Management',
+    route: APP_ROUTES.leaves,
+    permissions: ['leave.read'],
+    icon: 'M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2Zm0 16H5V10h14v10Zm0-12H5V6h14v2Zm-9 5h5v5h-5v-5Z',
+  },
 ] as const;

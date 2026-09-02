@@ -1,0 +1,173 @@
+@use 'abstractions' as *;
+
+:host { display: block; }
+
+.page-header {
+  @include flex(row, flex-start, space-between, spacing('4'));
+  margin-bottom: spacing('6');
+  flex-wrap: wrap;
+
+  &__title {
+    font-size: font-size('xl');
+    font-weight: font-weight('bold');
+    color: var(--color-text);
+  }
+
+  &__subtitle {
+    margin-top: spacing('1');
+    color: var(--color-text-muted);
+  }
+
+  &__actions {
+    @include flex(row, center, flex-end, spacing('2'));
+    flex-wrap: wrap;
+  }
+}
+
+// My-balance summary cards.
+
+.balances {
+  @include flex(row, stretch, flex-start, spacing('4'));
+  flex-wrap: wrap;
+  margin-bottom: spacing('6');
+}
+
+.balance-card {
+  @include flex(row, flex-start, flex-start, spacing('3'));
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: spacing('4');
+  border: 1px solid var(--color-border);
+  border-radius: radius('lg');
+  background: var(--color-surface);
+
+  &__dot {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    margin-top: spacing('1');
+    border-radius: 50%;
+  }
+
+  &__body {
+    @include flex(column, stretch, flex-start, spacing('1'));
+    min-width: 0;
+  }
+
+  &__name {
+    font-size: font-size('sm');
+    font-weight: font-weight('semibold');
+    color: var(--color-text-muted);
+  }
+
+  &__available {
+    font-size: font-size('xl');
+    font-weight: font-weight('bold');
+    color: var(--color-text);
+
+    small {
+      font-size: font-size('xs');
+      font-weight: font-weight('normal');
+      color: var(--color-text-muted);
+    }
+  }
+
+  &__meta {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+  }
+}
+
+// Single-column form used inside the create/edit/decision/type/allocate modals.
+.leave-form {
+  @include flex(column, stretch, flex-start, spacing('4'));
+
+  .field {
+    @include flex(column, stretch, flex-start, spacing('1'));
+
+    &__label {
+      font-size: font-size('sm');
+      font-weight: font-weight('semibold');
+      color: var(--color-primary);
+    }
+
+    &__input {
+      @include form-input;
+    }
+
+    &__error {
+      font-size: font-size('xs');
+      color: var(--color-danger, #dc2626);
+    }
+
+    &--check {
+      @include flex(row, center, flex-start, spacing('2'));
+
+      .field__label {
+        color: var(--color-text);
+        font-weight: font-weight('normal');
+      }
+    }
+
+    &--color {
+      flex: 0 0 120px;
+
+      .field__input {
+        padding: spacing('1');
+        height: 42px;
+      }
+    }
+  }
+}
+
+// Two fields side by side, stacking on small screens.
+.field-row {
+  @include flex(row, stretch, flex-start, spacing('4'));
+  flex-wrap: wrap;
+
+  .field {
+    flex: 1 1 200px;
+    min-width: 0;
+  }
+}
+
+.attachments-hint {
+  margin: spacing('2') 0 0;
+  font-size: font-size('sm');
+  color: var(--color-text-muted);
+}
+
+// Read-only details shown in the "View" modal.
+.leave-details {
+  @include flex(column, stretch, flex-start, spacing('3'));
+  margin: 0;
+
+  &__row {
+    @include flex(row, flex-start, flex-start, spacing('4'));
+
+    dt {
+      flex: 0 0 140px;
+      font-size: font-size('sm');
+      font-weight: font-weight('semibold');
+      color: var(--color-text-muted);
+    }
+
+    dd {
+      margin: 0;
+      flex: 1 1 auto;
+      color: var(--color-text);
+      word-break: break-word;
+    }
+
+    &--danger dd {
+      color: var(--color-danger, #dc2626);
+    }
+  }
+
+  &__files {
+    list-style: disc;
+    margin: 0;
+    padding-left: spacing('4');
+    color: var(--color-text);
+  }
+}

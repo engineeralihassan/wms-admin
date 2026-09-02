@@ -64,6 +64,14 @@ export const routes: Routes = [
             (m) => m.PROJECTS_ROUTES,
           ),
       },
+      {
+        path: 'leaves',
+        canActivate: [permissionGuard('leave.read')],
+        loadChildren: () =>
+          import('./features/leaves/leaves.routes').then(
+            (m) => m.LEAVES_ROUTES,
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

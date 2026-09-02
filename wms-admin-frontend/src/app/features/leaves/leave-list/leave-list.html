@@ -1,0 +1,328 @@
+<header class="page-header">
+  <div>
+    <h1 class="page-header__title">Leave Management</h1>
+    <p class="page-header__subtitle">Apply for time off, track approvals, and manage your leave balance.</p>
+  </div>
+  <div class="page-header__actions">
+    @if (isAllocator()) {
+      <app-button variant="ghost" (clicked)="openTypeModal()">New Leave Type</app-button>
+      <app-button variant="secondary" (clicked)="openAllocateModal()">Allocate Balance</app-button>
+    }
+    @if (canCreate()) {
+      <app-button variant="primary" (clicked)="openCreate()">Apply for Leave</app-button>
+    }
+  </div>
+</header>
+
+<!-- My balances summary -->
+@if (myBalances().length) {
+  <app-card [title]="'My Leave Balance · ' + balancesYear()" class="leave-balances">
+    <div class="balances">
+      @for (b of myBalances(); track b.uuid) {
+        <div class="balance-card">
+          <span class="balance-card__dot" [style.background]="b.leave_type?.color || 'var(--color-primary)'"></span>
+          <div class="balance-card__body">
+            <span class="balance-card__name">{{ b.leave_type?.name ?? 'Leave' }}</span>
+            <span class="balance-card__available">{{ b.available }} <small>available</small></span>
+            <span class="balance-card__meta">
+              {{ b.allocated }} allocated · {{ b.used }} used · {{ b.pending }} pending
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+  </app-card>
+}
+
+<app-card title="All Leave Requests">
+  <app-data-table
+    caption="Leave requests"
+    [columns]="columns"
+    [rows]="list.items()"
+    [rowId]="leave => leave.uuid"
+    [loading]="list.loading()"
+    emptyMessage="No leave requests match the current search and filters."
+    searchLabel="Search leave by reference or reason"
+    searchPlaceholder="Search reference or reason…"
+    [searchValue]="searchValue()"
+    [filters]="filters()"
+    [dateRangeFilter]="dateRangeFilter"
+    [filterValues]="list.filters()"
+    [actions]="actions()"
+    [iconOnlyActions]="true"
+    [page]="list.page()"
+    [totalPages]="list.totalPages()"
+    [total]="list.total()"
+    [limit]="list.limit()"
+    [sortBy]="list.sortBy()"
+    [sortDir]="list.sortDir()"
+    (searchChange)="onSearch($event)"
+    (filterChange)="list.setFilter($event.key, $event.value)"
+    (resetFilters)="onClearFilters()"
+    (sortChange)="list.toggleSort($event)"
+    (pageChange)="list.setPage($event)"
+    (pageSizeChange)="list.setLimit($event)"
+    (action)="onAction($event)"
+  />
+</app-card>
+
+<!-- Apply for leave -->
+<app-modal [open]="openModal() === 'create'" title="Apply for Leave" (closed)="closeModal()">
+  <form class="leave-form" [formGroup]="createForm">
+    <label class="field">
+      <span class="field__label">Leave type</span>
+      <select class="field__input" formControlName="leave_type">
+        @for (t of leaveTypes(); track t.uuid) {
+          <option [value]="t.uuid">{{ t.name }} @if (!t.is_paid) { (unpaid) }</option>
+        }
+      </select>
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">From</span>
+        <input class="field__input" type="date" formControlName="start_date" [min]="today" />
+      </label>
+      <label class="field">
+        <span class="field__label">To</span>
+        <input class="field__input" type="date" formControlName="end_date" [min]="today" />
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="field__label">Day portion</span>
+      <select class="field__input" formControlName="day_portion">
+        @for (p of dayPortionOptions; track p) { <option [value]="p">{{ dayPortionLabels[p] }}</option> }
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Reason</span>
+      <textarea class="field__input" rows="3" formControlName="reason" maxlength="2000" placeholder="Add a reason (optional)"></textarea>
+    </label>
+  </form>
+
+  <app-file-upload
+    [config]="attachmentConfig"
+    label="Attachments (optional)"
+    (filesChange)="attachments.set($event)"
+  />
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Discard</app-button>
+    <app-button variant="secondary" [loading]="submitting()" (clicked)="submitCreate('draft')">
+      Save as Draft
+    </app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitCreate('submit')">
+      Save and Submit
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- Edit leave (draft / rejected, owner only) -->
+<app-modal
+  [open]="openModal() === 'edit'"
+  [title]="'Edit ' + (activeLeave()?.leave_number ?? 'request')"
+  (closed)="closeModal()"
+>
+  <form class="leave-form" [formGroup]="editForm">
+    <label class="field">
+      <span class="field__label">Leave type</span>
+      <select class="field__input" formControlName="leave_type">
+        @for (t of leaveTypes(); track t.uuid) {
+          <option [value]="t.uuid">{{ t.name }} @if (!t.is_paid) { (unpaid) }</option>
+        }
+      </select>
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">From</span>
+        <input class="field__input" type="date" formControlName="start_date" [min]="today" />
+      </label>
+      <label class="field">
+        <span class="field__label">To</span>
+        <input class="field__input" type="date" formControlName="end_date" [min]="today" />
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="field__label">Day portion</span>
+      <select class="field__input" formControlName="day_portion">
+        @for (p of dayPortionOptions; track p) { <option [value]="p">{{ dayPortionLabels[p] }}</option> }
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Reason</span>
+      <textarea class="field__input" rows="3" formControlName="reason" maxlength="2000"></textarea>
+    </label>
+  </form>
+
+  @if (activeLeave()?.attachments?.length) {
+    <p class="attachments-hint">
+      Current attachments: {{ activeLeave()?.attachments?.length }}. Add files below to replace them.
+    </p>
+  }
+  <app-file-upload
+    [config]="attachmentConfig"
+    label="Attachments (optional)"
+    (filesChange)="attachments.set($event)"
+  />
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
+    <app-button variant="secondary" [loading]="submitting()" (clicked)="submitEdit('draft')">
+      Save as Draft
+    </app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitEdit('submit')">
+      Save and Submit
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- Decision (approve / reject) — approvers only -->
+<app-modal
+  [open]="openModal() === 'decision'"
+  size="sm"
+  [title]="'Review · ' + (activeLeave()?.leave_number ?? '')"
+  (closed)="closeModal()"
+>
+  <form class="leave-form" [formGroup]="decisionForm">
+    <label class="field">
+      <span class="field__label">Decision</span>
+      <select class="field__input" formControlName="decision">
+        <option value="approve">Approve</option>
+        <option value="reject">Reject</option>
+      </select>
+    </label>
+
+    @if (decisionForm.controls.decision.value === 'reject') {
+      <label class="field">
+        <span class="field__label">Rejection reason</span>
+        <textarea
+          class="field__input"
+          rows="3"
+          formControlName="rejection_reason"
+          maxlength="1000"
+          placeholder="Explain why this request is rejected…"
+        ></textarea>
+        @if (decisionForm.controls.rejection_reason.touched && decisionForm.controls.rejection_reason.errors) {
+          <span class="field__error">A reason is required to reject.</span>
+        }
+      </label>
+    }
+  </form>
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitDecision()">
+      Submit decision
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- New leave type — allocators only -->
+<app-modal [open]="openModal() === 'type'" size="sm" title="New Leave Type" (closed)="closeModal()">
+  <form class="leave-form" [formGroup]="typeForm">
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Key</span>
+        <input class="field__input" type="text" formControlName="key" maxlength="50" placeholder="e.g. sabbatical" />
+      </label>
+      <label class="field">
+        <span class="field__label">Name</span>
+        <input class="field__input" type="text" formControlName="name" maxlength="100" placeholder="e.g. Sabbatical" />
+      </label>
+    </div>
+    <div class="field-row">
+      <label class="field field--check">
+        <input type="checkbox" formControlName="is_paid" />
+        <span class="field__label">Paid leave (checks balance on submit)</span>
+      </label>
+      <label class="field field--color">
+        <span class="field__label">Color</span>
+        <input class="field__input" type="color" formControlName="color" />
+      </label>
+    </div>
+  </form>
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitType()">Create type</app-button>
+  </div>
+</app-modal>
+
+<!-- Allocate balance — allocators only -->
+<app-modal [open]="openModal() === 'allocate'" size="sm" title="Allocate Leave Balance" (closed)="closeModal()">
+  <form class="leave-form" [formGroup]="allocateForm">
+    <label class="field">
+      <span class="field__label">User UUID</span>
+      <input class="field__input" type="text" formControlName="user" placeholder="The user's uuid" />
+    </label>
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Leave type</span>
+        <select class="field__input" formControlName="leave_type">
+          @for (t of leaveTypes(); track t.uuid) { <option [value]="t.uuid">{{ t.name }}</option> }
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Year</span>
+        <input class="field__input" type="number" formControlName="period_year" min="2000" max="2100" />
+      </label>
+    </div>
+    <label class="field">
+      <span class="field__label">Allocated days</span>
+      <input class="field__input" type="number" formControlName="allocated" min="0" step="0.5" placeholder="0" />
+    </label>
+  </form>
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
+    <app-button variant="primary" [loading]="submitting()" (clicked)="submitAllocate()">Save balance</app-button>
+  </div>
+</app-modal>
+
+<!-- View details -->
+<app-modal
+  [open]="openModal() === 'view'"
+  [title]="activeLeave()?.leave_number ?? 'Leave request'"
+  (closed)="closeModal()"
+>
+  @if (activeLeave(); as l) {
+    <dl class="leave-details">
+      <div class="leave-details__row"><dt>Type</dt><dd>{{ l.leave_type?.name ?? '—' }}</dd></div>
+      <div class="leave-details__row"><dt>From</dt><dd>{{ formatDate(l.start_date) }}</dd></div>
+      <div class="leave-details__row"><dt>To</dt><dd>{{ formatDate(l.end_date) }}</dd></div>
+      <div class="leave-details__row"><dt>Day portion</dt><dd>{{ dayPortionLabels[l.day_portion] }}</dd></div>
+      <div class="leave-details__row"><dt>Total days</dt><dd>{{ l.total_days }}</dd></div>
+      <div class="leave-details__row"><dt>Status</dt><dd>{{ statusLabels[l.status] }}</dd></div>
+      <div class="leave-details__row"><dt>Applicant</dt><dd>{{ userName(l.applicant) }}</dd></div>
+      @if (l.reviewer) {
+        <div class="leave-details__row"><dt>Reviewed by</dt><dd>{{ userName(l.reviewer) }}</dd></div>
+      }
+      @if (l.reason) {
+        <div class="leave-details__row"><dt>Reason</dt><dd>{{ l.reason }}</dd></div>
+      }
+      @if (l.status === 'rejected' && l.rejection_reason) {
+        <div class="leave-details__row leave-details__row--danger">
+          <dt>Rejection reason</dt><dd>{{ l.rejection_reason }}</dd>
+        </div>
+      }
+      @if (l.attachments.length) {
+        <div class="leave-details__row">
+          <dt>Attachments</dt>
+          <dd>
+            <ul class="leave-details__files">
+              @for (a of l.attachments; track a.name) { <li>{{ a.name }}</li> }
+            </ul>
+          </dd>
+        </div>
+      }
+    </dl>
+  }
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Close</app-button>
+  </div>
+</app-modal>

@@ -60,6 +60,12 @@ const createOrganizationWithAdmin = async (body, res) => {
       { transaction }
     );
 
+    // Seed this tenant's default leave types (annual/sick/casual/unpaid). Required
+    // lazily to avoid a circular dependency through the services barrel.
+    // eslint-disable-next-line global-require
+    const { ensureDefaultLeaveTypes } = require('../leaves/leave.service');
+    await ensureDefaultLeaveTypes(organization.id, adminUser.id, transaction);
+
     return { organization, adminUser };
   });
 

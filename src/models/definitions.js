@@ -9,6 +9,10 @@ const Ticket = require('./ticket.model');
 const Expense = require('./expense.model');
 const Project = require('./project.model');
 const ProjectMember = require('./project-member.model');
+const LeaveType = require('./leave-type.model');
+const LeaveBalance = require('./leave-balance.model');
+const LeaveRequest = require('./leave-request.model');
+const LeaveBalanceLedger = require('./leave-balance-ledger.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -47,6 +51,10 @@ const definitions = (sequelize, Sequelize) => {
   db.Expense = Expense(sequelize);
   db.Project = Project(sequelize);
   db.ProjectMember = ProjectMember(sequelize);
+  db.LeaveType = LeaveType(sequelize);
+  db.LeaveBalance = LeaveBalance(sequelize);
+  db.LeaveRequest = LeaveRequest(sequelize);
+  db.LeaveBalanceLedger = LeaveBalanceLedger(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -132,6 +140,61 @@ const definitions = (sequelize, Sequelize) => {
   db.User.hasMany(db.ProjectMember, { foreignKey: 'user_id', as: 'projectMemberships' });
   db.ProjectMember.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
   db.ProjectMember.belongsTo(db.User, { foreignKey: 'added_by_id', as: 'addedBy' });
+
+  // ── Leave Management ──────────────────────────────────────────────────────
+
+  // Organization <-> LeaveType (tenant scope)
+  db.Organization.hasMany(db.LeaveType, { foreignKey: 'organization_id', as: 'leaveTypes' });
+  db.LeaveType.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.LeaveType.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+
+  // Organization <-> LeaveBalance (tenant scope)
+  db.Organization.hasMany(db.LeaveBalance, { foreignKey: 'organization_id', as: 'leaveBalances' });
+  db.LeaveBalance.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  // User <-> LeaveBalance (balance owner)
+  db.User.hasMany(db.LeaveBalance, { foreignKey: 'user_id', as: 'leaveBalances' });
+  db.LeaveBalance.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  // LeaveType <-> LeaveBalance
+  db.LeaveType.hasMany(db.LeaveBalance, { foreignKey: 'leave_type_id', as: 'balances' });
+  db.LeaveBalance.belongsTo(db.LeaveType, { foreignKey: 'leave_type_id', as: 'leaveType' });
+
+  // Organization <-> LeaveRequest (tenant scope)
+  db.Organization.hasMany(db.LeaveRequest, { foreignKey: 'organization_id', as: 'leaveRequests' });
+  db.LeaveRequest.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  // User <-> LeaveRequest (applicant + reviewer, two distinct associations)
+  db.User.hasMany(db.LeaveRequest, { foreignKey: 'created_by_id', as: 'createdLeaveRequests' });
+  db.LeaveRequest.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'applicant' });
+  db.User.hasMany(db.LeaveRequest, { foreignKey: 'reviewed_by_id', as: 'reviewedLeaveRequests' });
+  db.LeaveRequest.belongsTo(db.User, { foreignKey: 'reviewed_by_id', as: 'reviewer' });
+  // LeaveType <-> LeaveRequest
+  db.LeaveType.hasMany(db.LeaveRequest, { foreignKey: 'leave_type_id', as: 'requests' });
+  db.LeaveRequest.belongsTo(db.LeaveType, { foreignKey: 'leave_type_id', as: 'leaveType' });
+
+  // LeaveBalance <-> LeaveBalanceLedger (audit trail)
+  db.Organization.hasMany(db.LeaveBalanceLedger, {
+    foreignKey: 'organization_id',
+    as: 'leaveBalanceLedger',
+  });
+  db.LeaveBalanceLedger.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+  db.LeaveBalance.hasMany(db.LeaveBalanceLedger, {
+    foreignKey: 'leave_balance_id',
+    as: 'ledgerEntries',
+  });
+  db.LeaveBalanceLedger.belongsTo(db.LeaveBalance, {
+    foreignKey: 'leave_balance_id',
+    as: 'balance',
+  });
+  db.LeaveRequest.hasMany(db.LeaveBalanceLedger, {
+    foreignKey: 'leave_request_id',
+    as: 'ledgerEntries',
+  });
+  db.LeaveBalanceLedger.belongsTo(db.LeaveRequest, {
+    foreignKey: 'leave_request_id',
+    as: 'leaveRequest',
+  });
 
   return db;
 };

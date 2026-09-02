@@ -76,10 +76,41 @@ const PROJECT_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
+const LEAVE_QUERY_CONFIG = Object.freeze({
+  sortable: [
+    'created_at',
+    'updated_at',
+    'leave_number',
+    'start_date',
+    'end_date',
+    'status',
+    'total_days',
+    'submitted_at',
+  ],
+  searchable: ['leave_number', 'reason'],
+  filterable: ['status', 'leave_type_id', 'day_portion'],
+  rangeFilterable: ['created_at', 'start_date', 'end_date'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+const LEAVE_BALANCE_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'period_year', 'allocated', 'used'],
+  searchable: [],
+  filterable: ['leave_type_id', 'period_year', 'user_id'],
+  rangeFilterable: ['created_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
 module.exports = {
   USER_QUERY_CONFIG,
   ORGANIZATION_QUERY_CONFIG,
   TICKET_QUERY_CONFIG,
   EXPENSE_QUERY_CONFIG,
   PROJECT_QUERY_CONFIG,
+  LEAVE_QUERY_CONFIG,
+  LEAVE_BALANCE_QUERY_CONFIG,
 };

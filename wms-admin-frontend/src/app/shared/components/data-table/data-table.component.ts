@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { PaginationComponent } from '../pagination/pagination.component';
 import type { SortDirection } from '../../../core/models/pagination.model';
+import { iconPath, type IconName } from '../icon/icons';
 
 /** Semantic pill variants a column can render via the `badge` hook. */
 export type BadgeVariant =
@@ -50,7 +51,8 @@ export interface DataTableDateRangeFilter {
 export interface DataTableAction<T> {
   id: string;
   label: string;
-  icon?: string;
+  /** A named icon from the shared registry (rendered as a crisp inline SVG). */
+  icon?: IconName;
   /** Visual emphasis. 'danger' styles destructive actions (e.g. Delete). */
   variant?: 'default' | 'danger';
   isDisabled?: (row: T) => boolean;
@@ -104,6 +106,8 @@ export class DataTableComponent<T> {
   readonly pageChange = output<number>();
   readonly pageSizeChange = output<number>();
   readonly action = output<DataTableActionEvent<T>>();
+  /** Emitted when the user clicks "Clear all" — clears search + every filter. */
+  readonly resetFilters = output<void>();
 
   protected readonly visibleColumns = computed(() => this.columns());
   protected readonly hasActions = computed(() => this.actions().length > 0);
@@ -135,4 +139,9 @@ export class DataTableComponent<T> {
   }
 
   protected trackRow = (_: number, row: T): string | number => this.rowId()(row);
+
+  /** Resolve an action's named icon to its SVG path (null if unregistered). */
+  protected iconPath(name: string | undefined): string | null {
+    return iconPath(name);
+  }
 }

@@ -4,3 +4,4 @@ module.exports.userValidation = require('./user/user.validation');
 module.exports.ticketValidation = require('./tickets/ticket.validation');
 module.exports.expenseValidation = require('./expenses/expense.validation');
 module.exports.projectValidation = require('./projects/project.validation');
+module.exports.leaveValidation = require('./leaves/leave.validation');

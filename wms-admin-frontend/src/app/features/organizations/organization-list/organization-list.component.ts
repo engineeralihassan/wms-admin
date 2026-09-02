@@ -54,7 +54,7 @@ export class OrganizationListComponent {
   };
   protected readonly actions: ReadonlyArray<DataTableAction<Organization>> = [
     {
-      id: 'toggle-status', label: 'Change status', icon: '↻',
+      id: 'toggle-status', label: 'Change status', icon: 'status',
     },
   ];
   protected readonly searchValue = signal('');
@@ -81,6 +81,12 @@ export class OrganizationListComponent {
   protected onSearch(value: string): void {
     this.searchValue.set(value);
     this.list.onSearch(value);
+  }
+
+  /** "Clear all": wipe the search box + every filter. */
+  protected onClearFilters(): void {
+    this.searchValue.set('');
+    this.list.clearFilters();
   }
 
   protected onAction(event: { actionId: string; row: Organization }): void {

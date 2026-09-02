@@ -33,7 +33,7 @@
       </select>
     </label>
 
-    <button type="button" class="data-table__reset" (click)="searchChange.emit(''); filterChange.emit({ key: '__reset__', value: '' })">
+    <button type="button" class="data-table__reset" (click)="resetFilters.emit()">
       <span class="data-table__reset-icon" aria-hidden="true">×</span>
       Clear all
     </button>
@@ -88,7 +88,13 @@
                       [disabled]="item.isDisabled?.(row) ?? false"
                       [attr.aria-label]="item.label"
                       [attr.title]="item.isDisabled?.(row) ? item.disabledLabel?.(row) : item.label">
-                      @if (item.icon) { <span aria-hidden="true">{{ item.icon }}</span> }
+                      @if (iconPath(item.icon); as path) {
+                        <svg class="data-table__action-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                          <path [attr.d]="path" />
+                        </svg>
+                      } @else if (item.icon) {
+                        <span aria-hidden="true">{{ item.icon }}</span>
+                      }
                       @if (!iconOnlyActions()) { {{ item.label }} }
                     </button>
                   }

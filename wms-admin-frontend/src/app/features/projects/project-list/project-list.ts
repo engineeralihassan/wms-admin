@@ -233,16 +233,16 @@ export class ProjectList {
       {
         id: 'edit',
         label: 'Edit',
-        icon: '✎',
+        icon: 'edit',
         isDisabled: (p) => !this.canEdit(p),
         disabledLabel: () => 'You can only edit projects you created',
       },
     ];
     if (this.isManager()) {
-      acts.push({ id: 'members', label: 'Manage members', icon: '👥' });
+      acts.push({ id: 'members', label: 'Manage members', icon: 'members' });
     }
     if (this.canDelete()) {
-      acts.push({ id: 'delete', label: 'Delete', icon: '🗑', variant: 'danger' });
+      acts.push({ id: 'delete', label: 'Delete', icon: 'delete', variant: 'danger' });
     }
     return acts;
   });
@@ -326,6 +326,12 @@ export class ProjectList {
   protected onSearch(value: string): void {
     this.searchValue.set(value);
     this.list.onSearch(value);
+  }
+
+  /** "Clear all": wipe the search box + every filter. */
+  protected onClearFilters(): void {
+    this.searchValue.set('');
+    this.list.clearFilters();
   }
 
   // ---- Open modals ----

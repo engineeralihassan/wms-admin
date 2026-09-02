@@ -42,4 +42,17 @@ export const API_ENDPOINTS = {
     member: (uuid: string, userUuid: string) => `/projects/${uuid}/members/${userUuid}`,
     assignableUsers: (uuid: string) => `/projects/${uuid}/assignable-users`,
   },
+  leaves: {
+    root: '/leaves',
+    byUuid: (uuid: string) => `/leaves/${uuid}`,
+    submit: (uuid: string) => `/leaves/${uuid}/submit`,
+    withdraw: (uuid: string) => `/leaves/${uuid}/withdraw`,
+    decision: (uuid: string) => `/leaves/${uuid}/decision`,
+    cancel: (uuid: string) => `/leaves/${uuid}/cancel`,
+    myBalances: '/leaves/balances/me',
+    calendar: '/leaves/calendar',
+    types: '/leaves/types',
+    typeByUuid: (uuid: string) => `/leaves/types/${uuid}`,
+    balances: '/leaves/balances',
+  },
 } as const;

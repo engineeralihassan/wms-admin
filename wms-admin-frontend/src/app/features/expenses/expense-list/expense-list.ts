@@ -189,14 +189,14 @@ export class ExpenseList {
   /** Row actions, filtered by capability + per-row policy (mirrors backend). */
   protected readonly actions = computed<ReadonlyArray<DataTableAction<Expense>>>(() => {
     const acts: DataTableAction<Expense>[] = [
-      { id: 'view', label: 'View', icon: '👁' },
+      { id: 'view', label: 'View', icon: 'view' },
     ];
 
     // Owner can edit a draft or a rejected expense.
     acts.push({
       id: 'edit',
       label: 'Edit',
-      icon: '✎',
+      icon: 'edit',
       isDisabled: (e) => !this.canEdit(e),
       disabledLabel: () => 'Only draft or rejected expenses you own can be edited',
     });
@@ -206,7 +206,7 @@ export class ExpenseList {
       acts.push({
         id: 'review',
         label: 'Review',
-        icon: '✔',
+        icon: 'check',
         isDisabled: (e) => e.status !== 'submitted',
         disabledLabel: () => 'Only submitted expenses can be reviewed',
       });
@@ -216,7 +216,7 @@ export class ExpenseList {
       acts.push({
         id: 'delete',
         label: 'Delete',
-        icon: '🗑',
+        icon: 'delete',
         variant: 'danger',
         isDisabled: (e) => !this.canDeleteRow(e),
         disabledLabel: () => 'Only draft or rejected expenses can be deleted',
@@ -302,6 +302,12 @@ export class ExpenseList {
   protected onSearch(value: string): void {
     this.searchValue.set(value);
     this.list.onSearch(value);
+  }
+
+  /** "Clear all": wipe the search box + every filter. */
+  protected onClearFilters(): void {
+    this.searchValue.set('');
+    this.list.clearFilters();
   }
 
   // ---- Open modals ----

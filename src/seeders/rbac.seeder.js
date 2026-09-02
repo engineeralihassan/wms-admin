@@ -22,6 +22,7 @@ dotenv.config({
 
 const db = require('../models');
 const Encrypter = require('../helper/encrypter');
+const { leaveService } = require('../services');
 const {
   ROLES,
   ROLE_DEFINITIONS,
@@ -95,6 +96,8 @@ async function ensureSearchIndexes() {
     'CREATE INDEX IF NOT EXISTS expenses_expense_number_trgm ON expenses USING gin (expense_number gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS projects_name_trgm ON projects USING gin (name gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS projects_project_code_trgm ON projects USING gin (project_code gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS leave_requests_leave_number_trgm ON leave_requests USING gin (leave_number gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS leave_requests_reason_trgm ON leave_requests USING gin (reason gin_trgm_ops)',
   ];
   for (const sql of statements) {
     // eslint-disable-next-line no-await-in-loop
@@ -159,6 +162,23 @@ async function seedSuperAdmin(roles) {
   console.log(`  super admin: CREATED (${email})`);
 }
 
+/**
+ * Ensure the default leave types exist for every organization (idempotent).
+ * New organizations should also call leaveService.ensureDefaultLeaveTypes on creation;
+ * this backfills any orgs that predate the leave module.
+ */
+async function seedDefaultLeaveTypes(transaction) {
+  const { Organization } = db;
+  const orgs = await Organization.findAll({ attributes: ['id'], transaction });
+  let count = 0;
+  for (const org of orgs) {
+    // eslint-disable-next-line no-await-in-loop
+    await leaveService.ensureDefaultLeaveTypes(org.id, null, transaction);
+    count += 1;
+  }
+  console.log(`  leave types: defaults ensured for ${count} organization(s)`);
+}
+
 function humanize(permissionKey) {
   return permissionKey.replace('.', ' ').replace('_', ' ');
 }
@@ -176,6 +196,7 @@ async function run() {
     const roles = await seedRoles();
     await syncRolePermissions(roles, permissions);
     await seedSuperAdmin(roles);
+    await seedDefaultLeaveTypes(transaction);
     await ensureSearchIndexes();
 
     await transaction.commit();

@@ -80,6 +80,18 @@ const PERMISSIONS = Object.freeze({
   // and expense.review). Normal members only see projects they're assigned to.
   PROJECT_MANAGE: 'project.manage',
 
+  // Leave / Time Off
+  LEAVE_CREATE: 'leave.create',
+  LEAVE_READ: 'leave.read',
+  LEAVE_UPDATE: 'leave.update',
+  LEAVE_DELETE: 'leave.delete',
+  // The manager-distinguishing capability: holders see ALL of their org's leave
+  // requests and can approve/reject/cancel them (analogous to ticket.assign and
+  // expense.review). Normal members only see their own requests.
+  LEAVE_APPROVE: 'leave.approve',
+  // Admin capability to manage leave types and allocate/adjust user leave balances.
+  LEAVE_ALLOCATE: 'leave.allocate',
+
   // Example domain resource (warehouse/orders will follow this pattern)
   ORDER_CREATE: 'order.create',
   ORDER_READ: 'order.read',
@@ -122,6 +134,12 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.PROJECT_UPDATE,
     PERMISSIONS.PROJECT_DELETE,
     PERMISSIONS.PROJECT_MANAGE,
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
+    PERMISSIONS.LEAVE_APPROVE,
+    PERMISSIONS.LEAVE_ALLOCATE,
     PERMISSIONS.ORDER_CREATE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_UPDATE,
@@ -145,6 +163,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.EXPENSE_DELETE,
     // Vendors see only the projects they are assigned to (member visibility).
     PERMISSIONS.PROJECT_READ,
+    // Vendors apply for and manage their OWN leave; approval stays with org admins.
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_CREATE,
   ],
@@ -166,6 +189,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.EXPENSE_DELETE,
     // Consultants see only the projects they are assigned to (member visibility).
     PERMISSIONS.PROJECT_READ,
+    // Consultants apply for and manage their OWN leave (no approve/allocate).
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
   ],
 
   [ROLES.CONSULTANT_C2C]: [
@@ -181,6 +209,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.EXPENSE_DELETE,
     // Consultants see only the projects they are assigned to (member visibility).
     PERMISSIONS.PROJECT_READ,
+    // Consultants apply for and manage their OWN leave (no approve/allocate).
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
   ],
 });
 
