@@ -912,17 +912,26 @@ const allocateBalance = async (body, req, res) => {
   if (!isAllocator(req.auth)) {
     throw new ApiError(httpStatus.FORBIDDEN, res.__('forbidden'));
   }
-  const organizationId = req.auth.organizationId;
 
   return sequelize.transaction(async (transaction) => {
+    // Resolve the target user. A super_admin has no single org (organizationId is null)
+    // and may allocate to a user in ANY organization, so their lookup is unrestricted;
+    // everyone else is confined to their own org. The organization the balance belongs
+    // to is then DERIVED from the resolved user (never the caller's token), so the
+    // ledger/type all line up with the user's actual tenant.
+    const userWhere = { uuid: body.user };
+    if (!req.auth.isSuperAdmin) {
+      userWhere.organization_id = req.auth.organizationId;
+    }
     const user = await User.findOne({
-      where: { uuid: body.user, organization_id: organizationId },
-      attributes: ['id'],
+      where: userWhere,
+      attributes: ['id', 'organization_id'],
       transaction,
     });
-    if (!user) {
+    if (!user || !user.organization_id) {
       throw new ApiError(httpStatus.BAD_REQUEST, res.__('user_not_found'));
     }
+    const organizationId = user.organization_id;
     const type = await resolveLeaveType(body.leave_type, organizationId, res, transaction);
 
     const balance = await findOrCreateBalanceLocked(

@@ -256,10 +256,58 @@
 <!-- Allocate balance — allocators only -->
 <app-modal [open]="openModal() === 'allocate'" size="sm" title="Allocate Leave Balance" (closed)="closeModal()">
   <form class="leave-form" [formGroup]="allocateForm">
-    <label class="field">
-      <span class="field__label">User UUID</span>
-      <input class="field__input" type="text" formControlName="user" placeholder="The user's uuid" />
-    </label>
+    <!-- Searchable user picker (server-scoped: org admins see their org, super admin all). -->
+    <div class="user-picker">
+      <div class="user-picker__selected">
+        <span class="field__label">User</span>
+        @if (selectedUser(); as sel) {
+          <span class="user-chip">
+            {{ sel.first_name }} {{ sel.last_name }}
+            <small>{{ sel.email }}</small>
+          </span>
+        } @else {
+          <span class="user-picker__empty">No user selected</span>
+        }
+      </div>
+
+      <label class="field">
+        <span class="field__label">Search a user</span>
+        <input
+          class="field__input"
+          type="search"
+          [value]="userSearch()"
+          (input)="onUserSearch($any($event.target).value)"
+          placeholder="Type a name or email…"
+          autocomplete="off"
+        />
+      </label>
+
+      <ul class="user-results" role="listbox" aria-label="Matching users">
+        @if (userSearchLoading()) {
+          <li class="user-results__state">Searching…</li>
+        } @else if (userResults().length === 0) {
+          <li class="user-results__state">No matching users.</li>
+        } @else {
+          @for (u of userResults(); track u.uuid) {
+            <li>
+              <button
+                type="button"
+                class="user-results__item"
+                [class.is-selected]="selectedUser()?.uuid === u.uuid"
+                (click)="selectUser(u)"
+              >
+                <span class="user-results__name">{{ u.first_name }} {{ u.last_name }}</span>
+                <span class="user-results__email">{{ u.email }}</span>
+              </button>
+            </li>
+          }
+          @if (userHasMore()) {
+            <li class="user-results__state">More results exist — refine your search.</li>
+          }
+        }
+      </ul>
+    </div>
+
     <div class="field-row">
       <label class="field">
         <span class="field__label">Leave type</span>

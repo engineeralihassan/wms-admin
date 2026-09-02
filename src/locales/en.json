@@ -98,5 +98,7 @@
   "leave_type_created": "Leave type created successfully",
   "leave_type_updated": "Leave type updated successfully",
   "leave_balance_allocated": "Leave balance updated successfully",
-  "leave_allocation_too_low": "Allocation cannot be lower than the already used and pending days"
+  "leave_allocation_too_low": "Allocation cannot be lower than the already used and pending days",
+
+  "dashboard_loaded": "Dashboard data loaded successfully"
 }

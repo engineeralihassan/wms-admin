@@ -2,11 +2,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
+import { UsersService } from '../../users/services/users.service';
+import type { UserListItem } from '../../users/models/user-list-item.model';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ModalService } from '../../../core/services/modal.service';
 import { CardComponent } from '../../../shared/components/card/card.component';
@@ -75,6 +80,21 @@ export class LeaveList {
   private readonly auth = inject(AuthService);
   private readonly notify = inject(NotificationService);
   private readonly modal = inject(ModalService);
+  private readonly users = inject(UsersService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  // ---- Allocate user picker (searchable; scoped server-side by the caller's role:
+  // org_admin sees their org, super_admin sees all users). Mirrors the ticket
+  // assignee typeahead. Only active users are offered.
+  /** The user chosen in the picker (drives the allocateForm.user uuid on submit). */
+  protected readonly selectedUser = signal<UserListItem | null>(null);
+  /** Current page of matching users (server-searched, capped small). */
+  protected readonly userResults = signal<UserListItem[]>([]);
+  protected readonly userSearch = signal('');
+  protected readonly userSearchLoading = signal(false);
+  /** True when more matches exist than the page shows (prompt to refine). */
+  protected readonly userHasMore = signal(false);
+  private readonly userSearch$ = new Subject<string>();
 
   protected readonly statusOptions = LEAVE_STATUSES;
   protected readonly dayPortionOptions = LEAVE_DAY_PORTIONS;
@@ -306,6 +326,56 @@ export class LeaveList {
     this.list.init();
     this.loadLeaveTypes();
     this.loadMyBalances();
+    this.wireUserSearch();
+  }
+
+  /**
+   * Debounced, switch-mapped user search for the allocate picker: only the latest
+   * query's results win, and we never fetch the whole directory — just a small page of
+   * matches. The backend scopes results to what the caller may see (own org / all).
+   */
+  private wireUserSearch(): void {
+    this.userSearch$
+      .pipe(
+        debounceTime(300),
+        distinctUntilChanged(),
+        switchMap((term) => {
+          this.userSearchLoading.set(true);
+          return this.users.list({
+            search: term || undefined,
+            limit: 20,
+            sortBy: 'first_name',
+            sortDir: 'asc',
+            filters: { status: 'active' },
+          });
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (res) => {
+          this.userResults.set(res.data ?? []);
+          this.userHasMore.set(
+            res.meta?.strategy === 'offset' ? res.meta.total > res.data.length : false,
+          );
+          this.userSearchLoading.set(false);
+        },
+        error: () => {
+          this.userSearchLoading.set(false);
+          this.notify.error('Could not load users.');
+        },
+      });
+  }
+
+  /** Typeahead input handler for the allocate user picker. */
+  protected onUserSearch(term: string): void {
+    this.userSearch.set(term);
+    this.userSearch$.next(term.trim());
+  }
+
+  /** Pick a user from the results (sets the form's uuid). */
+  protected selectUser(user: UserListItem): void {
+    this.selectedUser.set(user);
+    this.allocateForm.controls.user.setValue(user.uuid);
   }
 
   // ---- Reference loaders ----
@@ -402,7 +472,13 @@ export class LeaveList {
       period_year: new Date().getFullYear(),
       allocated: null,
     });
+    // Reset the user picker and load an initial page of users to choose from.
+    this.selectedUser.set(null);
+    this.userSearch.set('');
+    this.userResults.set([]);
+    this.userHasMore.set(false);
     this.openModal.set('allocate');
+    this.userSearch$.next('');
   }
 
   protected onAction(event: { actionId: string; row: LeaveRequest }): void {

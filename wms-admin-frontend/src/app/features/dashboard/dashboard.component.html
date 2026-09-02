@@ -1,16 +1,185 @@
 <header class="page-header">
   <h1 class="page-header__title">{{ greeting() }}</h1>
-  <p class="page-header__subtitle">Here's an overview of your warehouse operations.</p>
+  <p class="page-header__subtitle">Here's an overview of your operations this month.</p>
 </header>
 
-<section class="stats">
-  @for (stat of stats; track stat.label) {
-    <app-card>
-      <div class="stat">
-        <span class="stat__label">{{ stat.label }}</span>
-        <span class="stat__value">{{ stat.value }}</span>
-        <span class="stat__hint">{{ stat.hint }}</span>
+<!-- ── Profile card ─────────────────────────────────────────────────────── -->
+<section class="profile">
+  <app-card>
+    @if (meLoading()) {
+      <div class="profile__loading" role="status"><app-spinner [size]="28" /></div>
+    } @else if (me(); as u) {
+      <div class="profile__body">
+        <div class="profile__avatar" aria-hidden="true">{{ initials() }}</div>
+        <div class="profile__info">
+          <div class="profile__name-row">
+            <span class="profile__name">{{ u.first_name }} {{ u.last_name }}</span>
+            <span class="profile__status profile__status--{{ u.status }}">{{ u.status }}</span>
+          </div>
+          <span class="profile__email">{{ u.email }}</span>
+          <div class="profile__meta">
+            @if (u.role) {
+              <span class="profile__chip">{{ u.role.name }}</span>
+            }
+            @if (u.organization) {
+              <span class="profile__chip">{{ u.organization.name }}</span>
+            }
+          </div>
+        </div>
       </div>
+    } @else {
+      <p class="profile__empty">Couldn't load your profile.</p>
+    }
+  </app-card>
+</section>
+
+<!-- ── Bar charts — one reusable component per module ─────────────────────── -->
+<section class="charts">
+  @if (isSuperAdmin()) {
+    <app-bar-chart-card
+      [data]="organizations.data()"
+      [loading]="organizations.loading()"
+      [error]="organizations.error()"
+      (viewDetails)="goTo($event)"
+      (retry)="reloadOrganizations()"
+    />
+  }
+  @if (canReadLeaves()) {
+    <app-bar-chart-card
+      [data]="leaves.data()"
+      [loading]="leaves.loading()"
+      [error]="leaves.error()"
+      (viewDetails)="goTo($event)"
+      (retry)="reloadLeaves()"
+    />
+  }
+  @if (canReadProjects()) {
+    <app-bar-chart-card
+      [data]="projects.data()"
+      [loading]="projects.loading()"
+      [error]="projects.error()"
+      (viewDetails)="goTo($event)"
+      (retry)="reloadProjects()"
+    />
+  }
+  @if (canReadTickets()) {
+    <app-bar-chart-card
+      [data]="tickets.data()"
+      [loading]="tickets.loading()"
+      [error]="tickets.error()"
+      (viewDetails)="goTo($event)"
+      (retry)="reloadTickets()"
+    />
+  }
+  @if (canReadExpenses()) {
+    <app-bar-chart-card
+      [data]="expenses.data()"
+      [loading]="expenses.loading()"
+      [error]="expenses.error()"
+      (viewDetails)="goTo($event)"
+      (retry)="reloadExpenses()"
+    />
+  }
+  @if (canReadUsers()) {
+    <app-bar-chart-card
+      [data]="users.data()"
+      [loading]="users.loading()"
+      [error]="users.error()"
+      (viewDetails)="goTo($event)"
+      (retry)="reloadUsers()"
+    />
+  }
+</section>
+
+<!-- ── Quick actions (moved directly under the charts) ────────────────────── -->
+@if (canReadSummary()) {
+  <section class="quick-actions">
+    <h2 class="section-title">Quick actions</h2>
+    @if (summary.loading()) {
+      <div class="quick-actions__grid">
+        @for (i of [1, 2, 3, 4, 5]; track i) {
+          <div class="quick-card quick-card--skeleton"></div>
+        }
+      </div>
+    } @else if (summary.error()) {
+      <app-card><p class="panel__empty">Couldn't load quick actions.</p></app-card>
+    } @else {
+      <div class="quick-actions__grid">
+        @for (card of summary.data(); track card.key) {
+          <button
+            type="button"
+            class="quick-card quick-card--{{ card.module }}"
+            (click)="goTo(card.detailPath)"
+          >
+            <span class="quick-card__value">{{ card.value }}</span>
+            <span class="quick-card__label">{{ card.label }}</span>
+            <span class="quick-card__cta" aria-hidden="true">View →</span>
+          </button>
+        }
+      </div>
+    }
+  </section>
+}
+
+<!-- ── Recent panels (moved to the bottom, side by side) ──────────────────── -->
+<section class="recent">
+  <!-- Latest active projects -->
+  @if (canReadProjects()) {
+    <app-card title="Active projects">
+      <button type="button" card-actions class="link-btn" (click)="goTo('/projects')">
+        View all
+      </button>
+      @if (recentProjects.loading()) {
+        <div class="panel__loading" role="status"><app-spinner [size]="22" /></div>
+      } @else if (recentProjects.error()) {
+        <p class="panel__empty">Couldn't load projects.</p>
+      } @else if (recentProjects.data()?.length) {
+        <ul class="panel-list">
+          @for (p of recentProjects.data(); track p.uuid) {
+            <li class="panel-item" (click)="goTo('/projects')">
+              <span class="panel-item__icon panel-item__icon--project" aria-hidden="true">
+                {{ p.name.charAt(0).toUpperCase() }}
+              </span>
+              <div class="panel-item__main">
+                <span class="panel-item__title">{{ p.name }}</span>
+                <span class="panel-item__sub">{{ p.project_code }} · Lead {{ fullName(p.lead) }}</span>
+              </div>
+              <span class="badge badge--{{ p.priority }}">{{ p.priority }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="panel__empty">No active projects right now.</p>
+      }
+    </app-card>
+  }
+
+  <!-- Latest urgent tickets -->
+  @if (canReadTickets()) {
+    <app-card title="Urgent tickets">
+      <button type="button" card-actions class="link-btn" (click)="goTo('/tickets')">
+        View all
+      </button>
+      @if (recentTickets.loading()) {
+        <div class="panel__loading" role="status"><app-spinner [size]="22" /></div>
+      } @else if (recentTickets.error()) {
+        <p class="panel__empty">Couldn't load tickets.</p>
+      } @else if (recentTickets.data()?.length) {
+        <ul class="panel-list">
+          @for (t of recentTickets.data(); track t.uuid) {
+            <li class="panel-item" (click)="goTo('/tickets')">
+              <span class="panel-item__icon panel-item__icon--ticket" aria-hidden="true">!</span>
+              <div class="panel-item__main">
+                <span class="panel-item__title">{{ t.subject }}</span>
+                <span class="panel-item__sub">{{ t.ticket_number }} · {{ t.status }}</span>
+              </div>
+              <span class="badge badge--urgent">{{ t.priority }}</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="panel__empty">No urgent tickets right now.</p>
+      }
     </app-card>
   }
 </section>

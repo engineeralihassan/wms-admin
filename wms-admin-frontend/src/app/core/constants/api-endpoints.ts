@@ -55,4 +55,18 @@ export const API_ENDPOINTS = {
     typeByUuid: (uuid: string) => `/leaves/types/${uuid}`,
     balances: '/leaves/balances',
   },
+  dashboard: {
+    me: '/dashboard/me',
+    charts: {
+      leaves: '/dashboard/charts/leaves',
+      tickets: '/dashboard/charts/tickets',
+      expenses: '/dashboard/charts/expenses',
+      projects: '/dashboard/charts/projects',
+      users: '/dashboard/charts/users',
+      organizations: '/dashboard/charts/organizations',
+    },
+    summary: '/dashboard/summary',
+    recentProjects: '/dashboard/recent-projects',
+    recentTickets: '/dashboard/recent-tickets',
+  },
 } as const;

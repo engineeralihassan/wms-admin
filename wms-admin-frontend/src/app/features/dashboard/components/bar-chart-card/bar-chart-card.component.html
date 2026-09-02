@@ -1,0 +1,31 @@
+<app-card [title]="title()">
+  <button type="button" card-actions class="view-details" (click)="onViewDetails()">
+    View details
+    <span class="view-details__arrow" aria-hidden="true">→</span>
+  </button>
+
+  <div class="chart">
+    @if (loading()) {
+      <div class="chart__state" role="status">
+        <app-spinner [size]="32" />
+        <span class="chart__state-text">Loading…</span>
+      </div>
+    } @else if (error()) {
+      <div class="chart__state">
+        <span class="chart__state-text">Couldn't load this chart.</span>
+        <app-button variant="secondary" (clicked)="onRetry()">Retry</app-button>
+      </div>
+    } @else if (isEmpty()) {
+      <div class="chart__state">
+        <span class="chart__state-text">No data for this period.</span>
+      </div>
+    } @else {
+      <div
+        echarts
+        class="chart__canvas"
+        [options]="chartOption()"
+        [autoResize]="true"
+      ></div>
+    }
+  </div>
+</app-card>

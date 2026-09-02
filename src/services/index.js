@@ -8,4 +8,5 @@ module.exports.ticketService = require('./tickets/ticket.service');
 module.exports.expenseService = require('./expenses/expense.service');
 module.exports.projectService = require('./projects/project.service');
 module.exports.leaveService = require('./leaves/leave.service');
+module.exports.dashboardService = require('./dashboard/dashboard.service');
 module.exports.emailService = require('./email/email.service');

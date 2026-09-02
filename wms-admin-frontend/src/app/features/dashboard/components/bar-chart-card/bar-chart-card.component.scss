@@ -1,0 +1,53 @@
+@use 'abstractions' as *;
+
+:host {
+  display: block;
+}
+
+/* "View details" rendered as a primary-colored link with an arrow that nudges on hover. */
+.view-details {
+  @include flex(row, center, center, spacing('1'));
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: font-size('sm');
+  font-weight: font-weight('semibold');
+  color: var(--color-primary, #0f766e);
+  transition: color 0.14s ease;
+
+  &:hover {
+    color: var(--color-primary-dark, #0b5c55);
+  }
+
+  &__arrow {
+    transition: transform 0.14s ease;
+  }
+
+  &:hover &__arrow {
+    transform: translateX(3px);
+  }
+
+  @include focus-ring;
+}
+
+.chart {
+  position: relative;
+  min-height: 260px;
+
+  &__canvas {
+    width: 100%;
+    height: 260px;
+  }
+
+  &__state {
+    @include flex(column, center, center, spacing('3'));
+    height: 260px;
+    text-align: center;
+  }
+
+  &__state-text {
+    font-size: font-size('sm');
+    color: var(--color-text-muted);
+  }
+}
