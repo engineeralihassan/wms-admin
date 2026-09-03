@@ -10,6 +10,7 @@ const expenseRoute = require('./expense.route');
 const projectRoute = require('./project.route');
 const leaveRoute = require('./leave.route');
 const dashboardRoute = require('./dashboard.route');
+const fileRoute = require('./files.route');
 const docsRoute = require('./docs.route');
 
 const devRoutes = [
@@ -28,6 +29,7 @@ const routes = [
   { path: '/projects', route: projectRoute },
   { path: '/leaves', route: leaveRoute },
   { path: '/dashboard', route: dashboardRoute },
+  { path: '/files', route: fileRoute },
 ];
 
 routes.forEach((route) => {

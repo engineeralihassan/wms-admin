@@ -81,6 +81,158 @@
   color: var(--color-text-muted);
 }
 
+// A labelled block of file cards (used in the edit + review modals).
+.attachments-block {
+  margin-top: spacing('4');
+
+  &__title {
+    @include flex(row, center, flex-start, spacing('2'));
+    margin: 0 0 spacing('2');
+    font-size: font-size('sm');
+    font-weight: font-weight('semibold');
+    color: var(--color-text-muted);
+  }
+}
+
+// Small count pill next to an "Attachments" label.
+.dt-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 spacing('1');
+  border-radius: 999px;
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+  font-size: font-size('xs');
+  font-weight: font-weight('semibold');
+}
+
+// Downloadable file cards — a responsive grid of tappable tiles.
+.file-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: spacing('2');
+}
+
+.file-card {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: radius('lg');
+  background: var(--color-surface, #fff);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+  }
+
+  &__link {
+    @include flex(row, center, flex-start, spacing('3'));
+    padding: spacing('3');
+    text-decoration: none;
+    color: inherit;
+  }
+
+  // Type badge (IMG / PDF / XLS / DOC). Colour comes from the kind modifier.
+  &__badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: radius('md');
+    font-size: font-size('xs');
+    font-weight: font-weight('bold');
+    letter-spacing: 0.02em;
+    background: var(--file-accent-bg, var(--color-hover));
+    color: var(--file-accent-fg, var(--color-text-muted));
+  }
+
+  &__meta {
+    @include flex(column, flex-start, center, 2px);
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  &__name {
+    font-size: font-size('sm');
+    font-weight: font-weight('medium');
+    color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  &__size {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+  }
+
+  &__action {
+    flex: 0 0 auto;
+    color: var(--color-text-muted);
+    font-size: font-size('sm');
+  }
+
+  // Remove button (edit modal only), floats top-right.
+  &__remove {
+    position: absolute;
+    top: spacing('1');
+    right: spacing('1');
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: font-size('xs');
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: var(--color-danger, #dc2626);
+      color: #fff;
+    }
+  }
+
+  // Per-type accents (badge colours).
+  &--image {
+    --file-accent-bg: #eef2ff;
+    --file-accent-fg: #4f46e5;
+  }
+  &--pdf {
+    --file-accent-bg: #fef2f2;
+    --file-accent-fg: #dc2626;
+  }
+  &--sheet {
+    --file-accent-bg: #ecfdf5;
+    --file-accent-fg: #059669;
+  }
+  &--doc {
+    --file-accent-bg: #eff6ff;
+    --file-accent-fg: #2563eb;
+  }
+  &--file {
+    --file-accent-bg: var(--color-hover);
+    --file-accent-fg: var(--color-text-muted);
+  }
+}
+
 // Read-only details shown in the "View" modal.
 .expense-details {
   @include flex(column, stretch, flex-start, spacing('3'));
@@ -101,6 +253,17 @@
       flex: 1 1 auto;
       color: var(--color-text);
       word-break: break-word;
+    }
+
+    // Attachments row stacks its label above full-width file cards.
+    &--stack {
+      flex-direction: column;
+      gap: spacing('2');
+
+      dt {
+        @include flex(row, center, flex-start, spacing('2'));
+        flex: 0 0 auto;
+      }
     }
   }
 

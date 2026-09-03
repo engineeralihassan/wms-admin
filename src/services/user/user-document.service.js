@@ -90,8 +90,17 @@ const listOwnDocuments = async (userId) => {
  * `actingUserId` is who performed the upload (self or admin).
  */
 const upsertDocument = async ({ targetUserId, organizationId, actingUserId, payload }) => {
-  const { doc_type, label, file_name, file_mime, file_size, storage_key, expires_on, note } =
-    payload;
+  const {
+    doc_type,
+    label,
+    file_name,
+    file_mime,
+    file_size,
+    storage_key,
+    file_url,
+    expires_on,
+    note,
+  } = payload;
 
   if (!USER_DOCUMENT_TYPE_KEYS.includes(doc_type)) {
     // Validation should have caught this; guard anyway.
@@ -115,6 +124,7 @@ const upsertDocument = async ({ targetUserId, organizationId, actingUserId, payl
     file_mime: file_mime || row.file_mime,
     file_size: file_size != null ? file_size : row.file_size,
     storage_key: storage_key || row.storage_key,
+    file_url: file_url || row.file_url,
     expires_on: expires_on || row.expires_on,
     note: note !== undefined ? note : row.note,
     uploaded_by_id: actingUserId,

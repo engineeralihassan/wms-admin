@@ -1,6 +1,8 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../../utils/catchAsync');
 const { userService, userDocumentService } = require('../../services');
+const fileService = require('../../services/storage/file.service');
+const { UPLOAD_FOLDERS } = require('../../config/storage');
 
 /** Shape the UserProfile row back into the nested, tab-grouped API shape. */
 const profileToDto = (p) => {
@@ -57,6 +59,7 @@ const documentToDto = (d) => ({
   file_name: d.file_name,
   file_mime: d.file_mime,
   file_size: d.file_size,
+  file_url: d.file_url,
   expires_on: d.expires_on,
   uploaded_at: d.uploaded_at,
   note: d.note,
@@ -163,9 +166,31 @@ const listDocuments = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('success'), data: docs });
 });
 
-/** POST /users/:uuid/documents  (requires user.update) — record an uploaded document. */
+/**
+ * POST /users/:uuid/documents  (requires user.update) — record an uploaded document.
+ *
+ * Two ways to call this:
+ *  - multipart/form-data with a `file` part: the binary is pushed to object storage
+ *    here and the resulting link/metadata is merged into the payload; OR
+ *  - application/json with pre-uploaded metadata (storage_key/file_url/...): kept for
+ *    backward compatibility (e.g. presigned-URL flows).
+ */
 const uploadDocument = catchAsync(async (req, res) => {
-  const doc = await userDocumentService.uploadUserDocument(req.params.uuid, req.body, req, res);
+  const payload = { ...req.body };
+
+  if (req.file) {
+    const [descriptor] = await fileService.uploadMany(
+      [{ ...req.file, field: req.file.fieldname }],
+      { folder: UPLOAD_FOLDERS.USER_DOCUMENTS }
+    );
+    payload.storage_key = descriptor.key;
+    payload.file_url = descriptor.url;
+    payload.file_name = payload.file_name || descriptor.name;
+    payload.file_mime = payload.file_mime || descriptor.mime;
+    payload.file_size = payload.file_size != null ? payload.file_size : descriptor.size;
+  }
+
+  const doc = await userDocumentService.uploadUserDocument(req.params.uuid, payload, req, res);
   res.status(httpStatus.OK).send({ message: res.__('success'), data: documentToDto(doc) });
 });
 

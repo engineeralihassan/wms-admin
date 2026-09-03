@@ -49,6 +49,10 @@ app.use(i18n);
 
 // Serving static files
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(
+  '/uploads',
+  express.static(path.resolve(process.cwd(), process.env.LOCAL_UPLOAD_DIR || 'uploads'))
+);
 
 // Enable CORS
 app.use(

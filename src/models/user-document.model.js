@@ -57,9 +57,12 @@ module.exports = (sequelize) => {
       file_name: { type: DataTypes.STRING(255), allowNull: true },
       file_mime: { type: DataTypes.STRING(120), allowNull: true },
       file_size: { type: DataTypes.INTEGER, allowNull: true },
-      // Opaque storage key/path (e.g. S3 object key). Kept private; a signed URL is
-      // generated on demand rather than storing a public URL.
-      storage_key: { type: DataTypes.STRING(512), allowNull: true },
+      // Opaque storage key/path (e.g. Cloudinary public_id / S3 object key). Kept
+      // private; used to delete or re-sign the object.
+      storage_key: { type: DataTypes.STRING(1024), allowNull: true },
+      // The delivery link stored for direct use by the frontend (Cloudinary secure_url
+      // / S3 URL). Populated by the upload subsystem alongside storage_key.
+      file_url: { type: DataTypes.TEXT, allowNull: true },
       // Optional expiry (e.g. a visa/work-permit document that must be renewed).
       expires_on: { type: DataTypes.DATEONLY, allowNull: true },
       // Who uploaded it (usually the user themselves, sometimes an admin).

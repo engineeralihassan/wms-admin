@@ -139,14 +139,36 @@
     </div>
   </form>
 
-  @if (activeExpense()?.attachments?.length) {
-    <p class="attachments-hint">
-      Current attachments: {{ activeExpense()?.attachments?.length }}. Add files below to replace them.
-    </p>
+  @if ((activeExpense()?.expense_attachments ?? []).length) {
+    <div class="attachments-block">
+      <p class="attachments-block__title">
+        Current attachments <span class="dt-count">{{ (activeExpense()?.expense_attachments ?? []).length }}</span>
+      </p>
+      <ul class="file-cards">
+        @for (a of activeExpense()?.expense_attachments ?? []; track a.uuid) {
+          <li class="file-card file-card--{{ fileKind(a) }}">
+            <a class="file-card__link" [href]="a.url" target="_blank" rel="noopener"
+               [attr.title]="'Open ' + (a.file_name || 'file')">
+              <span class="file-card__badge">{{ fileBadge(a) }}</span>
+              <span class="file-card__meta">
+                <span class="file-card__name">{{ a.file_name || 'file' }}</span>
+                @if (fileSize(a)) { <span class="file-card__size">{{ fileSize(a) }}</span> }
+              </span>
+            </a>
+            <button
+              type="button"
+              class="file-card__remove"
+              [attr.aria-label]="'Remove ' + (a.file_name || 'file')"
+              (click)="removeExistingAttachment(a.uuid)"
+            >✕</button>
+          </li>
+        }
+      </ul>
+    </div>
   }
   <app-file-upload
     [config]="attachmentConfig"
-    label="Attachments"
+    label="Add attachments"
     (filesChange)="attachments.set($event)"
   />
 
@@ -194,6 +216,29 @@
     }
   </form>
 
+  @if ((activeExpense()?.expense_attachments ?? []).length) {
+    <div class="attachments-block">
+      <p class="attachments-block__title">
+        Attachments <span class="dt-count">{{ (activeExpense()?.expense_attachments ?? []).length }}</span>
+      </p>
+      <ul class="file-cards">
+        @for (a of activeExpense()?.expense_attachments ?? []; track a.uuid) {
+          <li class="file-card file-card--{{ fileKind(a) }}">
+            <a class="file-card__link" [href]="a.url" target="_blank" rel="noopener"
+               [attr.title]="'Open ' + (a.file_name || 'file')">
+              <span class="file-card__badge">{{ fileBadge(a) }}</span>
+              <span class="file-card__meta">
+                <span class="file-card__name">{{ a.file_name || 'file' }}</span>
+                @if (fileSize(a)) { <span class="file-card__size">{{ fileSize(a) }}</span> }
+              </span>
+              <span class="file-card__action" aria-hidden="true">↗</span>
+            </a>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
   <div modal-footer>
     <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
     <app-button variant="primary" [loading]="submitting()" (clicked)="submitReview()">
@@ -225,7 +270,28 @@
       @if (e.status === 'rejected' && e.rejection_reason) {
         <div class="expense-details__row"><dt>Rejection reason</dt><dd>{{ e.rejection_reason }}</dd></div>
       }
-      @if (e.attachments.length) {
+      @if (e.expense_attachments.length) {
+        <div class="expense-details__row expense-details__row--stack">
+          <dt>Attachments <span class="dt-count">{{ e.expense_attachments.length }}</span></dt>
+          <dd>
+            <ul class="file-cards">
+              @for (a of e.expense_attachments; track a.uuid) {
+                <li class="file-card file-card--{{ fileKind(a) }}">
+                  <a class="file-card__link" [href]="a.url" target="_blank" rel="noopener"
+                     [attr.title]="'Open ' + (a.file_name || 'file')">
+                    <span class="file-card__badge">{{ fileBadge(a) }}</span>
+                    <span class="file-card__meta">
+                      <span class="file-card__name">{{ a.file_name || 'file' }}</span>
+                      @if (fileSize(a)) { <span class="file-card__size">{{ fileSize(a) }}</span> }
+                    </span>
+                    <span class="file-card__action" aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </dd>
+        </div>
+      } @else if (e.attachments.length) {
         <div class="expense-details__row">
           <dt>Attachments</dt>
           <dd>

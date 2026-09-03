@@ -4,6 +4,7 @@ const { expenseValidation } = require('../../validations');
 const expenseController = require('../../controllers/expenses/expense.controller');
 const { authVerify, requirePermission, tenantScope } = require('../../middlewares/auth');
 const { PERMISSIONS } = require('../../config/rbac');
+const uploadFiles = require('../../middlewares/upload');
 
 const router = express.Router();
 
@@ -72,6 +73,37 @@ router.patch(
   requirePermission(PERMISSIONS.EXPENSE_REVIEW),
   validate(expenseValidation.reviewExpense),
   expenseController.review
+);
+
+// ── Attachments (real uploaded files for an expense) ─────────────────────────
+// Upload is an owner action on their own draft/rejected expense (enforced in the
+// service), so it holds expense.update. uploadFiles.any() runs BEFORE validate so the
+// multipart parts are parsed; it accepts single OR multiple files under any field.
+router
+  .route('/:uuid/attachments')
+  .post(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.EXPENSE_UPDATE),
+    uploadFiles.any(),
+    validate(expenseValidation.expenseAttachments),
+    expenseController.uploadAttachments
+  )
+  .get(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.EXPENSE_READ),
+    validate(expenseValidation.expenseAttachments),
+    expenseController.listAttachments
+  );
+
+router.delete(
+  '/:uuid/attachments/:attachmentUuid',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.EXPENSE_UPDATE),
+  validate(expenseValidation.deleteExpenseAttachment),
+  expenseController.deleteAttachment
 );
 
 module.exports = router;

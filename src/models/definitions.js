@@ -16,6 +16,7 @@ const LeaveType = require('./leave-type.model');
 const LeaveBalance = require('./leave-balance.model');
 const LeaveRequest = require('./leave-request.model');
 const LeaveBalanceLedger = require('./leave-balance-ledger.model');
+const Attachment = require('./attachment.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -61,6 +62,7 @@ const definitions = (sequelize, Sequelize) => {
   db.LeaveBalance = LeaveBalance(sequelize);
   db.LeaveRequest = LeaveRequest(sequelize);
   db.LeaveBalanceLedger = LeaveBalanceLedger(sequelize);
+  db.Attachment = Attachment(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -225,6 +227,14 @@ const definitions = (sequelize, Sequelize) => {
     foreignKey: 'leave_request_id',
     as: 'leaveRequest',
   });
+
+  // Attachment (polymorphic file store). It is NOT tied to any single parent via a
+  // FK — owner_type/owner_id resolve the parent at the service layer — so it only
+  // carries tenant + uploader associations for scoping and auditing.
+  db.Organization.hasMany(db.Attachment, { foreignKey: 'organization_id', as: 'attachments' });
+  db.Attachment.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.User.hasMany(db.Attachment, { foreignKey: 'uploaded_by_id', as: 'uploadedAttachments' });
+  db.Attachment.belongsTo(db.User, { foreignKey: 'uploaded_by_id', as: 'uploadedBy' });
 
   return db;
 };

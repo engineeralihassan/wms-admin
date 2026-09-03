@@ -24,7 +24,16 @@ const toDto = (expense) => ({
   amount: expense.amount !== null && expense.amount !== undefined ? Number(expense.amount) : null,
   currency: expense.currency,
   status: expense.status,
+  // Legacy name-only metadata kept for backward compatibility.
   attachments: Array.isArray(expense.attachments) ? expense.attachments : [],
+  // Real uploaded files (bytes in object storage). Populated by the service on reads
+  // via setDataValue('expense_attachments', ...). It is NOT a defined model attribute,
+  // so plain property access returns undefined on a Sequelize instance — read it from
+  // dataValues (getDataValue) instead. Each: { uuid, url, file_name, file_mime, file_size, uploaded_at }.
+  expense_attachments:
+    (typeof expense.getDataValue === 'function'
+      ? expense.getDataValue('expense_attachments')
+      : expense.expense_attachments) || [],
   submitted_at: expense.submitted_at,
   reviewed_at: expense.reviewed_at,
   rejection_reason: expense.rejection_reason,
@@ -93,4 +102,41 @@ const remove = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('expense_deleted'), data: null });
 });
 
-module.exports = { create, list, getOne, update, submit, review, remove };
+/**
+ * POST /expenses/:uuid/attachments — upload one or more real files to an expense.
+ * multipart/form-data; the multer middleware on the route parses the files first.
+ */
+const uploadAttachments = catchAsync(async (req, res) => {
+  const data = await expenseService.uploadExpenseAttachments(req.params.uuid, req, res);
+  res.status(httpStatus.CREATED).send({ message: res.__('files_uploaded'), data });
+});
+
+/** GET /expenses/:uuid/attachments — list an expense's uploaded files. */
+const listAttachments = catchAsync(async (req, res) => {
+  const data = await expenseService.listExpenseAttachments(req.params.uuid, req, res);
+  res.status(httpStatus.OK).send({ message: res.__('success'), data });
+});
+
+/** DELETE /expenses/:uuid/attachments/:attachmentUuid — remove one uploaded file. */
+const deleteAttachment = catchAsync(async (req, res) => {
+  await expenseService.deleteExpenseAttachment(
+    req.params.uuid,
+    req.params.attachmentUuid,
+    req,
+    res
+  );
+  res.status(httpStatus.OK).send({ message: res.__('file_deleted'), data: null });
+});
+
+module.exports = {
+  create,
+  list,
+  getOne,
+  update,
+  submit,
+  review,
+  remove,
+  uploadAttachments,
+  listAttachments,
+  deleteAttachment,
+};

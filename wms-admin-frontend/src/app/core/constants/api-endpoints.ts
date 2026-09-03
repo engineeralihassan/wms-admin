@@ -37,6 +37,15 @@ export const API_ENDPOINTS = {
     byUuid: (uuid: string) => `/expenses/${uuid}`,
     submit: (uuid: string) => `/expenses/${uuid}/submit`,
     review: (uuid: string) => `/expenses/${uuid}/review`,
+    attachments: (uuid: string) => `/expenses/${uuid}/attachments`,
+    attachment: (uuid: string, attachmentUuid: string) =>
+      `/expenses/${uuid}/attachments/${attachmentUuid}`,
+  },
+  files: {
+    root: '/files',
+    byOwner: (ownerType: string, ownerId: number | string) => `/files/${ownerType}/${ownerId}`,
+    byUuid: (uuid: string) => `/files/${uuid}`,
+    limits: '/files/limits',
   },
   projects: {
     root: '/projects',

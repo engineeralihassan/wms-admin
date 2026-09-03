@@ -1,10 +1,23 @@
 const httpStatus = require('http-status');
-const { sequelize, Expense, User, Organization } = require('../../models');
+const { sequelize, Expense, User, Organization, Attachment } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const { PERMISSIONS } = require('../../config/rbac');
 const { paginate } = require('../../utils/query/paginate');
 const { EXPENSE_QUERY_CONFIG } = require('../../config/query-configs');
 const { EXPENSE_STATUSES } = require('../../utils/expense.constants');
+const attachmentService = require('../storage/attachment.service');
+const { UPLOAD_FOLDERS } = require('../../config/storage');
+
+/** owner_type used to key expense files in the polymorphic attachments table. */
+const EXPENSE_OWNER_TYPE = 'expense';
+
+/**
+ * Count the REAL uploaded attachment rows for an expense (the ones backed by bytes in
+ * object storage), used to enforce the "submit needs an attachment" rule. This replaces
+ * the older count of the name-only JSONB array now that files are actually uploaded.
+ */
+const countExpenseAttachments = (expenseId) =>
+  Attachment.count({ where: { owner_type: EXPENSE_OWNER_TYPE, owner_id: expenseId } });
 
 /** Columns returned for expense list/detail. */
 const EXPENSE_ATTRIBUTES = [
@@ -97,15 +110,48 @@ const normalizeAttachments = (attachments) =>
   Array.isArray(attachments) ? attachments.map((a) => ({ name: String(a.name).trim() })) : [];
 
 /**
+ * Attach the real uploaded-file rows (polymorphic attachments) onto expense
+ * instances as `expense_attachments`, batched by a single query. Because attachments
+ * are polymorphic (no Sequelize association), we load them here rather than via
+ * `include`. Mutates and returns the same instances for convenience.
+ */
+const withAttachments = async (expenses) => {
+  const list = Array.isArray(expenses) ? expenses : [expenses].filter(Boolean);
+  if (list.length === 0) return expenses;
+
+  const ids = list.map((e) => e.id);
+  const rows = await Attachment.findAll({
+    where: { owner_type: EXPENSE_OWNER_TYPE, owner_id: ids },
+    order: [['created_at', 'DESC']],
+  });
+
+  const byOwner = new Map();
+  rows.forEach((r) => {
+    const arr = byOwner.get(r.owner_id) || [];
+    arr.push(attachmentService.toDto(r));
+    byOwner.set(r.owner_id, arr);
+  });
+
+  list.forEach((e) => {
+    // setDataValue so the extra field survives toJSON/serialization.
+    e.setDataValue('expense_attachments', byOwner.get(e.id) || []);
+  });
+  return expenses;
+};
+
+/**
  * Load an expense by uuid within the caller's VISIBILITY scope. Returns null if the
  * caller cannot see it (so callers can turn that into a 404, never leaking existence).
  */
-const findVisibleExpense = async (uuid, req) =>
-  Expense.findOne({
+const findVisibleExpense = async (uuid, req) => {
+  const expense = await Expense.findOne({
     where: { uuid, ...buildExpenseScope(req) },
     attributes: EXPENSE_ATTRIBUTES,
     include: EXPENSE_INCLUDE,
   });
+  if (expense) await withAttachments(expense);
+  return expense;
+};
 
 /**
  * Create an expense as a draft or submit it immediately.
@@ -118,9 +164,9 @@ const createExpense = async (body, req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, res.__('organization_required'));
   }
 
-  const action = body.action === 'submit' ? 'submit' : 'draft';
-  const status = action === 'submit' ? EXPENSE_STATUSES.SUBMITTED : EXPENSE_STATUSES.DRAFT;
-
+  // A new expense is always created as a DRAFT: files are uploaded AFTER it exists
+  // (they need the expense id as their owner), and submitting requires >=1 uploaded
+  // file. The frontend flow is therefore: create (draft) -> upload files -> submit.
   const expense = await sequelize.transaction(async (transaction) => {
     const expense_number = await nextExpenseNumber(transaction);
     return Expense.create(
@@ -135,8 +181,8 @@ const createExpense = async (body, req, res) => {
         amount: body.amount,
         currency: body.currency,
         attachments: normalizeAttachments(body.attachments),
-        status,
-        submitted_at: status === EXPENSE_STATUSES.SUBMITTED ? new Date() : null,
+        status: EXPENSE_STATUSES.DRAFT,
+        submitted_at: null,
       },
       { transaction }
     );
@@ -157,11 +203,15 @@ const listExpenses = async (req) => {
     scopeWhere.created_by_id = req.auth.userId;
   }
 
-  return paginate(Expense, req.query, EXPENSE_QUERY_CONFIG, {
+  const result = await paginate(Expense, req.query, EXPENSE_QUERY_CONFIG, {
     scopeWhere,
     attributes: EXPENSE_ATTRIBUTES,
     include: EXPENSE_INCLUDE,
   });
+
+  // Batch-load real uploaded attachments onto the page of rows (one extra query).
+  await withAttachments(result.data);
+  return result;
 };
 
 /** Fetch one expense by uuid, visibility-scoped. */
@@ -209,7 +259,8 @@ const updateExpense = async (uuid, body, req, res) => {
 
   // Re-submitting after a rejection/draft edit clears the prior review verdict.
   if (body.action === 'submit') {
-    if ((expense.attachments || []).length === 0) {
+    // Require at least one REAL uploaded attachment (bytes in storage), not just a name.
+    if ((await countExpenseAttachments(expense.id)) === 0) {
       throw new ApiError(httpStatus.BAD_REQUEST, res.__('expense_attachment_required'));
     }
     expense.status = EXPENSE_STATUSES.SUBMITTED;
@@ -239,7 +290,7 @@ const submitExpense = async (uuid, req, res) => {
     // Already submitted or approved — nothing to submit.
     throw new ApiError(httpStatus.BAD_REQUEST, res.__('expense_not_submittable'));
   }
-  if ((expense.attachments || []).length === 0) {
+  if ((await countExpenseAttachments(expense.id)) === 0) {
     throw new ApiError(httpStatus.BAD_REQUEST, res.__('expense_attachment_required'));
   }
 
@@ -319,6 +370,76 @@ const deleteExpense = async (uuid, req, res) => {
   return true;
 };
 
+// ── Attachments (real files, backed by the polymorphic attachments table) ────────
+//
+// These sit on top of the generic attachment.service. The expense is always resolved
+// WITHIN the caller's visibility scope first, so owner_id is derived server-side and
+// never trusted from the client. Uploading is an owner action on an editable expense;
+// listing follows read visibility; deleting follows the same owner/editable rule.
+
+/** True when the caller may add/remove files on this expense (owner + draft/rejected). */
+const canModifyAttachments = (expense, auth) =>
+  expense.created_by_id === auth.userId && isOwnerEditable(expense);
+
+/**
+ * Upload one or more files to an expense (multipart already parsed onto req).
+ * Owner-only, and only while the expense is a draft or rejected.
+ */
+const uploadExpenseAttachments = async (uuid, req, res) => {
+  const expense = await findVisibleExpense(uuid, req);
+  if (!expense) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('expense_not_found'));
+  }
+  if (!canModifyAttachments(expense, req.auth)) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('forbidden'));
+  }
+
+  return attachmentService.uploadAndPersist(req, {
+    ownerType: EXPENSE_OWNER_TYPE,
+    ownerId: expense.id,
+    organizationId: expense.organization_id,
+    uploadedById: req.auth.userId,
+    folder: UPLOAD_FOLDERS.EXPENSES,
+  });
+};
+
+/** List an expense's uploaded files. Follows read visibility. */
+const listExpenseAttachments = async (uuid, req, res) => {
+  const expense = await findVisibleExpense(uuid, req);
+  if (!expense) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('expense_not_found'));
+  }
+  return attachmentService.listForOwner(EXPENSE_OWNER_TYPE, expense.id, req.tenantWhere);
+};
+
+/**
+ * Delete one uploaded file from an expense. Owner-only + draft/rejected, and the
+ * attachment must actually belong to that expense (guards against cross-expense uuids).
+ */
+const deleteExpenseAttachment = async (uuid, attachmentUuid, req, res) => {
+  const expense = await findVisibleExpense(uuid, req);
+  if (!expense) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('expense_not_found'));
+  }
+  if (!canModifyAttachments(expense, req.auth)) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('forbidden'));
+  }
+
+  const row = await Attachment.findOne({
+    where: {
+      uuid: attachmentUuid,
+      owner_type: EXPENSE_OWNER_TYPE,
+      owner_id: expense.id,
+      ...req.tenantWhere,
+    },
+  });
+  if (!row) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('file_not_found'));
+  }
+  await attachmentService.deleteByUuid(attachmentUuid, req.tenantWhere);
+  return true;
+};
+
 module.exports = {
   createExpense,
   listExpenses,
@@ -329,4 +450,8 @@ module.exports = {
   deleteExpense,
   buildExpenseScope,
   isReviewer,
+  uploadExpenseAttachments,
+  listExpenseAttachments,
+  deleteExpenseAttachment,
+  EXPENSE_OWNER_TYPE,
 };

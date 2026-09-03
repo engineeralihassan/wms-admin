@@ -12,3 +12,6 @@ config.PRODUCTION.env
 # Logs
 *.log
 /logs
+
+# Locally-stored uploads (dev only; production uses Cloudinary/S3)
+/uploads

@@ -4,6 +4,7 @@ const { userValidation } = require('../../validations');
 const userController = require('../../controllers/user/user.controller');
 const { authVerify, requirePermission, tenantScope } = require('../../middlewares/auth');
 const { PERMISSIONS } = require('../../config/rbac');
+const uploadFiles = require('../../middlewares/upload');
 
 const router = express.Router();
 
@@ -79,6 +80,9 @@ router
     authVerify,
     tenantScope,
     requirePermission(PERMISSIONS.USER_UPDATE),
+    // Accept an optional multipart `file` part; the controller pushes it to object
+    // storage. Runs before validate() so text fields (doc_type, etc.) reach req.body.
+    uploadFiles('file'),
     validate(userValidation.documentUpload),
     userController.uploadDocument
   );

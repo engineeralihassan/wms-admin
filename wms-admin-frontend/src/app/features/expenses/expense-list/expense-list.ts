@@ -6,6 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { of, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { ModalService } from '../../../core/services/modal.service';
@@ -15,6 +16,7 @@ import { ModalComponent } from '../../../shared/components/modal/modal.component
 import { FileUploadComponent } from '../../../shared/components/file-upload/file-upload.component';
 import {
   mb,
+  formatFileSize,
   type FileUploadConfig,
   type SelectedFile,
 } from '../../../shared/components/file-upload/file-upload.model';
@@ -39,6 +41,7 @@ import {
   type Expense,
   type ExpenseCategory,
   type ExpenseCurrency,
+  type ExpenseFile,
   type ExpenseSaveAction,
   type ExpenseStatus,
 } from '../models/expense.model';
@@ -299,6 +302,35 @@ export class ExpenseList {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount ?? 0);
   }
 
+  // ---- Attachment presentation helpers ----
+
+  /** Human-readable file size (e.g. "2.4 MB"), or '' when size is unknown. */
+  protected fileSize(file: ExpenseFile): string {
+    return file.file_size ? formatFileSize(file.file_size) : '';
+  }
+
+  /**
+   * A short kind key used to pick an icon + accent for a file, derived from its mime
+   * type (falling back to the extension). Keeps the template declarative.
+   */
+  protected fileKind(file: ExpenseFile): 'image' | 'pdf' | 'sheet' | 'doc' | 'file' {
+    const mime = (file.file_mime || '').toLowerCase();
+    const name = (file.file_name || '').toLowerCase();
+    if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(name)) return 'image';
+    if (mime === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+    if (mime.includes('sheet') || mime.includes('excel') || /\.(xlsx?|csv)$/.test(name))
+      return 'sheet';
+    if (mime.includes('word') || /\.(docx?|txt)$/.test(name)) return 'doc';
+    return 'file';
+  }
+
+  /** The short label shown on the file badge (e.g. "PDF", "IMG"). */
+  protected fileBadge(file: ExpenseFile): string {
+    return { image: 'IMG', pdf: 'PDF', sheet: 'XLS', doc: 'DOC', file: 'FILE' }[
+      this.fileKind(file)
+    ];
+  }
+
   protected onSearch(value: string): void {
     this.searchValue.set(value);
     this.list.onSearch(value);
@@ -372,40 +404,58 @@ export class ExpenseList {
     this.activeExpense.set(null);
   }
 
-  /** Attachment names currently on the active expense being edited. */
-  private existingAttachmentNames(): { name: string }[] {
-    return (this.activeExpense()?.attachments ?? []).map((a) => ({ name: a.name }));
-  }
+
 
   // ---- Submit handlers ----
 
-  /** Create: `action` is set by whichever button the user pressed. */
+  /** The raw File objects currently picked in the uploader. */
+  private pickedFiles(): File[] {
+    return this.attachments().map((f) => f.file);
+  }
+
+  /**
+   * Create flow (files are real now):
+   *   1. Create the expense (always a draft — it must exist before files can attach).
+   *   2. Upload any picked files to it.
+   *   3. If the user chose "Save and Submit", submit it (backend requires >=1 file).
+   * Each step waits for the previous one so the "submit needs an attachment" rule holds.
+   */
   protected submitCreate(action: ExpenseSaveAction): void {
     this.pendingAction.set(action);
     if (this.createForm.invalid) {
       markAllAsTouched(this.createForm);
       return;
     }
-    const v = this.createForm.getRawValue();
-    const attachments = this.attachments().map((f) => ({ name: f.name }));
-
-    if (action === 'submit' && attachments.length === 0) {
+    const files = this.pickedFiles();
+    if (action === 'submit' && files.length === 0) {
       this.notify.error('At least one attachment is required to submit an expense.');
       return;
     }
+    const v = this.createForm.getRawValue();
 
     this.submitting.set(true);
     this.expenses
       .create({
-        action,
+        action: 'draft', // always create as draft; submit happens after files upload
         title: v.title.trim(),
         category: v.category,
         expense_date: v.expense_date,
         notes: v.notes?.trim() || undefined,
         amount: Number(v.amount),
         currency: v.currency,
-        attachments,
       })
+      .pipe(
+        // Upload picked files (if any) to the freshly-created expense.
+        switchMap((expense) =>
+          files.length
+            ? this.expenses.uploadAttachments(expense.uuid, files).pipe(switchMap(() => of(expense)))
+            : of(expense),
+        ),
+        // Submit if requested, now that the files exist on the expense.
+        switchMap((expense) =>
+          action === 'submit' ? this.expenses.submit(expense.uuid) : of(expense),
+        ),
+      )
       .subscribe({
         next: () => {
           this.notify.success(action === 'submit' ? 'Expense submitted.' : 'Draft saved.');
@@ -417,7 +467,10 @@ export class ExpenseList {
       });
   }
 
-  /** Edit: save draft changes, or save-and-resubmit. */
+  /**
+   * Edit flow: save content, upload any newly-picked files, then optionally resubmit.
+   * A resubmit is allowed if the expense already has files OR the user just picked some.
+   */
   protected submitEdit(action: ExpenseSaveAction): void {
     const expense = this.activeExpense();
     if (!expense) return;
@@ -426,29 +479,36 @@ export class ExpenseList {
       markAllAsTouched(this.editForm);
       return;
     }
-    const v = this.editForm.getRawValue();
-    // Newly picked files replace nothing; combine with existing attachment names so a
-    // resubmit still satisfies the "at least one attachment" rule.
-    const picked = this.attachments().map((f) => ({ name: f.name }));
-    const attachments = picked.length ? picked : this.existingAttachmentNames();
+    const files = this.pickedFiles();
+    const existingCount = expense.expense_attachments?.length ?? 0;
 
-    if (action === 'submit' && attachments.length === 0) {
+    if (action === 'submit' && files.length === 0 && existingCount === 0) {
       this.notify.error('At least one attachment is required to submit an expense.');
       return;
     }
+    const v = this.editForm.getRawValue();
 
     this.submitting.set(true);
     this.expenses
       .update(expense.uuid, {
-        action,
+        // Save content only; the submit is done as a discrete step after files upload.
         title: v.title.trim(),
         category: v.category,
         expense_date: v.expense_date,
         notes: v.notes?.trim() || undefined,
         amount: Number(v.amount),
         currency: v.currency,
-        attachments,
       })
+      .pipe(
+        switchMap((updated) =>
+          files.length
+            ? this.expenses.uploadAttachments(expense.uuid, files).pipe(switchMap(() => of(updated)))
+            : of(updated),
+        ),
+        switchMap((updated) =>
+          action === 'submit' ? this.expenses.submit(expense.uuid) : of(updated),
+        ),
+      )
       .subscribe({
         next: () => {
           this.notify.success(
@@ -462,6 +522,25 @@ export class ExpenseList {
         },
         error: () => this.submitting.set(false),
       });
+  }
+
+  /** Delete one already-uploaded file from the active expense (in the edit modal). */
+  protected removeExistingAttachment(attachmentUuid: string): void {
+    const expense = this.activeExpense();
+    if (!expense) return;
+    this.expenses.deleteAttachment(expense.uuid, attachmentUuid).subscribe({
+      next: () => {
+        // Reflect the removal in the open modal without a full reload.
+        this.activeExpense.set({
+          ...expense,
+          expense_attachments: (expense.expense_attachments ?? []).filter(
+            (a) => a.uuid !== attachmentUuid,
+          ),
+        });
+        this.notify.success('Attachment removed.');
+        this.list.reload();
+      },
+    });
   }
 
   /** Reviewer approves or rejects the active submitted expense. */

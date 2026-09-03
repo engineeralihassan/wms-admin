@@ -102,5 +102,10 @@
   "leave_balance_allocated": "Leave balance updated successfully",
   "leave_allocation_too_low": "Allocation cannot be lower than the already used and pending days",
 
-  "dashboard_loaded": "Dashboard data loaded successfully"
+  "dashboard_loaded": "Dashboard data loaded successfully",
+
+  "files_uploaded": "Files uploaded successfully",
+  "file_deleted": "File deleted successfully",
+  "file_not_found": "File not found",
+  "no_files_provided": "No files were provided"
 }

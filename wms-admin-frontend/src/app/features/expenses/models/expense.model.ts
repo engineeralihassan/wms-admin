@@ -40,12 +40,25 @@ export interface ExpenseUser {
 }
 
 /**
- * An expense attachment. For now we persist ONLY the file name (no bytes/storage yet).
- * Shape is intentionally open for the future: when S3 lands we add `key`, `size`,
- * `mime`, `url` here without changing callers that only read `name`.
+ * Legacy name-only attachment metadata kept on the expense row (`attachments`).
+ * Retained for backward compatibility; new uploads use ExpenseFile below.
  */
 export interface ExpenseAttachment {
   name: string;
+}
+
+/**
+ * A real uploaded expense file (bytes stored in object storage, link kept in the DB).
+ * Returned on the expense read path as `expense_attachments`, and by the upload
+ * endpoint. `url` is the direct link to open/download the file.
+ */
+export interface ExpenseFile {
+  uuid: string;
+  url: string;
+  file_name: string | null;
+  file_mime: string | null;
+  file_size: number | null;
+  uploaded_at?: string;
 }
 
 /** Expense row as returned by the backend list/detail endpoints. */
@@ -59,7 +72,10 @@ export interface Expense {
   amount: number;
   currency: ExpenseCurrency;
   status: ExpenseStatus;
+  /** Legacy name-only metadata (kept for compatibility). */
   attachments: ExpenseAttachment[];
+  /** Real uploaded files with links (the ones users open/download). */
+  expense_attachments: ExpenseFile[];
   submitted_at: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;

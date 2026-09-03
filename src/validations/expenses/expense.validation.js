@@ -71,11 +71,10 @@ const createExpense = {
         .valid(...EXPENSE_CURRENCIES)
         .default(EXPENSE_DEFAULT_CURRENCY),
       attachments: attachmentsList,
-    })
-    // On submit, at least one attachment is required (UI marks Attachments* required).
-    .when(Joi.object({ action: Joi.valid('submit') }).unknown(), {
-      then: Joi.object({ attachments: Joi.array().items(attachment).min(1).max(EXPENSE_ATTACHMENT_MAX_FILES).required() }),
     }),
+  // NOTE: the "at least one attachment to submit" rule is enforced in the service
+  // against REAL uploaded files (attachments table), since files are uploaded via
+  // POST /expenses/:uuid/attachments AFTER the expense exists — not in this body.
 };
 
 /**
@@ -165,6 +164,23 @@ const deleteExpense = {
   }),
 };
 
+/**
+ * Attachment routes. The FILE bytes are validated by the multer middleware
+ * (type/size/count from config/storage.js); these schemas only guard the params.
+ */
+const expenseAttachments = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+  }),
+};
+
+const deleteExpenseAttachment = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+    attachmentUuid: Joi.string().uuid().required(),
+  }),
+};
+
 module.exports = {
   createExpense,
   listExpenses,
@@ -173,4 +189,6 @@ module.exports = {
   submitExpense,
   reviewExpense,
   deleteExpense,
+  expenseAttachments,
+  deleteExpenseAttachment,
 };
