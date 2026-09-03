@@ -29,13 +29,27 @@ if (process.env.NODE_ENV === 'DEVELOPMENT') {
   app.use(morgan.errorHandler);
 }
 
-// Body parser, reading data from body into req.body
-app.use(express.json({ limit: '10kb' }));
+// Body parser, reading data from body into req.body.
+// 1mb comfortably covers rich-text descriptions and other JSON payloads; actual
+// file uploads go through multipart/multer, not this JSON parser.
+app.use(express.json({ limit: '1mb' }));
 // parse urlencoded request body
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Cookie parser
 app.use(cookieParser());
+
+// Preserve the raw rich-text job description BEFORE xss-clean escapes it.
+// xss-clean HTML-encodes every string in req.body, which turns the description's
+// <h2>/<ul>/… into &lt;h2>… and makes it render as literal text on the careers page.
+// The job service sanitizes the description with its own allow-list sanitizer
+// (utils/sanitize-html), so route handlers can safely restore this raw value.
+app.use((req, _res, next) => {
+  if (req.body && typeof req.body.description === 'string') {
+    req.rawDescription = req.body.description;
+  }
+  next();
+});
 
 // Data sanitization against XSS
 app.use(xss());

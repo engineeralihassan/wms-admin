@@ -1,3 +1,10 @@
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
 .job-form {
   display: flex;
   flex-direction: column;
@@ -21,6 +28,11 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text-muted, #64748b);
+}
+
+.field__error {
+  font-size: 0.8rem;
+  color: var(--color-danger, #dc2626);
 }
 
 .field__input {

@@ -122,6 +122,7 @@
   "job_round_in_use": "An interview round with candidates in it cannot be removed",
   "job_has_applications": "This job has applications and cannot be deleted; close it instead",
   "job_not_accepting": "This position is no longer accepting applications",
+  "job_description_required": "A job description is required",
 
   "application_submitted": "Your application has been submitted successfully",
   "application_found": "Application found successfully",

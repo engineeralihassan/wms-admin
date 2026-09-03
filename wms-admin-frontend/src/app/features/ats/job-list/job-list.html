@@ -56,15 +56,17 @@
       <input class="field__input" type="text" formControlName="title" placeholder="e.g. Senior Backend Engineer" />
     </label>
 
-    <label class="field">
+    <div class="field">
       <span class="field__label">Job description</span>
-      <textarea
-        class="field__input"
-        rows="6"
+      <app-rich-text-editor
         formControlName="description"
-        placeholder="Responsibilities, requirements, benefits…"
-      ></textarea>
-    </label>
+        placeholder="Describe the role: responsibilities, requirements, benefits…"
+        [minHeight]="240"
+      />
+      @if (jobForm.controls.description.touched && jobForm.controls.description.invalid) {
+        <span class="field__error">A job description is required.</span>
+      }
+    </div>
 
     <div class="field-row">
       <label class="field">

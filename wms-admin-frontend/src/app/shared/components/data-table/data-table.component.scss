@@ -96,7 +96,13 @@
   td { padding: spacing('4'); border-top: 1px solid var(--color-border); color: var(--color-text); vertical-align: middle; }
   tbody tr { transition: background-color .15s ease; &:hover { background: var(--color-surface-alt); } }
   &__sort { @include flex(row, center, flex-start, spacing('1')); color: inherit; font: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; @include focus-ring; }
-  &__state { padding: spacing('8'); color: var(--color-text-muted); text-align: center; }
+  &__state { padding: spacing('8'); color: var(--color-text-muted); text-align: center;
+    &-image{
+      display: block;
+      margin: 0 auto spacing('4');
+      max-width: 12rem;
+    }
+   }
   &__value { display: inline-block; &--muted { color: var(--color-text-muted); } &--code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: font-size('xs'); } &--status { padding: spacing('1') spacing('2'); border-radius: radius('pill'); font-size: font-size('xs'); font-weight: font-weight('semibold'); &-active { background: var(--color-success-050); color: var(--color-success-700); } &-invited { background: var(--color-warning-050); color: var(--color-warning-700); } &-disabled, &-inactive { background: var(--color-danger-050); color: var(--color-danger-700); } } }
   &__actions-heading, &__actions { text-align: right; white-space: nowrap; }
   &__actions { @include flex(row, center, flex-end, spacing('2')); }

@@ -9,6 +9,19 @@ const { PERMISSIONS } = require('../../config/rbac');
 const router = express.Router();
 
 /**
+ * Restore the rich-text description to its raw (pre-xss-clean) value so that HTML
+ * markup survives to the service, which sanitizes it with a proper allow-list.
+ * Without this, xss-clean's global entity-encoding would store &lt;h2>… and the
+ * public careers page would show the tags as literal text.
+ */
+const restoreRawDescription = (req, _res, next) => {
+  if (typeof req.rawDescription === 'string') {
+    req.body.description = req.rawDescription;
+  }
+  next();
+};
+
+/**
  * Recruiter-facing ATS routes (authenticated). Every route:
  *   authVerify -> tenantScope -> requirePermission -> validate -> controller
  *
@@ -25,6 +38,7 @@ router
     authVerify,
     tenantScope,
     requirePermission(PERMISSIONS.JOB_CREATE),
+    restoreRawDescription,
     validate(jobValidation.createJob),
     jobController.create
   )
@@ -60,6 +74,7 @@ router
     authVerify,
     tenantScope,
     requirePermission(PERMISSIONS.JOB_UPDATE),
+    restoreRawDescription,
     validate(jobValidation.updateJob),
     jobController.update
   )

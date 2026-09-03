@@ -50,7 +50,9 @@
       <!-- Description -->
       <section class="careers__body">
         <h2>About the role</h2>
-        <p class="careers__description">{{ j.description }}</p>
+        <!-- Rich-text description. Angular auto-sanitizes [innerHTML]; the backend also
+             sanitized it to a safe allow-list before storing (defense in depth). -->
+        <div class="prose careers__description" [innerHTML]="j.description"></div>
 
         @if (j.skills?.length) {
           <h2>Skills</h2>

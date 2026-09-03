@@ -4,6 +4,7 @@ import {
   computed,
   inject,
   input,
+  OnInit,
   signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -40,7 +41,7 @@ import {
   templateUrl: './careers-page.html',
   styleUrl: './careers-page.scss',
 })
-export class CareersPage {
+export class CareersPage implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly careers = inject(CareersService);
 
@@ -77,7 +78,9 @@ export class CareersPage {
     cover_note: ['', [Validators.maxLength(5000)]],
   });
 
-  constructor() {
+  ngOnInit(): void {
+    // Route input (token) is bound before ngOnInit runs — reading it in the constructor
+    // throws NG0950 (input required but not yet available) and blanks the page.
     this.load();
   }
 

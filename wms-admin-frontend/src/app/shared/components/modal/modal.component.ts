@@ -31,8 +31,9 @@ export type ModalSize = 'sm' | 'md' | 'lg';
  *  2. Indirectly via ModalService/ModalHost for one-off confirmations.
  *
  * Accessibility: role="dialog" + aria-modal, labelled by the title, Escape closes,
- * clicking the backdrop closes (configurable), and focus is moved into the dialog
- * on open and restored to the previously-focused element on close.
+ * and focus is moved into the dialog on open and restored to the previously-focused
+ * element on close. Backdrop clicks do NOT close by default (opt in via
+ * [closeOnBackdrop]="true").
  */
 @Component({
   selector: 'app-modal',
@@ -48,7 +49,7 @@ export class ModalComponent {
   /** Show the top-right close (×) button. */
   readonly showClose = input(true);
   /** Close when the backdrop (area outside the dialog) is clicked. */
-  readonly closeOnBackdrop = input(true);
+  readonly closeOnBackdrop = input(false);
   /** Close when Escape is pressed. */
   readonly closeOnEscape = input(true);
 

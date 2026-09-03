@@ -13,6 +13,7 @@ import { ModalService } from '../../../core/services/modal.service';
 import { CardComponent } from '../../../shared/components/card/card.component';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ModalComponent } from '../../../shared/components/modal/modal.component';
+import { RichTextEditorComponent } from '../../../shared/components/rich-text-editor/rich-text-editor.component';
 import {
   DataTableComponent,
   type BadgeVariant,
@@ -60,6 +61,7 @@ const DEFAULT_ROUNDS = ['Screening', 'Technical Interview', 'Managerial Round', 
     ButtonComponent,
     ModalComponent,
     DataTableComponent,
+    RichTextEditorComponent,
   ],
   templateUrl: './job-list.html',
   styleUrl: './job-list.scss',

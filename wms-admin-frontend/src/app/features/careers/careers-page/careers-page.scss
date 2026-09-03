@@ -92,9 +92,8 @@
 }
 
 .careers__description {
-  white-space: pre-wrap;
-  line-height: 1.6;
-  color: var(--color-text, #334155);
+  // Rich-text HTML; typographic styling comes from the global .prose class.
+  margin-top: 0.25rem;
 }
 
 .careers__skills {

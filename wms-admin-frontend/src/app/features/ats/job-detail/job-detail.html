@@ -1,45 +1,76 @@
-<header class="page-header">
-  <div class="page-header__lead">
-    <app-button variant="ghost" (clicked)="back()">← Back to jobs</app-button>
-    @if (job(); as j) {
-      <div>
-        <h1 class="page-header__title">{{ j.title }}</h1>
-        <p class="page-header__subtitle">
-          {{ j.job_code }} · {{ statusLabels[j.status] }} · {{ employmentLabels[j.employment_type] }} ·
-          {{ workModeLabels[j.work_mode] }}
-          @if (j.location) { · {{ j.location }} }
-        </p>
+<header class="job-header">
+  <app-button variant="ghost" (clicked)="back()">← Back to jobs</app-button>
+
+  @if (job(); as j) {
+    <div class="job-hero">
+      <div class="job-hero__main">
+        <span class="job-hero__avatar" aria-hidden="true">{{ (j.title || '?')[0] }}</span>
+        <div class="job-hero__text">
+          <div class="job-hero__title-row">
+            <h1 class="job-hero__title">{{ j.title }}</h1>
+            <span class="job-status" [class]="'job-status--' + j.status">
+              <span class="job-status__dot"></span>{{ statusLabels[j.status] }}
+            </span>
+          </div>
+          <p class="job-hero__code">{{ j.job_code }}</p>
+          <div class="job-hero__tags">
+            <span class="job-tag">{{ employmentLabels[j.employment_type] }}</span>
+            <span class="job-tag">{{ workModeLabels[j.work_mode] }}</span>
+            @if (j.location) { <span class="job-tag">📍 {{ j.location }}</span> }
+            @if (j.department) { <span class="job-tag">🏢 {{ j.department }}</span> }
+          </div>
+        </div>
       </div>
-    }
-  </div>
+
+      <div class="job-stats">
+        <div class="job-stat">
+          <span class="job-stat__value">{{ j.openings }}</span>
+          <span class="job-stat__label">Openings</span>
+        </div>
+        <div class="job-stat">
+          <span class="job-stat__value">{{ j.application_count ?? 0 }}</span>
+          <span class="job-stat__label">Applicants</span>
+        </div>
+        <div class="job-stat">
+          <span class="job-stat__value">
+            @if (j.experience_min != null || j.experience_max != null) {
+              {{ j.experience_min ?? 0 }}–{{ j.experience_max ?? '∞' }}
+            } @else { — }
+          </span>
+          <span class="job-stat__label">Experience (yrs)</span>
+        </div>
+      </div>
+    </div>
+  }
 </header>
 
 @if (job(); as j) {
   <app-card title="Job Summary" class="job-summary">
-    <div class="summary-grid">
-      <div><span class="summary__label">Department</span><span>{{ j.department || '—' }}</span></div>
-      <div>
-        <span class="summary__label">Experience</span>
-        <span>
-          @if (j.experience_min != null || j.experience_max != null) {
-            {{ j.experience_min ?? 0 }}–{{ j.experience_max ?? '∞' }} yrs
-          } @else { — }
-        </span>
-      </div>
-      <div><span class="summary__label">Openings</span><span>{{ j.openings }}</span></div>
-      <div><span class="summary__label">Applicants</span><span>{{ j.application_count ?? '—' }}</span></div>
-      <div class="summary--wide">
+    <div class="summary-list">
+      <div class="summary-row">
         <span class="summary__label">Public link</span>
-        <a [href]="j.public_url" target="_blank" rel="noopener" class="summary__link">{{ j.public_url }}</a>
+        <a [href]="j.public_url" target="_blank" rel="noopener" class="summary__link">
+          {{ j.public_url }}
+        </a>
       </div>
-      <div class="summary--wide">
+
+      <div class="summary-row">
         <span class="summary__label">Interview pipeline</span>
-        <span class="pipeline">
-          @for (r of j.interview_rounds; track r.key; let last = $last) {
-            <span class="pipeline__step">{{ r.name }}</span>@if (!last) { <span class="pipeline__arrow">→</span> }
+        <div class="pipeline">
+          @for (r of j.interview_rounds; track r.key; let last = $last; let i = $index) {
+            <span class="pipeline__step">
+              <span class="pipeline__num">{{ i + 1 }}</span>{{ r.name }}
+            </span>
+            @if (!last) { <span class="pipeline__arrow" aria-hidden="true">→</span> }
           }
-          @if (!j.interview_rounds.length) { — }
-        </span>
+          @if (!j.interview_rounds.length) { <span class="applicant__muted">No rounds configured.</span> }
+        </div>
+      </div>
+
+      <div class="summary-row">
+        <span class="summary__label">Description</span>
+        <!-- Rich-text HTML (auto-sanitized by Angular; also sanitized on the backend). -->
+        <div class="prose job-description" [innerHTML]="j.description"></div>
       </div>
     </div>
   </app-card>
@@ -85,32 +116,52 @@
 >
   @if (activeApplication(); as app) {
     <div class="applicant">
+      <!-- Candidate header -->
+      <div class="applicant__hero">
+        <span class="applicant__avatar" aria-hidden="true">{{ (app.candidate_name || '?')[0] }}</span>
+        <div class="applicant__hero-text">
+          <p class="applicant__name">{{ app.candidate_name }}</p>
+          <p class="applicant__ref">{{ app.application_number }}</p>
+        </div>
+        <span class="app-status" [class]="'app-status--' + app.status">
+          <span class="app-status__dot"></span>{{ appStatusLabels[app.status] }}
+        </span>
+      </div>
+
       <!-- Candidate details -->
       <section class="applicant__section">
         <h3 class="applicant__heading">Candidate</h3>
-        <div class="applicant__grid">
-          <div><span class="summary__label">Reference</span><span>{{ app.application_number }}</span></div>
-          <div><span class="summary__label">Email</span><span>{{ app.candidate_email }}</span></div>
-          <div><span class="summary__label">Phone</span><span>{{ app.candidate_phone || '—' }}</span></div>
-          <div>
-            <span class="summary__label">Experience</span>
-            <span>{{ app.experience_years != null ? app.experience_years + ' yrs' : '—' }}</span>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-item__label">Email</span>
+            <a [href]="'mailto:' + app.candidate_email" class="info-item__value summary__link">{{ app.candidate_email }}</a>
+          </div>
+          <div class="info-item">
+            <span class="info-item__label">Phone</span>
+            <span class="info-item__value">{{ app.candidate_phone || '—' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-item__label">Experience</span>
+            <span class="info-item__value">{{ app.experience_years != null ? app.experience_years + ' yrs' : '—' }}</span>
           </div>
           @if (app.linkedin_url) {
-            <div class="summary--wide">
-              <span class="summary__label">LinkedIn</span>
-              <a [href]="app.linkedin_url" target="_blank" rel="noopener" class="summary__link">{{ app.linkedin_url }}</a>
+            <div class="info-item info-item--wide">
+              <span class="info-item__label">LinkedIn</span>
+              <a [href]="app.linkedin_url" target="_blank" rel="noopener" class="info-item__value summary__link">{{ app.linkedin_url }}</a>
             </div>
           }
           @if (app.portfolio_url) {
-            <div class="summary--wide">
-              <span class="summary__label">Portfolio</span>
-              <a [href]="app.portfolio_url" target="_blank" rel="noopener" class="summary__link">{{ app.portfolio_url }}</a>
+            <div class="info-item info-item--wide">
+              <span class="info-item__label">Portfolio</span>
+              <a [href]="app.portfolio_url" target="_blank" rel="noopener" class="info-item__value summary__link">{{ app.portfolio_url }}</a>
             </div>
           }
         </div>
         @if (app.cover_note) {
-          <p class="applicant__cover">{{ app.cover_note }}</p>
+          <div class="applicant__cover">
+            <span class="info-item__label">Cover note</span>
+            <p>{{ app.cover_note }}</p>
+          </div>
         }
       </section>
 

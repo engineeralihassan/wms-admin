@@ -4,6 +4,7 @@ import {
   computed,
   inject,
   input,
+  OnInit,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
@@ -60,7 +61,7 @@ import {
   templateUrl: './job-detail.html',
   styleUrl: './job-detail.scss',
 })
-export class JobDetail {
+export class JobDetail implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly jobs = inject(JobsService);
   private readonly auth = inject(AuthService);
@@ -198,7 +199,9 @@ export class JobDetail {
     rating: [3, [Validators.required, Validators.min(1), Validators.max(5)]],
   });
 
-  constructor() {
+  ngOnInit(): void {
+    // Route inputs (uuid) are bound by the time ngOnInit runs — NOT in the constructor,
+    // so both the job load and the applications list (which read uuid()) must start here.
     this.loadJob();
     this.list.init();
   }

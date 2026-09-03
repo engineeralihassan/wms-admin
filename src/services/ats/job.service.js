@@ -14,6 +14,7 @@ const {
   normalizeInterviewRounds,
   nextSequenceCode,
 } = require('./ats.shared');
+const { sanitizeHtml, isEffectivelyEmpty } = require('../../utils/sanitize-html');
 
 /**
  * job.service — business logic for recruiter-facing job openings.
@@ -104,11 +105,18 @@ const createJob = async (body, req, res) => {
   const publish = body.action === 'publish';
   const rounds = normalizeInterviewRounds(body.interview_rounds);
 
+  // The description is rich text (HTML). Sanitize to a safe subset before storing,
+  // since it is rendered on the PUBLIC careers page. Reject an empty (tags-only) body.
+  const description = sanitizeHtml(body.description);
+  if (isEffectivelyEmpty(description)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('job_description_required'));
+  }
+
   const draft = {
     organization_id: auth.organizationId,
     created_by_id: auth.userId,
     title: body.title,
-    description: body.description,
+    description,
     department: body.department ?? null,
     location: body.location ?? null,
     employment_type: body.employment_type,
@@ -204,6 +212,15 @@ const updateJob = async (uuid, body, req, res) => {
         throw new ApiError(httpStatus.BAD_REQUEST, res.__('job_round_in_use'));
       }
       job.interview_rounds = nextRounds;
+    }
+
+    // Sanitize the rich-text description before it's assigned below.
+    if (body.description !== undefined) {
+      const clean = sanitizeHtml(body.description);
+      if (isEffectivelyEmpty(clean)) {
+        throw new ApiError(httpStatus.BAD_REQUEST, res.__('job_description_required'));
+      }
+      body.description = clean;
     }
 
     const assignable = [
