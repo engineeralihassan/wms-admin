@@ -148,6 +148,14 @@ export interface UserDetail {
   vendor_profile: VendorProfile | null;
 }
 
+/** One initial leave-balance grant sent with a new user (Time Off tab). */
+export interface LeaveAllocationInput {
+  /** LeaveType uuid (from GET /leaves/types). */
+  leave_type: string;
+  /** Days granted (absolute allocation) for the period year. */
+  allocated: number;
+}
+
 /** Payload for POST /users. */
 export interface CreateUserPayload {
   first_name: string;
@@ -164,6 +172,10 @@ export interface CreateUserPayload {
     settings: ProfileSettings;
   }>;
   vendor_profile?: Partial<VendorProfile>;
+  /** Period year for the initial leave grant (defaults to current year on the server). */
+  period_year?: number;
+  /** Initial time-off allocations the creator assigns to the new user. */
+  leave_allocations?: LeaveAllocationInput[];
 }
 
 /**

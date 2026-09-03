@@ -973,6 +973,88 @@ const allocateBalance = async (body, req, res) => {
 };
 
 /**
+ * Allocate a set of leave balances for a user, INSIDE a caller-supplied transaction.
+ *
+ * This is the transaction-friendly sibling of `allocateBalance` (which is HTTP/RBAC
+ * oriented and opens its own transaction). It's meant to be composed into a larger
+ * unit of work — e.g. seeding a new user's time-off during user creation — so the
+ * whole thing commits or rolls back atomically. The caller is responsible for the
+ * RBAC check (the user.create flow already gates on the creator's permissions).
+ *
+ * `allocations` is [{ leaveTypeUuid, allocated }]. Each entry sets the ABSOLUTE
+ * `allocated` value for (org, user, type, year), preserving used/pending, and writes
+ * an ALLOCATION ledger entry for the delta. Entries with allocated <= 0 are skipped
+ * (nothing to grant). Leave types are resolved within `organizationId`, so a type
+ * from another org is rejected. Duplicate leave types in the input are ignored after
+ * the first (the unique per-type row makes repeats meaningless).
+ *
+ * Returns the array of created/updated LeaveBalance rows.
+ */
+const allocateBalancesForUser = async (
+  { organizationId, userId, createdById, year, allocations },
+  transaction,
+  res
+) => {
+  if (!Array.isArray(allocations) || allocations.length === 0) return [];
+
+  const periodYear = year || new Date().getUTCFullYear();
+  const results = [];
+  const seenTypeIds = new Set();
+
+  for (const entry of allocations) {
+    const amount = Number(entry.allocated);
+    // Skip empty/zero grants — creating a 0-allocated row adds no value.
+    if (!Number.isFinite(amount) || amount <= 0) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const type = await resolveLeaveType(entry.leave_type, organizationId, res, transaction);
+    if (seenTypeIds.has(type.id)) {
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+    seenTypeIds.add(type.id);
+
+    // eslint-disable-next-line no-await-in-loop
+    const balance = await findOrCreateBalanceLocked(
+      { organizationId, userId, leaveTypeId: type.id, year: periodYear, createdById },
+      transaction
+    );
+
+    const previous = Number(balance.allocated);
+    // Absolute set, guarded against dropping below used + pending (won't happen for a
+    // brand-new user, but keeps the invariant identical to allocateBalance).
+    if (amount < Number(balance.used) + Number(balance.pending)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, res.__('leave_allocation_too_low'));
+    }
+    balance.allocated = amount;
+    balance.created_by_id = createdById;
+    // eslint-disable-next-line no-await-in-loop
+    await balance.save({ transaction });
+
+    // eslint-disable-next-line no-await-in-loop
+    await writeLedger(
+      {
+        organizationId,
+        balanceId: balance.id,
+        requestId: null,
+        entryType: LEAVE_LEDGER_ENTRY_TYPES.ALLOCATION,
+        amount: amount - previous,
+        balanceAfter: availableDays(balance),
+        createdById,
+      },
+      transaction
+    );
+
+    results.push(balance);
+  }
+
+  return results;
+};
+
+/**
  * Ensure the default leave types exist for an organization. Idempotent — safe to call
  * on org creation or from the seeder. Not tenant-scoped by the middleware (system op).
  */
@@ -1014,6 +1096,7 @@ module.exports = {
   updateLeaveType,
   listBalances,
   allocateBalance,
+  allocateBalancesForUser,
   ensureDefaultLeaveTypes,
   buildLeaveScope,
   isApprover,

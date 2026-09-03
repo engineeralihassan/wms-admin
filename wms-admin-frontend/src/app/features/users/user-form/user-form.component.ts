@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CardComponent } from '../../../shared/components/card/card.component';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
@@ -8,17 +8,20 @@ import { NotificationService } from '../../../core/services/notification.service
 import { markAllAsTouched } from '../../../shared/utils/form.utils';
 import { APP_ROUTES } from '../../../core/constants/app-routes';
 import { UsersService } from '../services/users.service';
+import { LeavesService } from '../../leaves/services/leaves';
+import type { LeaveType } from '../../leaves/models/leave.model';
 import {
   ADVANTAGE_TOOLTIPS,
   ASSIGNABLE_ROLE_OPTIONS,
   CONTRACT_TYPE_OPTIONS,
   EMPLOYEE_TYPE_OPTIONS,
   type CreateUserPayload,
+  type LeaveAllocationInput,
   type UserDetail,
   type VendorOption,
 } from '../models/user.model';
 
-type TabId = 'work' | 'private' | 'contract' | 'documents' | 'settings';
+type TabId = 'work' | 'private' | 'contract' | 'documents' | 'timeoff' | 'settings';
 
 /**
  * Tabbed create/edit form for a user (Odoo-style, trimmed to the fields we keep).
@@ -43,6 +46,7 @@ type TabId = 'work' | 'private' | 'contract' | 'documents' | 'settings';
 export class UserFormComponent {
   private readonly fb = inject(FormBuilder);
   private readonly users = inject(UsersService);
+  private readonly leaves = inject(LeavesService);
   private readonly notify = inject(NotificationService);
   private readonly router = inject(Router);
 
@@ -64,11 +68,18 @@ export class UserFormComponent {
   protected readonly vendors = signal<VendorOption[]>([]);
   /** True when the currently-selected role is C2C (drives the vendor dropdown). */
   protected readonly isC2c = signal(false);
+
+  /** Org leave types, loaded once for the Time Off tab dropdowns. */
+  protected readonly leaveTypes = signal<LeaveType[]>([]);
+  /** The period year the initial grant applies to (defaults to the current year). */
+  protected readonly periodYear = new Date().getFullYear();
+
   protected readonly tabs: ReadonlyArray<{ id: TabId; label: string }> = [
     { id: 'work', label: 'Work Information' },
     { id: 'private', label: 'Private Information' },
     { id: 'contract', label: 'Contract' },
     { id: 'documents', label: 'Documents' },
+    { id: 'timeoff', label: 'Time Off' },
     { id: 'settings', label: 'Settings' },
   ];
 
@@ -156,15 +167,67 @@ export class UserFormComponent {
       employee_type: [''],
       joining_date: [''],
     }),
+
+    // Time Off — initial leave balances the creator assigns to the new user.
+    // Each row: { leave_type: <uuid>, allocated: <days> }.
+    leave_allocations: this.fb.array<FormGroup>([]),
   });
+
+  /** Typed accessor for the leave_allocations FormArray (used by the template). */
+  protected get leaveAllocations(): FormArray<FormGroup> {
+    return this.form.controls.leave_allocations as FormArray<FormGroup>;
+  }
 
   constructor() {
     queueMicrotask(() => {
       if (this.isEdit()) this.load();
-      else this.onRoleChange(this.form.controls.role.value);
+      else {
+        this.onRoleChange(this.form.controls.role.value);
+        // Time-off allocation is a create-time concern; load the org's leave types so
+        // the creator can seed balances. In edit mode, balances are managed elsewhere.
+        this.loadLeaveTypes();
+      }
     });
     // React to role changes: show/hide the vendor dropdown and lazy-load vendors.
     this.form.controls.role.valueChanges.subscribe((role) => this.onRoleChange(role));
+  }
+
+  /** Load the org leave types once, then seed one empty allocation row for convenience. */
+  private loadLeaveTypes(): void {
+    this.leaves.listTypes().subscribe({
+      next: (types) => {
+        this.leaveTypes.set(types);
+        if (types.length && this.leaveAllocations.length === 0) this.addAllocation();
+      },
+    });
+  }
+
+  /** Add an empty time-off allocation row. */
+  protected addAllocation(): void {
+    this.leaveAllocations.push(
+      this.fb.nonNullable.group({
+        leave_type: ['', [Validators.required]],
+        allocated: [null as number | null, [Validators.required, Validators.min(0)]],
+      }),
+    );
+  }
+
+  /** Remove the allocation row at the given index. */
+  protected removeAllocation(index: number): void {
+    this.leaveAllocations.removeAt(index);
+  }
+
+  /** Remove time-off rows the creator left completely blank (no type AND no days). */
+  private dropEmptyAllocations(): void {
+    for (let i = this.leaveAllocations.length - 1; i >= 0; i -= 1) {
+      const { leave_type, allocated } = this.leaveAllocations.at(i).getRawValue() as {
+        leave_type?: string;
+        allocated?: number | null;
+      };
+      if (!leave_type && (allocated == null || (allocated as unknown as string) === '')) {
+        this.leaveAllocations.removeAt(i);
+      }
+    }
   }
 
   /** When C2C is chosen, reveal the vendor dropdown and load the org's vendors once. */
@@ -246,10 +309,20 @@ export class UserFormComponent {
   }
 
   protected submit(): void {
+    // Time-off rows are optional. Drop any fully-empty allocation rows so their
+    // required-validators don't block an otherwise valid form. Partially-filled rows
+    // are kept so the validator nudges the creator to finish (or clear) them.
+    this.dropEmptyAllocations();
+
     if (this.form.invalid) {
       markAllAsTouched(this.form);
-      this.activeTab.set('work');
-      this.notify.error('Please complete the required fields (name, email, role).');
+      // Point the creator at the tab that actually has the problem.
+      this.activeTab.set(this.leaveAllocations.invalid ? 'timeoff' : 'work');
+      this.notify.error(
+        this.leaveAllocations.invalid
+          ? 'Complete or remove the time-off rows (both a leave type and days are required).'
+          : 'Please complete the required fields (name, email, role).',
+      );
       return;
     }
     const raw = this.form.getRawValue();
@@ -269,6 +342,13 @@ export class UserFormComponent {
   }
 
   private saveCreate(raw: ReturnType<typeof this.form.getRawValue>, profile: object): void {
+    // Collect the time-off rows the creator filled in: a leave type + a positive
+    // number of days. Blank/zero rows are dropped so we never send noise.
+    const allocations: LeaveAllocationInput[] = (raw.leave_allocations ?? [])
+      .map((row) => row as { leave_type?: string; allocated?: number | null })
+      .filter((row) => !!row.leave_type && row.allocated != null && Number(row.allocated) > 0)
+      .map((row) => ({ leave_type: row.leave_type as string, allocated: Number(row.allocated) }));
+
     const payload: CreateUserPayload = {
       first_name: raw.first_name,
       last_name: raw.last_name,
@@ -276,6 +356,8 @@ export class UserFormComponent {
       role: raw.role,
       vendor_uuid: raw.role === 'consultant_c2c' && raw.vendor_uuid ? raw.vendor_uuid : undefined,
       profile: Object.keys(profile).length ? (profile as CreateUserPayload['profile']) : undefined,
+      leave_allocations: allocations.length ? allocations : undefined,
+      period_year: allocations.length ? this.periodYear : undefined,
     };
     this.users.create(payload).subscribe({
       next: () => {

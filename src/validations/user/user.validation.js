@@ -122,6 +122,16 @@ const createUser = {
     profile: profileSchema.optional(),
     // Company details when creating a vendor user.
     vendor_profile: vendorProfileSchema.optional(),
+    period_year: Joi.number().integer().min(2000).max(3000).optional(),
+    leave_allocations: Joi.array()
+      .items(
+        Joi.object().keys({
+          leave_type: Joi.string().uuid().required(),
+          allocated: Joi.number().min(0).max(9999).required(),
+        })
+      )
+      .max(50)
+      .optional(),
   }),
 };
 

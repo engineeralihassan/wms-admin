@@ -296,6 +296,63 @@
         </div>
       }
 
+      <!-- TIME OFF (initial leave balances; create mode only) -->
+      @if (activeTab() === 'timeoff') {
+        <div class="tab-panel" role="tabpanel">
+          @if (isEdit()) {
+            <p class="field__hint doc-note">
+              Time-off balances are managed from the Leaves section after the user is created.
+            </p>
+          } @else if (leaveTypes().length === 0) {
+            <p class="field__hint doc-note">
+              No leave types are set up for your organization yet, so time off can't be assigned here.
+            </p>
+          } @else {
+            <p class="field__hint doc-note">
+              Assign starting leave balances for {{ periodYear }}. These become the user's allocated
+              days and can be adjusted later from the Leaves section. Leave empty to skip.
+            </p>
+
+            <div formArrayName="leave_allocations" class="alloc-list">
+              @for (row of leaveAllocations.controls; track $index) {
+                <div class="alloc-row" [formGroupName]="$index">
+                  <label class="field">
+                    <span class="field__label">Leave type</span>
+                    <select class="field__input" formControlName="leave_type">
+                      <option value="">— Select type —</option>
+                      @for (t of leaveTypes(); track t.uuid) {
+                        <option [value]="t.uuid">{{ t.name }}{{ t.is_paid ? '' : ' (unpaid)' }}</option>
+                      }
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field__label">Days ({{ periodYear }})</span>
+                    <input
+                      class="field__input"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      formControlName="allocated"
+                      placeholder="e.g. 15"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="alloc-row__remove"
+                    aria-label="Remove this time-off row"
+                    (click)="removeAllocation($index)"
+                  >&times;</button>
+                </div>
+              }
+            </div>
+
+            <app-button type="button" variant="ghost" (clicked)="addAllocation()">
+              + Add leave type
+            </app-button>
+          }
+        </div>
+      }
+
       <!-- SETTINGS -->
       @if (activeTab() === 'settings') {
         <div formGroupName="settings" class="tab-panel" role="tabpanel">

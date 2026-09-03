@@ -229,6 +229,26 @@ const createUser = async (body, auth, res) => {
         );
       }
 
+      // Optional initial time-off grant: seed the user's leave balances now, reusing
+      // the leave module's balance + ledger machinery so they're identical to an
+      // admin-allocated balance. Lazy require avoids a service<->service cycle. Runs
+      // in the SAME transaction, so a bad leave type rolls the whole create back.
+      if (Array.isArray(body.leave_allocations) && body.leave_allocations.length) {
+        // eslint-disable-next-line global-require
+        const leaveService = require('../leaves/leave.service');
+        await leaveService.allocateBalancesForUser(
+          {
+            organizationId,
+            userId: created.id,
+            createdById: auth.userId,
+            year: body.period_year,
+            allocations: body.leave_allocations,
+          },
+          t,
+          res
+        );
+      }
+
       return created;
     });
   } catch (err) {
