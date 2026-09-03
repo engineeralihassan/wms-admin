@@ -41,6 +41,7 @@ const toDto = (job) => ({
   openings: job.openings,
   skills: Array.isArray(job.skills) ? job.skills : [],
   interview_rounds: Array.isArray(job.interview_rounds) ? job.interview_rounds : [],
+  screening_criteria: job.screening_criteria || {},
   status: job.status,
   public_token: job.public_token,
   // Convenience: the full shareable link the recruiter can copy.

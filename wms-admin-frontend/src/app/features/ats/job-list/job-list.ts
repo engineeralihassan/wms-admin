@@ -221,6 +221,10 @@ export class JobList {
     show_salary: [false],
     openings: [1, [Validators.required, Validators.min(1)]],
     skills: [''], // comma-separated in the UI, split on submit
+    // Optional resume-screening guidance (comma-separated in the UI).
+    screening_must_have: [''],
+    screening_keywords: [''],
+    screening_min_experience: [null as number | null],
     rounds: this.fb.array<ReturnType<JobList['createRoundControl']>>([]),
   });
 
@@ -281,6 +285,9 @@ export class JobList {
       show_salary: false,
       openings: 1,
       skills: '',
+      screening_must_have: '',
+      screening_keywords: '',
+      screening_min_experience: null,
     });
     this.setRounds(DEFAULT_ROUNDS);
     this.openModal.set('create');
@@ -304,6 +311,9 @@ export class JobList {
       show_salary: job.show_salary,
       openings: job.openings,
       skills: (job.skills ?? []).join(', '),
+      screening_must_have: (job.screening_criteria?.must_have_skills ?? []).join(', '),
+      screening_keywords: (job.screening_criteria?.keywords ?? []).join(', '),
+      screening_min_experience: job.screening_criteria?.min_experience ?? null,
     });
     this.setRounds((job.interview_rounds ?? []).map((r) => r.name));
     this.openModal.set('edit');
@@ -359,6 +369,11 @@ export class JobList {
     const interview_rounds: InterviewRoundInput[] = this.rounds.controls
       .map((c) => ({ name: String(c.get('name')?.value ?? '').trim() }))
       .filter((r) => r.name.length > 0);
+    const csv = (s: string | null | undefined) =>
+      (s || '')
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
     return {
       action,
       title: v.title.trim(),
@@ -377,6 +392,11 @@ export class JobList {
       openings: Number(v.openings),
       skills,
       interview_rounds,
+      screening_criteria: {
+        must_have_skills: csv(v.screening_must_have),
+        keywords: csv(v.screening_keywords),
+        min_experience: v.screening_min_experience,
+      },
     };
   }
 

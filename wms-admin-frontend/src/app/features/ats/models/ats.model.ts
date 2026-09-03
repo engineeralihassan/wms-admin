@@ -46,6 +46,37 @@ export interface InterviewRound {
   order: number;
 }
 
+/** Optional resume-screening guidance appended to the JD sent to the matcher. */
+export interface ScreeningCriteria {
+  must_have_skills?: string[];
+  keywords?: string[];
+  min_experience?: number | null;
+}
+
+/** Async resume-screening lifecycle for an application. */
+export type ScreeningStatus = 'pending' | 'processing' | 'done' | 'failed' | 'skipped';
+
+/** Score band label (mirrors the matcher's bands). */
+export type ScreeningBand = 'excellent' | 'strong' | 'good' | 'fair' | 'weak';
+
+/** One matched/missed requirement with optional supporting evidence. */
+export interface ScreeningRequirement {
+  requirement: string;
+  evidence?: string | null;
+}
+
+/** Explainable breakdown stored alongside the score. */
+export interface ScreeningBreakdown {
+  band?: ScreeningBand | string | null;
+  summary?: string | null;
+  notes?: string | null;
+  met_requirements?: ScreeningRequirement[];
+  missed_requirements?: ScreeningRequirement[];
+  provider?: string;
+  request_id?: string | null;
+  credits_used?: number | null;
+}
+
 export interface UserSummary {
   uuid: string;
   first_name: string;
@@ -80,6 +111,7 @@ export interface Job {
   openings: number;
   skills: string[];
   interview_rounds: InterviewRound[];
+  screening_criteria: ScreeningCriteria;
   status: JobStatus;
   public_token: string;
   public_url: string;
@@ -118,6 +150,7 @@ export interface CreateJobRequest {
   openings?: number;
   skills?: string[];
   interview_rounds?: InterviewRoundInput[];
+  screening_criteria?: ScreeningCriteria;
 }
 
 export type UpdateJobRequest = Partial<Omit<CreateJobRequest, 'action'>>;
@@ -171,11 +204,37 @@ export interface JobApplication {
   submitted_at: string | null;
   created_at: string;
   updated_at: string;
+  // Resume screening (populated asynchronously).
+  screening_status?: ScreeningStatus;
+  screening_score?: number | null;
+  screening_band?: ScreeningBand | string | null;
+  screening_breakdown?: ScreeningBreakdown | null;
+  screened_at?: string | null;
   job?: ApplicationJobSummary | null;
   reviewer?: UserSummary | null;
   /** Present on the single-application read. */
   attachments?: ApplicationAttachment[];
   events?: ApplicationEvent[];
+}
+
+/** Pipeline health summary returned alongside the ranked list. */
+export interface ScreeningSummary {
+  enabled: boolean;
+  done: number;
+  pending: number;
+  processing: number;
+  failed: number;
+  skipped: number;
+}
+
+/** Response shape of GET /jobs/:uuid/applications/ranked. */
+export interface RankedApplicationsResponse {
+  data: JobApplication[];
+  meta: {
+    limit: number;
+    total_ranked: number;
+    screening: ScreeningSummary;
+  };
 }
 
 export interface ChangeApplicationStatusRequest {
@@ -259,6 +318,14 @@ export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   hired: 'Hired',
   rejected: 'Rejected',
   on_hold: 'On Hold',
+};
+
+export const SCREENING_BAND_LABELS: Record<ScreeningBand, string> = {
+  excellent: 'Excellent',
+  strong: 'Strong',
+  good: 'Good',
+  fair: 'Fair',
+  weak: 'Weak',
 };
 
 /** Permission keys used for UX gating (backend re-enforces). */

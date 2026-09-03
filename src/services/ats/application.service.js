@@ -1,4 +1,5 @@
 const httpStatus = require('http-status');
+const { Op } = require('sequelize');
 const {
   Job,
   JobApplication,
@@ -13,6 +14,7 @@ const { paginate } = require('../../utils/query/paginate');
 const { APPLICATION_QUERY_CONFIG } = require('../../config/query-configs');
 const attachmentService = require('../storage/attachment.service');
 const fileService = require('../storage/file.service');
+const resumeScreeningService = require('./resume/resume-screening.service');
 const { config, UPLOAD_FOLDERS } = require('../../config/storage');
 const {
   JOB_STATUSES,
@@ -26,7 +28,11 @@ const {
   APPLICATION_EVENT_TYPES,
   APPLICATION_ATTACHMENT_OWNER_TYPE,
   APPLICATION_MAX_FILES,
+  SCREENING_STATUSES,
+  SCREENING_RANK_DEFAULT_LIMIT,
+  SCREENING_RANK_MAX_LIMIT,
 } = require('../../utils/ats.constants');
+const { config: aiConfig } = require('../../config/ai');
 const { buildJobScope, nextSequenceCode } = require('./ats.shared');
 
 /**
@@ -60,6 +66,11 @@ const APPLICATION_ATTRIBUTES = [
   'decision_reason',
   'source',
   'submitted_at',
+  'screening_status',
+  'screening_score',
+  'screening_band',
+  'screening_breakdown',
+  'screened_at',
   'createdAt',
   'updatedAt',
 ];
@@ -186,6 +197,13 @@ const applyToJob = async (token, body, req, res) => {
       return created;
     });
 
+    // Screen the CV asynchronously (once). Fire-and-forget AFTER commit so a queue or
+    // provider hiccup can never affect the candidate's submission.
+    resumeScreeningService.enqueueSafe(application.id, {
+      organizationId: job.organization_id,
+      reason: 'apply',
+    });
+
     // Public-safe acknowledgement only (never leak internal ids or org data).
     return {
       application_number: application.application_number,
@@ -223,6 +241,67 @@ const listApplicationsForJob = async (jobUuid, req, res) => {
     attributes: APPLICATION_ATTRIBUTES,
     include: APPLICATION_INCLUDE,
   });
+};
+
+/**
+ * Ranked (top-N) applications for a job, ordered by cached screening_score DESC. This
+ * reads the score already computed by the resume worker — no AI call happens here, so
+ * it stays instant even with thousands of applicants. Only screened candidates with a
+ * score are ranked; unscored/failed/skipped are reported separately for transparency.
+ *
+ * @returns {{ items, total_ranked, screening: { enabled, done, pending, processing,
+ *             failed, skipped } }}
+ */
+const listRankedApplications = async (jobUuid, req, res) => {
+  const job = await resolveOwnedJob(jobUuid, req, res);
+
+  const requested = Number(req.query.limit) || SCREENING_RANK_DEFAULT_LIMIT;
+  const limit = Math.min(Math.max(1, requested), SCREENING_RANK_MAX_LIMIT);
+
+  const baseWhere = { organization_id: job.organization_id, job_id: job.id };
+
+  // The ranked list: screened candidates that have a numeric score, best first.
+  // NULLS LAST is implicit because we filter to non-null scores.
+  const rows = await JobApplication.findAll({
+    where: { ...baseWhere, screening_score: { [Op.ne]: null } },
+    attributes: APPLICATION_ATTRIBUTES,
+    include: APPLICATION_INCLUDE,
+    order: [
+      ['screening_score', 'DESC'],
+      ['rating', 'DESC'],
+      ['created_at', 'ASC'],
+    ],
+    limit,
+  });
+
+  // Pipeline health so the UI can show "12 of 200 screened, 5 pending…".
+  const grouped = await JobApplication.findAll({
+    where: baseWhere,
+    attributes: [
+      'screening_status',
+      [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+    ],
+    group: ['screening_status'],
+    raw: true,
+  });
+  const counts = grouped.reduce((acc, g) => {
+    acc[g.screening_status] = Number(g.count);
+    return acc;
+  }, {});
+
+  return {
+    items: rows,
+    limit,
+    total_ranked: rows.length,
+    screening: {
+      enabled: aiConfig.enabled,
+      done: counts[SCREENING_STATUSES.DONE] || 0,
+      pending: counts[SCREENING_STATUSES.PENDING] || 0,
+      processing: counts[SCREENING_STATUSES.PROCESSING] || 0,
+      failed: counts[SCREENING_STATUSES.FAILED] || 0,
+      skipped: counts[SCREENING_STATUSES.SKIPPED] || 0,
+    },
+  };
 };
 
 /**
@@ -495,6 +574,7 @@ module.exports = {
   getPublicJobByToken,
   applyToJob,
   listApplicationsForJob,
+  listRankedApplications,
   getApplicationByUuid,
   findVisibleApplication,
   changeStatus,

@@ -1,5 +1,9 @@
 const { DataTypes } = require('sequelize');
-const { APPLICATION_STATUSES, APPLICATION_SOURCES } = require('../utils/ats.constants');
+const {
+  APPLICATION_STATUSES,
+  APPLICATION_SOURCES,
+  SCREENING_STATUSES,
+} = require('../utils/ats.constants');
 
 /**
  * JobApplication = one candidate's submission against a Job.
@@ -145,6 +149,44 @@ module.exports = (sequelize) => {
         defaultValue: APPLICATION_SOURCES.CAREERS_PAGE,
       },
 
+      // ── Resume screening (populated asynchronously by the resume worker) ────────
+
+      // Where the screening pipeline is for this application.
+      screening_status: {
+        type: DataTypes.ENUM(...Object.values(SCREENING_STATUSES)),
+        allowNull: false,
+        defaultValue: SCREENING_STATUSES.PENDING,
+      },
+
+      // Final 0–100 fit score from the matcher (Rezmatch). Highest = best match.
+      // Indexed for fast "top N" ordering within a job. Null until screened.
+      screening_score: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        validate: { min: 0, max: 100 },
+      },
+
+      // Score band label: 'excellent' | 'strong' | 'good' | 'fair' | 'weak'.
+      screening_band: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+      },
+
+      // Explainable breakdown from the matcher so recruiters see WHY a candidate scored
+      // as they did: { band, summary, met_requirements[], missed_requirements[],
+      //   notes, provider, request_id }.
+      screening_breakdown: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+
+      // When screening last completed (or failed). Lets us detect a stale score after
+      // the job description / criteria changed and re-enqueue.
+      screened_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+
       submitted_at: {
         type: DataTypes.DATE,
         allowNull: true,
@@ -164,6 +206,8 @@ module.exports = (sequelize) => {
         { fields: ['organization_id', 'candidate_email'] },
         // Supports the default list ordering (created_at DESC) within a job/tenant.
         { fields: ['organization_id', 'created_at'] },
+        // Supports the "top N candidates" ranking query: order by score within a job.
+        { fields: ['job_id', 'screening_score'] },
       ],
     }
   );

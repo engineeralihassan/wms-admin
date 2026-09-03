@@ -76,6 +76,70 @@
   </app-card>
 }
 
+<!-- Top candidates (AI resume screening) -->
+<app-card title="Top candidates">
+  <div card-actions>
+    <app-button variant="ghost" (clicked)="toggleRanked()">
+      {{ rankedOpen() ? 'Hide' : 'Show top candidates' }}
+    </app-button>
+  </div>
+
+  @if (rankedOpen()) {
+    @if (rankedSummary(); as s) {
+      @if (!s.enabled) {
+        <p class="ranked__notice">
+          Resume screening isn't configured yet. Add a Rezmatch API key on the server to
+          enable automatic candidate scoring.
+        </p>
+      } @else {
+        <p class="ranked__summary">
+          <span class="ranked__stat ranked__stat--done">{{ s.done }} screened</span>
+          @if (s.pending || s.processing) {
+            <span class="ranked__stat ranked__stat--pending">
+              {{ s.pending + s.processing }} in progress
+            </span>
+          }
+          @if (s.failed) { <span class="ranked__stat ranked__stat--failed">{{ s.failed }} failed</span> }
+          @if (s.skipped) { <span class="ranked__stat ranked__stat--skipped">{{ s.skipped }} no CV</span> }
+          <app-button variant="ghost" [loading]="rankedLoading()" (clicked)="loadRanked()">
+            Refresh
+          </app-button>
+        </p>
+      }
+    }
+
+    @if (rankedLoading() && !rankedItems().length) {
+      <p class="applicant__muted">Loading…</p>
+    } @else if (rankedItems().length) {
+      <ol class="ranked">
+        @for (a of rankedItems(); track a.uuid; let i = $index) {
+          <li class="ranked__item" (click)="openRanked(a)">
+            <span class="ranked__rank">{{ i + 1 }}</span>
+            <span class="ranked__score" [class]="bandClass(a.screening_band)">
+              <span class="ranked__score-num">{{ a.screening_score }}</span>
+              <span class="ranked__score-band">{{ bandLabel(a.screening_band) }}</span>
+            </span>
+            <div class="ranked__body">
+              <p class="ranked__name">{{ a.candidate_name }}</p>
+              <p class="ranked__meta">{{ a.application_number }} · {{ a.candidate_email }}</p>
+              @if (a.screening_breakdown?.summary) {
+                <p class="ranked__note">{{ a.screening_breakdown?.summary }}</p>
+              }
+              @if (a.screening_breakdown?.missed_requirements?.length) {
+                <p class="ranked__missed">Missing: {{ missedText(a) }}</p>
+              }
+            </div>
+          </li>
+        }
+      </ol>
+    } @else if (!rankedLoading()) {
+      <p class="applicant__muted">
+        No screened candidates yet. Scores appear here automatically once CVs are processed.
+      </p>
+    }
+  }
+</app-card>
+
 <app-card title="Applicants">
   <app-data-table
     caption="Applicants"

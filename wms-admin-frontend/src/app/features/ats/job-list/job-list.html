@@ -175,6 +175,49 @@
         }
       </div>
     </div>
+
+    <!-- AI resume screening criteria (optional) -->
+    <div class="screening">
+      <div class="screening__header">
+        <span class="field__label">Resume screening (optional)</span>
+        <span class="screening__badge">AI</span>
+      </div>
+      <p class="screening__hint">
+        Candidates' CVs are automatically scored against this job. Add a few must-haves to
+        sharpen the match; leave blank to score against the full job description.
+      </p>
+
+      <label class="field">
+        <span class="field__label">Must-have skills (comma-separated)</span>
+        <input
+          class="field__input"
+          type="text"
+          formControlName="screening_must_have"
+          placeholder="Angular, TypeScript, REST APIs"
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">Important keywords (comma-separated)</span>
+        <input
+          class="field__input"
+          type="text"
+          formControlName="screening_keywords"
+          placeholder="microservices, CI/CD, agile"
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">Minimum experience (years)</span>
+        <input
+          class="field__input"
+          type="number"
+          min="0"
+          formControlName="screening_min_experience"
+          placeholder="e.g. 3"
+        />
+      </label>
+    </div>
   </form>
 
   <div modal-footer>

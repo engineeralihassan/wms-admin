@@ -106,3 +106,36 @@
   font-size: 0.85rem;
   color: var(--color-text-muted, #64748b);
 }
+
+.screening {
+  margin-top: 1rem;
+  border: 1px dashed var(--color-primary, #5a6acf);
+  border-radius: 0.6rem;
+  padding: 0.9rem;
+  background: var(--color-primary-050, #eef0fb);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.screening__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.screening__badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-primary, #5a6acf);
+  color: var(--color-on-primary, #fff);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.screening__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #64748b);
+}

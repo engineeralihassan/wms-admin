@@ -8,6 +8,7 @@ const {
   JOB_STATUSES,
   APPLICATION_STATUSES,
 } = require('../../utils/ats.constants');
+const resumeScreeningService = require('./resume/resume-screening.service');
 const {
   buildJobScope,
   generatePublicToken,
@@ -51,12 +52,27 @@ const JOB_ATTRIBUTES = [
   'openings',
   'skills',
   'interview_rounds',
+  'screening_criteria',
   'status',
   'published_at',
   'closed_at',
   'createdAt',
   'updatedAt',
 ];
+
+/** Normalize an incoming screening_criteria object to the stored shape (or {}). */
+const normalizeScreeningCriteria = (raw) => {
+  if (!raw || typeof raw !== 'object') return {};
+  const out = {};
+  if (Array.isArray(raw.must_have_skills)) {
+    out.must_have_skills = raw.must_have_skills.map((s) => String(s).trim()).filter(Boolean);
+  }
+  if (Array.isArray(raw.keywords)) {
+    out.keywords = raw.keywords.map((s) => String(s).trim()).filter(Boolean);
+  }
+  if (raw.min_experience != null) out.min_experience = Number(raw.min_experience);
+  return out;
+};
 
 const JOB_INCLUDE = [
   { model: User, as: 'recruiter', attributes: ['uuid', 'first_name', 'last_name', 'email'] },
@@ -131,6 +147,7 @@ const createJob = async (body, req, res) => {
     openings: body.openings ?? 1,
     skills: Array.isArray(body.skills) ? body.skills : [],
     interview_rounds: rounds,
+    screening_criteria: normalizeScreeningCriteria(body.screening_criteria),
   };
   validateRanges(draft, res);
 
@@ -223,6 +240,10 @@ const updateJob = async (uuid, body, req, res) => {
       body.description = clean;
     }
 
+    if (body.screening_criteria !== undefined) {
+      job.screening_criteria = normalizeScreeningCriteria(body.screening_criteria);
+    }
+
     const assignable = [
       'title',
       'description',
@@ -247,11 +268,31 @@ const updateJob = async (uuid, body, req, res) => {
     });
 
     validateRanges(job, res);
+    // Changing what a candidate is scored against means existing scores are stale.
+    const rescoreNeeded =
+      job.changed('description') ||
+      job.changed('skills') ||
+      job.changed('experience_min') ||
+      job.changed('screening_criteria');
     await job.save({ transaction });
-    return job;
+    return { job, rescoreNeeded };
   });
 
-  return findVisibleJob(updated.uuid, req, res);
+  // Re-screen existing applications against the new criteria (async, once each).
+  if (updated.rescoreNeeded) {
+    const apps = await JobApplication.findAll({
+      where: { job_id: updated.job.id },
+      attributes: ['id'],
+    });
+    apps.forEach((a) =>
+      resumeScreeningService.enqueueSafe(a.id, {
+        organizationId: updated.job.organization_id,
+        reason: 'rescore',
+      })
+    );
+  }
+
+  return findVisibleJob(updated.job.uuid, req, res);
 };
 
 /**

@@ -195,7 +195,65 @@ const APPLICATION_EVENT_TYPES = Object.freeze({
   STAGE_CHANGED: 'stage_changed',
   NOTE_ADDED: 'note_added',
   RATING_UPDATED: 'rating_updated',
+  // The screening pipeline finished parsing + scoring this application's resume.
+  SCREENED: 'screened',
 });
+
+// ── Resume screening ────────────────────────────────────────────────────────────
+
+/**
+ * Lifecycle of the async resume screening for an application:
+ *   PENDING    — enqueued, not yet processed (or no resume to process yet).
+ *   PROCESSING — a worker is extracting text + scoring right now.
+ *   DONE       — parsed + scored; screening_score & screening_breakdown are populated.
+ *   FAILED     — extraction/scoring failed after retries (e.g. unreadable file).
+ *   SKIPPED    — nothing to screen (no supported CV attachment).
+ */
+const SCREENING_STATUSES = Object.freeze({
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+  DONE: 'done',
+  FAILED: 'failed',
+  SKIPPED: 'skipped',
+});
+
+/**
+ * Optional per-job screening guidance (JSONB `screening_criteria` on the job). Rezmatch
+ * already extracts requirements from the job description; these fields let a recruiter
+ * emphasize a few must-haves that get appended to the JD text sent to the matcher.
+ * All optional — an empty object means "just use the job description".
+ *
+ *   { must_have_skills: string[], keywords: string[], min_experience: number|null }
+ */
+const SCREENING_CRITERIA_LIMITS = Object.freeze({
+  MAX_MUST_HAVE_SKILLS: 40,
+  MAX_KEYWORDS: 60,
+  TERM_MAX_LENGTH: 80,
+  MAX_EXPERIENCE_YEARS: 60,
+});
+
+/** Score band labels (mirrors Rezmatch's weak → excellent bands). */
+const SCREENING_BANDS = Object.freeze({
+  EXCELLENT: 'excellent',
+  STRONG: 'strong',
+  GOOD: 'good',
+  FAIR: 'fair',
+  WEAK: 'weak',
+});
+
+/** Map a 0–100 score to a band label (used when the provider omits one). */
+const scoreToBand = (score) => {
+  if (score == null) return null;
+  if (score >= 85) return SCREENING_BANDS.EXCELLENT;
+  if (score >= 70) return SCREENING_BANDS.STRONG;
+  if (score >= 55) return SCREENING_BANDS.GOOD;
+  if (score >= 40) return SCREENING_BANDS.FAIR;
+  return SCREENING_BANDS.WEAK;
+};
+
+/** Ranking endpoint: default and hard-cap on how many top candidates to return. */
+const SCREENING_RANK_DEFAULT_LIMIT = 10;
+const SCREENING_RANK_MAX_LIMIT = 100;
 
 // ── Field limits (shared by model + validation) ─────────────────────────────────
 
@@ -253,4 +311,10 @@ module.exports = {
   JOB_PUBLIC_TOKEN_BYTES,
   APPLICATION_ATTACHMENT_OWNER_TYPE,
   APPLICATION_MAX_FILES,
+  SCREENING_STATUSES,
+  SCREENING_CRITERIA_LIMITS,
+  SCREENING_BANDS,
+  scoreToBand,
+  SCREENING_RANK_DEFAULT_LIMIT,
+  SCREENING_RANK_MAX_LIMIT,
 };

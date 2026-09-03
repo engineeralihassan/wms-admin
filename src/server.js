@@ -96,10 +96,12 @@ app.use((req, res, next) => {
 });
 
 const emailWorker = require('./services/email/email.worker');
+const resumeWorker = require('./services/ats/resume/resume.worker');
 
 db.sequelize.sync({ force: false }).then(() => {
   console.log('Database connected');
   emailWorker.start();
+  resumeWorker.start();
 });
 
 // Start server
@@ -124,6 +126,7 @@ const shutdown = async (signal) => {
   server.close(async () => {
     try {
       await emailWorker.stop();
+      await resumeWorker.stop();
       await db.sequelize.close();
     } catch (err) {
       console.error('Error during shutdown:', err.message);

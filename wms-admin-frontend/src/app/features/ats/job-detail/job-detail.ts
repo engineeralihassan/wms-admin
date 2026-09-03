@@ -32,11 +32,14 @@ import {
   ATS_PERMISSIONS,
   EMPLOYMENT_TYPE_LABELS,
   JOB_STATUS_LABELS,
+  SCREENING_BAND_LABELS,
   WORK_MODE_LABELS,
   type ApplicationStatus,
   type InterviewRound,
   type Job,
   type JobApplication,
+  type ScreeningBand,
+  type ScreeningSummary,
 } from '../models/ats.model';
 
 /**
@@ -101,6 +104,59 @@ export class JobDetail implements OnInit {
     (query) => this.jobs.listApplications(this.uuid(), query),
     { sortBy: 'created_at', sortDir: 'desc', limit: 10 },
   );
+
+  // ── Top candidates (resume screening) ──────────────────────────────────────
+  protected readonly bandLabels = SCREENING_BAND_LABELS;
+  protected readonly rankedOpen = signal(false);
+  protected readonly rankedLoading = signal(false);
+  protected readonly rankedItems = signal<JobApplication[]>([]);
+  protected readonly rankedSummary = signal<ScreeningSummary | null>(null);
+  protected readonly rankedLimit = signal(10);
+
+  /** Load (or reload) the ranked candidates for this job. */
+  protected loadRanked(): void {
+    this.rankedLoading.set(true);
+    this.jobs.listRankedApplications(this.uuid(), this.rankedLimit()).subscribe({
+      next: (res) => {
+        this.rankedItems.set(res.data);
+        this.rankedSummary.set(res.meta.screening);
+        this.rankedLoading.set(false);
+      },
+      error: () => this.rankedLoading.set(false),
+    });
+  }
+
+  /** Toggle the top-candidates panel, loading on first open. */
+  protected toggleRanked(): void {
+    const next = !this.rankedOpen();
+    this.rankedOpen.set(next);
+    if (next && this.rankedItems().length === 0) this.loadRanked();
+  }
+
+  /** CSS modifier for a score band chip. */
+  protected bandClass(band?: string | null): string {
+    return band ? `band--${band}` : 'band--none';
+  }
+
+  /** Human label for a score band (falls back to the raw value). */
+  protected bandLabel(band?: string | null): string {
+    if (!band) return '';
+    return this.bandLabels[band as ScreeningBand] ?? band;
+  }
+
+  /** Comma-joined list of the top missing requirements for a ranked candidate. */
+  protected missedText(app: JobApplication): string {
+    const missed = app.screening_breakdown?.missed_requirements ?? [];
+    return missed
+      .slice(0, 4)
+      .map((m) => m.requirement)
+      .join(', ');
+  }
+
+  /** Open the drawer for a ranked candidate (reuses the applicant drawer). */
+  protected openRanked(app: JobApplication): void {
+    this.openApplication(app);
+  }
 
   protected readonly columns: ReadonlyArray<DataTableColumn<JobApplication>> = [
     { key: 'application_number', label: 'Ref', value: (a) => a.application_number, tone: 'code' },
@@ -252,7 +308,7 @@ export class JobDetail implements OnInit {
   }
 
   // ── Drawer ───────────────────────────────────────────────────────────────
-  private openApplication(app: JobApplication): void {
+  protected openApplication(app: JobApplication): void {
     this.drawerOpen.set(true);
     this.activeApplication.set(app); // show a light version immediately
     // Fetch the full record (attachments + events).

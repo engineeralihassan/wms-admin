@@ -184,6 +184,16 @@ module.exports = (sequelize) => {
         defaultValue: [],
       },
 
+      // Optional AI/auto-screening criteria used to rank applicants against this job.
+      // JSONB object: { required_skills[], nice_to_have_skills[], keywords[], schools[],
+      // min_experience, preferred_experience, weights{}, use_ai }. Empty {} = no explicit
+      // criteria (scorer falls back to the job's own skills/experience range).
+      screening_criteria: {
+        type: DataTypes.JSONB,
+        allowNull: false,
+        defaultValue: {},
+      },
+
       status: {
         type: DataTypes.ENUM(...Object.values(JOB_STATUSES)),
         allowNull: false,

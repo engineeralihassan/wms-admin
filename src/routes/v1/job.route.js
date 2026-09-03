@@ -60,6 +60,16 @@ router.get(
   applicationController.listForJob
 );
 
+// Top-N candidates for a job, ranked by cached resume-screening score.
+router.get(
+  '/:uuid/applications/ranked',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.APPLICATION_READ),
+  validate(applicationValidation.listRankedApplications),
+  applicationController.listRankedForJob
+);
+
 // ── Single job by uuid ─────────────────────────────────────────────────────────
 router
   .route('/:uuid')

@@ -12,6 +12,7 @@ const {
   JOB_SKILL_MAX_LENGTH,
   JOB_MAX_INTERVIEW_ROUNDS,
   INTERVIEW_ROUND_NAME_MAX_LENGTH,
+  SCREENING_CRITERIA_LIMITS,
 } = require('../../utils/ats.constants');
 const { listQuery } = require('../common.validation');
 
@@ -40,6 +41,24 @@ const interviewRoundsList = Joi.array()
   .items(interviewRound)
   .max(JOB_MAX_INTERVIEW_ROUNDS);
 
+// Optional resume-screening guidance. All fields optional; empty object = "use the JD".
+const screeningTerm = Joi.string().trim().min(1).max(SCREENING_CRITERIA_LIMITS.TERM_MAX_LENGTH);
+const screeningCriteria = Joi.object({
+  must_have_skills: Joi.array()
+    .items(screeningTerm)
+    .max(SCREENING_CRITERIA_LIMITS.MAX_MUST_HAVE_SKILLS)
+    .unique((a, b) => a.toLowerCase() === b.toLowerCase()),
+  keywords: Joi.array()
+    .items(screeningTerm)
+    .max(SCREENING_CRITERIA_LIMITS.MAX_KEYWORDS)
+    .unique((a, b) => a.toLowerCase() === b.toLowerCase()),
+  min_experience: Joi.number()
+    .integer()
+    .min(0)
+    .max(SCREENING_CRITERIA_LIMITS.MAX_EXPERIENCE_YEARS)
+    .allow(null),
+}).unknown(false);
+
 // Shared money/experience range guards. Cross-field (min<=max) is enforced in the
 // service where all values are known together.
 const experience = Joi.number().integer().min(0).max(60);
@@ -66,6 +85,7 @@ const jobBodyBase = {
   openings: Joi.number().integer().min(1).max(9999),
   skills: skillsList,
   interview_rounds: interviewRoundsList,
+  screening_criteria: screeningCriteria,
 };
 
 /**

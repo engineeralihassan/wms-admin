@@ -31,6 +31,16 @@ const listApplications = {
   }),
 };
 
+// GET /jobs/:uuid/applications/ranked — top-N candidates by screening score.
+const listRankedApplications = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+  }),
+  query: Joi.object().keys({
+    limit: Joi.number().integer().min(1).max(100),
+  }),
+};
+
 const getApplication = {
   params: Joi.object().keys({
     uuid: Joi.string().uuid().required(),
@@ -103,6 +113,7 @@ const deleteApplication = {
 
 module.exports = {
   listApplications,
+  listRankedApplications,
   getApplication,
   changeApplicationStatus,
   rateApplication,

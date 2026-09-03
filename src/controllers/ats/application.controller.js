@@ -42,6 +42,12 @@ const toDto = (a) => ({
   submitted_at: a.submitted_at,
   created_at: a.createdAt,
   updated_at: a.updatedAt,
+  // Resume screening (populated asynchronously by the resume worker).
+  screening_status: a.screening_status,
+  screening_score: a.screening_score,
+  screening_band: a.screening_band,
+  screening_breakdown: a.screening_breakdown || null,
+  screened_at: a.screened_at,
   job: jobSummary(a.job),
   reviewer: userSummary(a.reviewer),
 });
@@ -61,6 +67,20 @@ const eventToDto = (e) => ({
 const listForJob = catchAsync(async (req, res) => {
   const { data, meta } = await applicationService.listApplicationsForJob(req.params.uuid, req, res);
   res.status(httpStatus.OK).send({ message: res.__('success'), data: data.map(toDto), meta });
+});
+
+/** GET /jobs/:uuid/applications/ranked — top-N candidates by cached screening score. */
+const listRankedForJob = catchAsync(async (req, res) => {
+  const result = await applicationService.listRankedApplications(req.params.uuid, req, res);
+  res.status(httpStatus.OK).send({
+    message: res.__('success'),
+    data: result.items.map(toDto),
+    meta: {
+      limit: result.limit,
+      total_ranked: result.total_ranked,
+      screening: result.screening,
+    },
+  });
 });
 
 /** GET /applications/:uuid — full application with attachments + event history. */
@@ -128,6 +148,7 @@ module.exports = {
   toDto,
   eventToDto,
   listForJob,
+  listRankedForJob,
   getOne,
   changeStatus,
   rate,

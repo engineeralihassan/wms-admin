@@ -20,6 +20,7 @@ const Attachment = require('./attachment.model');
 const Job = require('./job.model');
 const JobApplication = require('./job-application.model');
 const ApplicationEvent = require('./application-event.model');
+const ResumeScreeningJob = require('./resume-screening-job.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -69,6 +70,7 @@ const definitions = (sequelize, Sequelize) => {
   db.Job = Job(sequelize);
   db.JobApplication = JobApplication(sequelize);
   db.ApplicationEvent = ApplicationEvent(sequelize);
+  db.ResumeScreeningJob = ResumeScreeningJob(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -283,6 +285,25 @@ const definitions = (sequelize, Sequelize) => {
   // User(actor) <-> ApplicationEvent
   db.User.hasMany(db.ApplicationEvent, { foreignKey: 'created_by_id', as: 'applicationEvents' });
   db.ApplicationEvent.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'actor' });
+
+  // JobApplication <-> ResumeScreeningJob (async screening queue). Carries only tenant
+  // + application associations; the worker resolves CV + criteria at run time.
+  db.JobApplication.hasMany(db.ResumeScreeningJob, {
+    foreignKey: 'application_id',
+    as: 'screeningJobs',
+  });
+  db.ResumeScreeningJob.belongsTo(db.JobApplication, {
+    foreignKey: 'application_id',
+    as: 'application',
+  });
+  db.Organization.hasMany(db.ResumeScreeningJob, {
+    foreignKey: 'organization_id',
+    as: 'resumeScreeningJobs',
+  });
+  db.ResumeScreeningJob.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
 
   // Attachment (polymorphic file store). It is NOT tied to any single parent via a
   // FK — owner_type/owner_id resolve the parent at the service layer — so it only

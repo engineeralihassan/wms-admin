@@ -3,12 +3,15 @@ import { Observable } from 'rxjs';
 import { ApiService } from '../../../core/http/api.service';
 import { API_ENDPOINTS } from '../../../core/constants/api-endpoints';
 import type { ListQuery, PaginatedResult } from '../../../core/models/pagination.model';
+import { map } from 'rxjs';
 import type {
   ChangeApplicationStatusRequest,
   CreateJobRequest,
   Job,
   JobApplication,
   JobStatus,
+  RankedApplicationsResponse,
+  ScreeningSummary,
   UpdateJobRequest,
 } from '../models/ats.model';
 
@@ -56,6 +59,21 @@ export class JobsService {
 
   getApplication(uuid: string): Observable<JobApplication> {
     return this.api.get<JobApplication>(API_ENDPOINTS.applications.byUuid(uuid));
+  }
+
+  /**
+   * Top-N candidates for a job, ranked by cached resume-screening score. Reads the
+   * already-computed scores, so this is instant regardless of applicant count.
+   */
+  listRankedApplications(jobUuid: string, limit = 10): Observable<RankedApplicationsResponse> {
+    return this.api
+      .list<JobApplication>(API_ENDPOINTS.jobs.rankedApplications(jobUuid), { limit })
+      .pipe(
+        map((res) => ({
+          data: res.data,
+          meta: res.meta as unknown as RankedApplicationsResponse['meta'],
+        })),
+      );
   }
 
   /** Move an application through its hiring lifecycle. */
