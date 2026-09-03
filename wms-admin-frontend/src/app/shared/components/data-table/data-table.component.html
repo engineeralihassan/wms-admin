@@ -6,37 +6,43 @@
         [placeholder]="searchPlaceholder()" (input)="onSearch($event)" />
     </label>
 
-    @for (filter of filters(); track filter.key) {
-      <label class="data-table__filter">
-        <span class="data-table__label">{{ filter.label }}</span>
-        <select [value]="filterValues()[filter.key]" (change)="onFilter(filter.key, $event)">
-          @for (option of filter.options; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-          }
-        </select>
-      </label>
-    }
+    <div class="data-table__right">
+      <div class="data-table__filters">
+        @for (filter of filters(); track filter.key) {
+          <label class="data-table__filter">
+            <span class="data-table__label">{{ filter.label }}</span>
+            <select [value]="filterValues()[filter.key]" (change)="onFilter(filter.key, $event)">
+              @for (option of filter.options; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </label>
+        }
 
-    @if (dateRangeFilter(); as dateRange) {
-      <fieldset class="data-table__date-range">
-        <legend class="data-table__label">{{ dateRange.label }}</legend>
-        <label><span class="visually-hidden">From</span><input type="date" [value]="filterValues()[dateRange.fromKey]" (change)="onFilter(dateRange.fromKey, $event)" aria-label="Created from" /></label>
-        <span class="data-table__range-separator" aria-hidden="true">–</span>
-        <label><span class="visually-hidden">To</span><input type="date" [value]="filterValues()[dateRange.toKey]" (change)="onFilter(dateRange.toKey, $event)" aria-label="Created to" /></label>
-      </fieldset>
-    }
+        @if (dateRangeFilter(); as dateRange) {
+          <fieldset class="data-table__date-range">
+            <legend class="data-table__label">{{ dateRange.label }}</legend>
+            <label><span class="visually-hidden">From</span><input type="date" [value]="filterValues()[dateRange.fromKey]" (change)="onFilter(dateRange.fromKey, $event)" aria-label="Created from" /></label>
+            <span class="data-table__range-separator" aria-hidden="true">–</span>
+            <label><span class="visually-hidden">To</span><input type="date" [value]="filterValues()[dateRange.toKey]" (change)="onFilter(dateRange.toKey, $event)" aria-label="Created to" /></label>
+          </fieldset>
+        }
+      </div>
 
-    <label class="data-table__page-size">
-      <span class="data-table__label">Rows per page</span>
-      <select [value]="limit()" (change)="onPageSize($event)">
-        @for (size of pageSizeOptions(); track size) { <option [value]="size">{{ size }}</option> }
-      </select>
-    </label>
+      <div class="data-table__controls-end">
+        <label class="data-table__page-size">
+          <span class="data-table__label">Rows per page</span>
+          <select [value]="limit()" (change)="onPageSize($event)">
+            @for (size of pageSizeOptions(); track size) { <option [value]="size">{{ size }}</option> }
+          </select>
+        </label>
 
-    <button type="button" class="data-table__reset" (click)="resetFilters.emit()">
-      <span class="data-table__reset-icon" aria-hidden="true">×</span>
-      Clear all
-    </button>
+        <button type="button" class="data-table__reset" (click)="resetFilters.emit()">
+          <span class="data-table__reset-icon" aria-hidden="true">×</span>
+          Clear all
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="data-table__scroll" tabindex="0">
@@ -80,6 +86,7 @@
               @if (hasActions()) {
                 <td class="data-table__actions">
                   @for (item of actions(); track item.id) {
+                    @if (!(item.isHidden?.(row) ?? false)) {
                     <button type="button"
                       class="data-table__action"
                       [class.data-table__action--danger]="item.variant === 'danger'"
@@ -97,6 +104,7 @@
                       }
                       @if (!iconOnlyActions()) { {{ item.label }} }
                     </button>
+                    }
                   }
                 </td>
               }

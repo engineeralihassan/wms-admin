@@ -1,0 +1,324 @@
+<header class="page-header">
+  <a class="back-link" [routerLink]="usersHome">&larr; Back to users</a>
+  <h1 class="page-header__title">{{ isEdit() ? 'Edit user' : 'New user' }}</h1>
+  <p class="page-header__subtitle">
+    {{ isEdit()
+      ? 'Update this user\'s profile information.'
+      : 'Create a user. They\'ll get an email link to set their own password and can complete the rest of their profile after signing in.' }}
+  </p>
+</header>
+
+@if (loading()) {
+  <app-card><div class="centered"><app-spinner /></div></app-card>
+} @else {
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <!-- Identity + role: always visible header block -->
+    <app-card title="Basic information">
+      <div class="grid grid--2">
+        <label class="field">
+          <span class="field__label">First name *</span>
+          <input class="field__input" type="text" formControlName="first_name" placeholder="e.g. John" />
+        </label>
+        <label class="field">
+          <span class="field__label">Last name *</span>
+          <input class="field__input" type="text" formControlName="last_name" placeholder="e.g. Doe" />
+        </label>
+        <label class="field">
+          <span class="field__label">Email *</span>
+          <input class="field__input" type="email" formControlName="email" placeholder="e.g. john.doe@example.com" />
+          @if (!isEdit()) {
+            <span class="field__hint">Activation link is sent here. Cannot be changed later.</span>
+          }
+        </label>
+        <label class="field">
+          <span class="field__label">Role *</span>
+          <select class="field__input" formControlName="role">
+            @for (opt of roleOptions; track opt.value) {
+              <option [value]="opt.value">{{ opt.label }}</option>
+            }
+          </select>
+          <span class="field__hint">Controls permissions and engagement type (W2 / 1099 / C2C / Vendor).</span>
+        </label>
+        @if (isC2c()) {
+          <label class="field">
+            <span class="field__label">Vendor</span>
+            <select class="field__input" formControlName="vendor_uuid">
+              <option value="">— Select vendor —</option>
+              @for (v of vendors(); track v.uuid) {
+                <option [value]="v.uuid">{{ v.company_name || v.name }}</option>
+              }
+            </select>
+            @if (vendors().length === 0) {
+              <span class="field__hint">No vendors yet. Create a user with the Vendor role first.</span>
+            } @else {
+              <span class="field__hint">The company this C2C consultant works through.</span>
+            }
+          </label>
+        }
+      </div>
+    </app-card>
+
+    <!-- Tab strip -->
+    <nav class="tabs" role="tablist" aria-label="User profile sections">
+      @for (tab of tabs; track tab.id) {
+        <button
+          type="button"
+          role="tab"
+          class="tabs__tab"
+          [class.tabs__tab--active]="activeTab() === tab.id"
+          [attr.aria-selected]="activeTab() === tab.id"
+          (click)="setTab(tab.id)"
+        >{{ tab.label }}</button>
+      }
+    </nav>
+
+    <app-card>
+      <!-- WORK INFORMATION -->
+      @if (activeTab() === 'work') {
+        <div formGroupName="work_information" class="tab-panel" role="tabpanel">
+          <div class="grid grid--2">
+            <label class="field"><span class="field__label">Job title</span>
+              <input class="field__input" type="text" formControlName="job_title" placeholder="e.g. Senior Software Engineer" /></label>
+            <label class="field"><span class="field__label">Job position</span>
+              <input class="field__input" type="text" formControlName="job_position" placeholder="e.g. Backend Developer" /></label>
+            <label class="field"><span class="field__label">Department</span>
+              <input class="field__input" type="text" formControlName="department" placeholder="e.g. Engineering" /></label>
+            <label class="field"><span class="field__label">Work email</span>
+              <input class="field__input" type="email" formControlName="work_email" placeholder="e.g. john.doe@company.com" /></label>
+            <label class="field"><span class="field__label">Work phone</span>
+              <input class="field__input" type="text" formControlName="work_phone" placeholder="e.g. +1 555 123 4567" /></label>
+            <label class="field"><span class="field__label">Work mobile</span>
+              <input class="field__input" type="text" formControlName="work_mobile" placeholder="e.g. +1 555 987 6543" /></label>
+            <label class="field"><span class="field__label">Work location</span>
+              <input class="field__input" type="text" formControlName="work_location" placeholder="e.g. Building 2, Remote" /></label>
+            <label class="field"><span class="field__label">Working hours</span>
+              <input class="field__input" type="text" formControlName="working_hours"
+                placeholder="Standard 40 hours/week" /></label>
+          </div>
+          <h3 class="section-title">Work address</h3>
+          <div formGroupName="work_address" class="grid grid--2">
+            <label class="field field--full"><span class="field__label">Street</span>
+              <input class="field__input" type="text" formControlName="line1" placeholder="Street address" /></label>
+            <label class="field field--full"><span class="field__label">Street 2</span>
+              <input class="field__input" type="text" formControlName="line2" placeholder="Apartment, suite, etc." /></label>
+            <label class="field"><span class="field__label">City</span>
+              <input class="field__input" type="text" formControlName="city" placeholder="City" /></label>
+            <label class="field"><span class="field__label">State</span>
+              <input class="field__input" type="text" formControlName="state" placeholder="State / Province" /></label>
+            <label class="field"><span class="field__label">ZIP</span>
+              <input class="field__input" type="text" formControlName="zip" placeholder="ZIP / Postal code" /></label>
+            <label class="field"><span class="field__label">Country</span>
+              <input class="field__input" type="text" formControlName="country" placeholder="Country" /></label>
+          </div>
+        </div>
+      }
+
+      <!-- PRIVATE INFORMATION -->
+      @if (activeTab() === 'private') {
+        <div formGroupName="private_information" class="tab-panel" role="tabpanel">
+          <h3 class="section-title">Private contact</h3>
+          <div formGroupName="private_address" class="grid grid--2">
+            <label class="field field--full"><span class="field__label">Street</span>
+              <input class="field__input" type="text" formControlName="line1" /></label>
+            <label class="field"><span class="field__label">City</span>
+              <input class="field__input" type="text" formControlName="city" /></label>
+            <label class="field"><span class="field__label">State</span>
+              <input class="field__input" type="text" formControlName="state" /></label>
+            <label class="field"><span class="field__label">ZIP</span>
+              <input class="field__input" type="text" formControlName="zip" /></label>
+            <label class="field"><span class="field__label">Country</span>
+              <input class="field__input" type="text" formControlName="country" /></label>
+          </div>
+          <div class="grid grid--2">
+            <label class="field"><span class="field__label">Private email</span>
+              <input class="field__input" type="email" formControlName="private_email" /></label>
+            <label class="field"><span class="field__label">Private phone</span>
+              <input class="field__input" type="text" formControlName="private_phone" /></label>
+            <label class="field"><span class="field__label">Identification No</span>
+              <input class="field__input" type="text" formControlName="identification_no" /></label>
+            <label class="field"><span class="field__label">Passport No</span>
+              <input class="field__input" type="text" formControlName="passport_no" /></label>
+          </div>
+
+          <h3 class="section-title">Citizenship</h3>
+          <div formGroupName="citizenship" class="grid grid--2">
+            <label class="field"><span class="field__label">Country of residence</span>
+              <input class="field__input" type="text" formControlName="country_of_residence" /></label>
+            <label class="field"><span class="field__label">SSN No</span>
+              <input class="field__input" type="text" formControlName="ssn_no" /></label>
+            <label class="field"><span class="field__label">Gender</span>
+              <select class="field__input" formControlName="gender">
+                <option value="">—</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+                <option value="prefer_not_to_say">Prefer not to say</option>
+              </select></label>
+            <label class="field"><span class="field__label">Date of birth</span>
+              <input class="field__input" type="date" formControlName="date_of_birth" /></label>
+            <label class="field"><span class="field__label">Place of birth</span>
+              <input class="field__input" type="text" formControlName="place_of_birth" /></label>
+            <label class="field"><span class="field__label">Country of birth</span>
+              <input class="field__input" type="text" formControlName="country_of_birth" /></label>
+          </div>
+
+          <h3 class="section-title">Emergency contact</h3>
+          <div formGroupName="emergency_contact" class="grid grid--2">
+            <label class="field"><span class="field__label">Contact name</span>
+              <input class="field__input" type="text" formControlName="contact_name" /></label>
+            <label class="field"><span class="field__label">Contact phone</span>
+              <input class="field__input" type="text" formControlName="contact_phone" /></label>
+            <label class="field"><span class="field__label">Contact email</span>
+              <input class="field__input" type="email" formControlName="contact_email" /></label>
+            <label class="field"><span class="field__label">Relation</span>
+              <input class="field__input" type="text" formControlName="relation" /></label>
+          </div>
+
+          <h3 class="section-title">Education</h3>
+          <div formGroupName="education" class="grid grid--2">
+            <label class="field"><span class="field__label">Certificate level</span>
+              <input class="field__input" type="text" formControlName="certificate_level" /></label>
+            <label class="field"><span class="field__label">Field of study</span>
+              <input class="field__input" type="text" formControlName="field_of_study" /></label>
+            <label class="field field--full"><span class="field__label">School</span>
+              <input class="field__input" type="text" formControlName="school" /></label>
+          </div>
+
+          <h3 class="section-title">Work permit</h3>
+          <div formGroupName="work_permit" class="grid grid--2">
+            <label class="field"><span class="field__label">Visa No</span>
+              <input class="field__input" type="text" formControlName="visa_no" /></label>
+            <label class="field"><span class="field__label">Visa type</span>
+              <input class="field__input" type="text" formControlName="visa_type" /></label>
+            <label class="field"><span class="field__label">Work permit No</span>
+              <input class="field__input" type="text" formControlName="work_permit_no" /></label>
+            <label class="field"><span class="field__label">Visa expiration date</span>
+              <input class="field__input" type="date" formControlName="visa_expiration_date" /></label>
+            <label class="field"><span class="field__label">Work permit expiration date</span>
+              <input class="field__input" type="date" formControlName="work_permit_expiration_date" /></label>
+          </div>
+        </div>
+      }
+
+      <!-- CONTRACT -->
+      @if (activeTab() === 'contract') {
+        <div formGroupName="contract" class="tab-panel" role="tabpanel">
+          <div class="grid grid--2">
+            <label class="field"><span class="field__label">Contract reference</span>
+              <input class="field__input" type="text" formControlName="contract_reference" placeholder="e.g. CTR-2026-014" /></label>
+            <label class="field"><span class="field__label">Contract type</span>
+              <select class="field__input" formControlName="contract_type">
+                <option value="">— Select type —</option>
+                @for (opt of contractTypeOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select></label>
+            <label class="field"><span class="field__label">Contract start date</span>
+              <input class="field__input" type="date" formControlName="contract_start_date" /></label>
+            <label class="field"><span class="field__label">Contract end date</span>
+              <input class="field__input" type="date" formControlName="contract_end_date" /></label>
+            <label class="field"><span class="field__label">Notice period (days)</span>
+              <input class="field__input" type="number" min="0" formControlName="notice_period_days" placeholder="e.g. 30" /></label>
+            <label class="field"><span class="field__label">Working schedule</span>
+              <input class="field__input" type="text" formControlName="working_schedule" placeholder="Standard 40 hours/week" /></label>
+            <label class="field"><span class="field__label">Wage (monthly)</span>
+              <input class="field__input" type="number" min="0" step="0.01" formControlName="wage" placeholder="0.00" /></label>
+            <label class="field"><span class="field__label">Currency</span>
+              <input class="field__input" type="text" maxlength="3" formControlName="wage_currency" placeholder="USD" /></label>
+          </div>
+          <h3 class="section-title">Monthly advantages (in cash)</h3>
+          <div formGroupName="monthly_advantages" class="grid grid--2">
+            <label class="field">
+              <span class="field__label">
+                HRA
+                <span class="field__help" [title]="advantageTooltips['hra']" aria-label="House Rent Allowance">?</span>
+              </span>
+              <input class="field__input" type="number" min="0" step="0.01" formControlName="hra" placeholder="0.00" /></label>
+            <label class="field">
+              <span class="field__label">
+                DA
+                <span class="field__help" [title]="advantageTooltips['da']" aria-label="Dearness Allowance">?</span>
+              </span>
+              <input class="field__input" type="number" min="0" step="0.01" formControlName="da" placeholder="0.00" /></label>
+            <label class="field">
+              <span class="field__label">
+                Travel allowance
+                <span class="field__help" [title]="advantageTooltips['travel_allowance']" aria-label="Travel allowance">?</span>
+              </span>
+              <input class="field__input" type="number" min="0" step="0.01" formControlName="travel_allowance" placeholder="0.00" /></label>
+            <label class="field">
+              <span class="field__label">
+                Meal allowance
+                <span class="field__help" [title]="advantageTooltips['meal_allowance']" aria-label="Meal allowance">?</span>
+              </span>
+              <input class="field__input" type="number" min="0" step="0.01" formControlName="meal_allowance" placeholder="0.00" /></label>
+            <label class="field">
+              <span class="field__label">
+                Medical allowance
+                <span class="field__help" [title]="advantageTooltips['medical_allowance']" aria-label="Medical allowance">?</span>
+              </span>
+              <input class="field__input" type="number" min="0" step="0.01" formControlName="medical_allowance" placeholder="0.00" /></label>
+            <label class="field">
+              <span class="field__label">
+                Other allowance
+                <span class="field__help" [title]="advantageTooltips['other_allowance']" aria-label="Other allowance">?</span>
+              </span>
+              <input class="field__input" type="number" min="0" step="0.01" formControlName="other_allowance" placeholder="0.00" /></label>
+          </div>
+        </div>
+      }
+
+      <!-- DOCUMENTS (read-only checklist; the user uploads after logging in) -->
+      @if (activeTab() === 'documents') {
+        <div class="tab-panel" role="tabpanel">
+          <p class="field__hint doc-note">
+            Documents are provided by the user after they sign in. This is the checklist they'll see.
+          </p>
+          @if (documents() && documents()!.length) {
+            <ul class="doc-list">
+              @for (doc of documents(); track doc.doc_type) {
+                <li class="doc-list__item">
+                  <span class="doc-list__label">{{ doc.label }}</span>
+                  <span class="doc-list__status doc-list__status--{{ doc.status }}">{{ doc.status }}</span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <ul class="doc-list">
+              <li class="doc-list__item"><span class="doc-list__label">Offer Letter</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+              <li class="doc-list__item"><span class="doc-list__label">ID Proof</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+              <li class="doc-list__item"><span class="doc-list__label">Work Authorization</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+              <li class="doc-list__item"><span class="doc-list__label">Resume / CV</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+              <li class="doc-list__item"><span class="doc-list__label">Education Certificate</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+              <li class="doc-list__item"><span class="doc-list__label">Bank Details</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+            </ul>
+          }
+        </div>
+      }
+
+      <!-- SETTINGS -->
+      @if (activeTab() === 'settings') {
+        <div formGroupName="settings" class="tab-panel" role="tabpanel">
+          <div class="grid grid--2">
+            <label class="field"><span class="field__label">Consultant / employee type</span>
+              <select class="field__input" formControlName="employee_type">
+                <option value="">—</option>
+                @for (opt of employeeTypeOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select></label>
+            <label class="field"><span class="field__label">Joining date</span>
+              <input class="field__input" type="date" formControlName="joining_date" /></label>
+          </div>
+        </div>
+      }
+    </app-card>
+
+    <div class="form-actions">
+      <app-button type="button" variant="ghost" (clicked)="cancel()">Cancel</app-button>
+      <app-button type="submit" variant="primary" [loading]="submitting()">
+        {{ isEdit() ? 'Save changes' : 'Create user' }}
+      </app-button>
+    </div>
+  </form>
+}

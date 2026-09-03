@@ -1,5 +1,14 @@
 const httpStatus = require('http-status');
-const { User, Role, Organization } = require('../../models');
+const { Op } = require('sequelize');
+const {
+  sequelize,
+  User,
+  UserProfile,
+  UserDocument,
+  VendorProfile,
+  Role,
+  Organization,
+} = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const { ROLES, ASSIGNABLE_ROLES_BY_ROLE } = require('../../config/rbac');
 const { paginate } = require('../../utils/query/paginate');
@@ -7,6 +16,12 @@ const { USER_QUERY_CONFIG } = require('../../config/query-configs');
 const { buildUnusablePassword, sendActivation } = require('../auth/invitation.service');
 const { revokeAllUserTokens } = require('../auth/token.service');
 const { tokenTypes } = require('../../config/tokens');
+const {
+  buildProfileAttributes,
+  defaultEmployeeTypeForRole,
+  isConsultantRole,
+  buildInitialDocumentRows,
+} = require('./user-profile.mapper');
 
 /** Columns returned for user list/detail (never password/salt). */
 const USER_PUBLIC_ATTRIBUTES = [
@@ -19,6 +34,15 @@ const USER_PUBLIC_ATTRIBUTES = [
   'organization_id',
   'manager_id',
   'createdAt',
+];
+
+/** The include chain for a FULL user (profile + documents), used on detail views. */
+const fullUserInclude = () => [
+  { model: Role, as: 'role', attributes: ['key', 'name'] },
+  { model: Organization, as: 'organization', attributes: ['id', 'uuid', 'name', 'slug'] },
+  { model: UserProfile, as: 'profile' },
+  { model: UserDocument, as: 'documents', separate: true, order: [['createdAt', 'ASC']] },
+  { model: VendorProfile, as: 'vendorProfile' },
 ];
 
 /**
@@ -76,11 +100,17 @@ const resolveCreationRules = (auth) => {
 };
 
 /**
- * Create a user. Org comes from the caller's token (super_admin may target an org).
- * Role must be permitted for the caller's role. Vendors stamp manager_id = self.
+ * Create a user + their profile (and, for vendors, a vendor company profile) in a
+ * single transaction. Org comes from the caller's token (super_admin may target an
+ * org). Role must be permitted for the caller's role. Vendors stamp manager_id = self.
+ *
+ * The account is created 'invited' with an unusable password; an activation email is
+ * queued so the user sets their own password (admin never sets it). Profile fields are
+ * OPTIONAL — the admin may seed some now; the user completes the rest after login.
  */
 const createUser = async (body, auth, res) => {
   const { first_name, last_name, email, role: roleKey } = body;
+  const profilePayload = body.profile || {};
 
   const { allowedRoles, setManagerToCaller } = resolveCreationRules(auth);
   if (allowedRoles && !allowedRoles.includes(roleKey)) {
@@ -107,20 +137,99 @@ const createUser = async (body, auth, res) => {
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, res.__('something_went_wrong'));
   }
 
+  // Resolve the vendor link for a C2C consultant.
+  //  - If a VENDOR creates the consultant: they ARE the vendor (owner + vendor_id).
+  //  - If an ORG_ADMIN creates a C2C consultant: they may pick a vendor via vendor_uuid.
+  // The vendor must be a vendor-role user in the SAME organization (validated below).
+  let resolvedVendorId = null;
+  if (setManagerToCaller && auth.role === ROLES.VENDOR) {
+    resolvedVendorId = auth.userId;
+  } else if (roleKey === ROLES.CONSULTANT_C2C && body.vendor_uuid) {
+    const vendorRole = await Role.findOne({
+      where: { key: ROLES.VENDOR, organization_id: null },
+      attributes: ['id'],
+    });
+    const vendorUser = await User.findOne({
+      where: {
+        uuid: body.vendor_uuid,
+        organization_id: organizationId,
+        role_id: vendorRole ? vendorRole.id : -1,
+      },
+      attributes: ['id'],
+    });
+    if (!vendorUser) {
+      throw new ApiError(httpStatus.BAD_REQUEST, res.__('vendor_not_found'));
+    }
+    resolvedVendorId = vendorUser.id;
+  }
+
   // Invited users get an unusable password until they activate and set their own.
   const enc = await buildUnusablePassword();
+  const managerId = setManagerToCaller ? auth.userId : null;
+
   let user;
   try {
-    user = await User.create({
-      first_name,
-      last_name,
-      email,
-      password: enc.encr,
-      salt: enc.salt,
-      organization_id: organizationId,
-      role_id: role.id,
-      manager_id: setManagerToCaller ? auth.userId : null,
-      status: 'invited',
+    user = await sequelize.transaction(async (t) => {
+      const created = await User.create(
+        {
+          first_name,
+          last_name,
+          email,
+          password: enc.encr,
+          salt: enc.salt,
+          organization_id: organizationId,
+          role_id: role.id,
+          manager_id: managerId,
+          status: 'invited',
+        },
+        { transaction: t }
+      );
+
+      // Profile row (1-1). Seed employee_type from the role when not supplied.
+      const profileAttrs = buildProfileAttributes(profilePayload);
+      if (profileAttrs.employee_type === undefined) {
+        const derived = defaultEmployeeTypeForRole(roleKey);
+        if (derived) profileAttrs.employee_type = derived;
+      }
+      await UserProfile.create(
+        {
+          ...profileAttrs,
+          user_id: created.id,
+          organization_id: organizationId,
+          // Link to the resolved vendor (from the vendor themselves, or an org admin's
+          // vendor_uuid selection). null for non-C2C or when no vendor is chosen.
+          vendor_id: resolvedVendorId,
+        },
+        { transaction: t }
+      );
+
+      // Seed the empty document checklist for consultants (admin uploads nothing;
+      // the consultant provides files after logging in).
+      if (isConsultantRole(roleKey)) {
+        const docRows = buildInitialDocumentRows(created.id, organizationId);
+        await UserDocument.bulkCreate(docRows, { transaction: t });
+      }
+
+      // A vendor user gets a company profile shell (details filled later).
+      if (roleKey === ROLES.VENDOR) {
+        const vendorInput = body.vendor_profile || {};
+        await VendorProfile.create(
+          {
+            user_id: created.id,
+            organization_id: organizationId,
+            company_name: vendorInput.company_name || `${first_name} ${last_name}`,
+            tax_id: vendorInput.tax_id || null,
+            contact_person: vendorInput.contact_person || `${first_name} ${last_name}`,
+            contact_email: vendorInput.contact_email || email,
+            contact_phone: vendorInput.contact_phone || null,
+            address: vendorInput.address || {},
+            website: vendorInput.website || null,
+          },
+          { transaction: t }
+        );
+      }
+
+      return created;
     });
   } catch (err) {
     // Authoritative guard against the email-uniqueness race: two concurrent creates
@@ -134,7 +243,11 @@ const createUser = async (body, auth, res) => {
   // Fire-and-forget activation email (queued; never blocks the API response).
   await sendActivation(user, organization.name);
 
-  return user;
+  // Reload with associations so the response carries the full profile.
+  return User.findByPk(user.id, {
+    attributes: USER_PUBLIC_ATTRIBUTES,
+    include: fullUserInclude(),
+  });
 };
 
 /**
@@ -150,24 +263,102 @@ const listUsers = async (req) => {
     include: [
       { model: Role, as: 'role', attributes: ['key', 'name'] },
       { model: Organization, as: 'organization', attributes: ['id', 'uuid', 'name', 'slug'] },
+      // Lightweight profile summary for the list (job title / type badge).
+      { model: UserProfile, as: 'profile', attributes: ['job_title', 'department', 'employee_type'] },
     ],
   });
 };
 
-/** Fetch one user by uuid, still tenant + ownership scoped. */
+/**
+ * List the vendors in the caller's organization (for the "select vendor" dropdown when
+ * creating a C2C consultant). Tenant-scoped: an org_admin sees their org's vendors.
+ * Returns a light shape { uuid, name, company_name } — never secrets.
+ */
+const listVendors = async (req) => {
+  const vendorRole = await Role.findOne({
+    where: { key: ROLES.VENDOR, organization_id: null },
+    attributes: ['id'],
+  });
+  if (!vendorRole) return [];
+
+  const scope = { ...req.tenantWhere, role_id: vendorRole.id, status: { [Op.ne]: 'disabled' } };
+  const vendors = await User.findAll({
+    where: scope,
+    attributes: ['uuid', 'first_name', 'last_name'],
+    include: [{ model: VendorProfile, as: 'vendorProfile', attributes: ['company_name'] }],
+    order: [['first_name', 'ASC']],
+  });
+  return vendors.map((v) => ({
+    uuid: v.uuid,
+    name: `${v.first_name} ${v.last_name}`,
+    company_name: v.vendorProfile ? v.vendorProfile.company_name : null,
+  }));
+};
+
+/** Fetch one user by uuid with FULL profile + documents, still tenant + ownership scoped. */
 const getUserByUuid = async (uuid, req, res) => {
   const user = await User.findOne({
     where: { uuid, ...buildUserScope(req) },
     attributes: USER_PUBLIC_ATTRIBUTES,
-    include: [
-      { model: Role, as: 'role', attributes: ['key', 'name'] },
-      { model: Organization, as: 'organization', attributes: ['id', 'uuid', 'name', 'slug'] },
-    ],
+    include: fullUserInclude(),
   });
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, res.__('user_not_found'));
   }
   return user;
+};
+
+/**
+ * Load a scoped user row (for mutations). Throws 404 if outside the caller's scope,
+ * so an org_admin/vendor can only ever mutate users they're allowed to see.
+ */
+const findScopedUserOrThrow = async (uuid, req, res, options = {}) => {
+  const user = await User.findOne({
+    where: { uuid, ...buildUserScope(req) },
+    ...options,
+  });
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('user_not_found'));
+  }
+  return user;
+};
+
+/**
+ * Update a user's basic identity fields (name) — email/role/org changes are
+ * deliberately excluded here (email is the login + unique key; role changes belong to
+ * a dedicated, audited flow). Tenant + ownership scoped.
+ */
+const updateUser = async (uuid, body, req, res) => {
+  const user = await findScopedUserOrThrow(uuid, req, res);
+  const patch = {};
+  if (body.first_name !== undefined) patch.first_name = body.first_name;
+  if (body.last_name !== undefined) patch.last_name = body.last_name;
+  if (Object.keys(patch).length) {
+    await user.update(patch);
+  }
+  return getUserByUuid(uuid, req, res);
+};
+
+/**
+ * Upsert a user's profile (admin editing someone else's profile). Partial: only the
+ * keys provided are written; JSONB blocks are replaced wholesale when present.
+ * Tenant + ownership scoped via the parent user lookup.
+ */
+const updateUserProfile = async (uuid, profilePayload, req, res) => {
+  const user = await findScopedUserOrThrow(uuid, req, res, {
+    include: [{ model: UserProfile, as: 'profile' }],
+  });
+  const attrs = buildProfileAttributes(profilePayload || {});
+  if (user.profile) {
+    await user.profile.update(attrs);
+  } else {
+    await UserProfile.create({
+      ...attrs,
+      user_id: user.id,
+      organization_id: user.organization_id,
+    });
+  }
+  return getUserByUuid(uuid, req, res);
 };
 
 /**
@@ -193,10 +384,44 @@ const resendInvite = async (uuid, req, res) => {
   return true;
 };
 
+// ── Self-service (a logged-in user managing their OWN profile) ────────────────
+
+/** Load the caller's own full user + profile + documents (used by /auth/me/profile). */
+const getOwnProfile = async (userId) => {
+  const user = await User.findByPk(userId, {
+    attributes: USER_PUBLIC_ATTRIBUTES,
+    include: fullUserInclude(),
+  });
+  return user;
+};
+
+/** Upsert the caller's OWN profile. Same partial-write semantics as the admin path. */
+const updateOwnProfile = async (userId, profilePayload) => {
+  const user = await User.findByPk(userId, {
+    include: [{ model: UserProfile, as: 'profile' }],
+  });
+  const attrs = buildProfileAttributes(profilePayload || {});
+  if (user.profile) {
+    await user.profile.update(attrs);
+  } else {
+    await UserProfile.create({
+      ...attrs,
+      user_id: user.id,
+      organization_id: user.organization_id,
+    });
+  }
+  return getOwnProfile(userId);
+};
+
 module.exports = {
   createUser,
   listUsers,
+  listVendors,
   getUserByUuid,
+  updateUser,
+  updateUserProfile,
   resendInvite,
+  getOwnProfile,
+  updateOwnProfile,
   buildUserScope,
 };

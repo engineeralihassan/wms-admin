@@ -1,6 +1,7 @@
 {
   "success": "Success",
   "userCreated": "User created successfully",
+  "userUpdated": "User updated successfully",
   "userSignin": "Signed in successfully",
   "userFound": "User found successfully",
   "logout_success": "Logged out successfully",
@@ -13,6 +14,7 @@
   "account_not_activated": "Please activate your account using the invitation link sent to your email",
   "invite_resent": "Invitation email has been resent",
   "user_already_active": "This user has already activated their account",
+  "vendor_not_found": "Selected vendor was not found in your organization",
 
   "email_already_exist": "Email already exists",
   "password_not_match": "Passwords do not match",

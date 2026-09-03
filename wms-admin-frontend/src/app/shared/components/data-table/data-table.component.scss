@@ -3,18 +3,91 @@
 :host { display: block; }
 
 .data-table {
-  &__toolbar { @include flex(row, end, flex-start, spacing('3')); flex-wrap: wrap; margin-bottom: spacing('4'); }
-  &__search-wrap { flex: 1 1 15rem; max-width: 24rem; }
+  // The whole filter area is one grouped surface panel so the controls read as
+  // a deliberate unit instead of loose fields floating on the page.
+  // Search on the left, all filters grouped on the right, with a gap between.
+  &__toolbar {
+    @include flex(row, flex-end, space-between, spacing('5'));
+    flex-wrap: wrap;
+    margin-bottom: spacing('4');
+    padding: spacing('4');
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: radius('lg');
+  }
+
+  // Search leads the bar on the left.
+  &__search-wrap { flex: 1 1 16rem; min-width: 14rem; max-width: 24rem; }
+
+  // Right-hand group: every filter + rows-per-page + clear all, pushed right.
+  &__right {
+    @include flex(row, flex-end, flex-end, spacing('4'));
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
+  // Filters keep consistent widths and wrap in a tidy row.
+  &__filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: spacing('3'); }
+
+  // Rows-per-page + Clear all sit together at the far right edge.
+  &__controls-end {
+    @include flex(row, flex-end, flex-end, spacing('3'));
+    flex-wrap: wrap;
+    padding-left: spacing('4');
+    border-left: 1px solid var(--color-border);
+  }
+
   &__filter, &__page-size, &__search-wrap { @include flex(column, stretch, flex-start, spacing('1')); }
   &__label { font-size: font-size('xs'); font-weight: font-weight('semibold'); color: var(--color-text-muted); }
-  &__search, select { @include form-input; min-height: 2.5rem; }
-  &__filter select { min-width: 9rem; }
-  &__page-size { min-width: 7.5rem; }
-  &__date-range { display: grid; grid-template-columns: 8.8rem auto 8.8rem; align-items: center; gap: spacing('1'); margin: 0; padding: 0; border: 0; }
-  &__date-range legend { grid-column: 1 / -1; padding: 0; }
-  &__date-range input { @include form-input; width: 8.8rem; min-height: 2.5rem; }
-  &__range-separator { color: var(--color-text-subtle); }
-  &__reset { @include flex(row, center, flex-start, spacing('2')); min-height: 2.5rem; padding: spacing('2') spacing('3'); border: 1px solid var(--color-border); border-radius: radius('md'); color: var(--color-text-muted); font-size: font-size('sm'); font-weight: font-weight('semibold'); @include focus-ring; &:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-050); } }
+
+  // ---- One shared control height so every field lines up exactly ----
+  // Every input/select/date field in the filter bar is forced to the same
+  // fixed box height, box model, and vertical padding. Native selects and date
+  // inputs otherwise render at slightly different heights than a text input.
+  $control-height: 2.5rem;
+  &__search,
+  &__filter select,
+  &__page-size select,
+  &__date-range input {
+    @include form-input;
+    box-sizing: border-box;
+    height: $control-height;
+    min-height: $control-height;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: normal;
+    background: var(--color-surface);
+    background-clip: padding-box;
+  }
+
+  // Native selects need appearance reset + room for the caret so their text
+  // baseline matches the text/date inputs.
+  &__filter select,
+  &__page-size select {
+    appearance: none;
+    padding-right: spacing('6');
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236b7280' stroke-width='1.6'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right spacing('2') center;
+    background-size: 1rem;
+  }
+
+  // Date inputs: kill the intrinsic min-height some engines add.
+  &__date-range input { min-width: 0; }
+  &__date-range input::-webkit-datetime-edit { line-height: normal; }
+
+  &__filter select { min-width: 10rem; }
+  &__page-size { min-width: 6rem; }
+  &__page-size select { min-width: 5rem; }
+  &__date-range { display: grid; grid-template-columns: 8.8rem auto 8.8rem; align-items: end; gap: spacing('1'); margin: 0; padding: 0; border: 0; }
+  &__date-range legend { grid-column: 1 / -1; padding: 0; margin-bottom: spacing('1'); }
+  &__date-range input { width: 8.8rem; }
+  &__range-separator { color: var(--color-text-subtle); align-self: center; height: $control-height; display: grid; place-items: center; }
+
+  // Clear all matches the exact control height too.
+  &__reset { @include flex(row, center, flex-start, spacing('2')); box-sizing: border-box; height: $control-height; padding: 0 spacing('3'); border: 1px solid var(--color-border); border-radius: radius('md'); background: var(--color-surface); color: var(--color-text-muted); font-size: font-size('sm'); font-weight: font-weight('semibold'); white-space: nowrap; @include focus-ring; &:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-050); } }
   &__reset-icon { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 1px solid currentColor; border-radius: radius('circle'); font-size: 1rem; font-weight: font-weight('normal'); line-height: 1; }
   &__scroll { overflow-x: auto; border: 1px solid var(--color-border); border-radius: radius('md'); @include focus-ring; }
   table { width: 100%; min-width: 44rem; border-collapse: collapse; font-size: font-size('sm'); }

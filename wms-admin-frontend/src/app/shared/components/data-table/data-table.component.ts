@@ -57,6 +57,8 @@ export interface DataTableAction<T> {
   variant?: 'default' | 'danger';
   isDisabled?: (row: T) => boolean;
   disabledLabel?: (row: T) => string;
+  /** When it returns true, the action is not rendered at all for that row. */
+  isHidden?: (row: T) => boolean;
 }
 
 export interface DataTableActionEvent<T> {

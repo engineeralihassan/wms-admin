@@ -36,4 +36,20 @@ router.post(
 // Protected: returns the current user + resolved authorization context.
 router.get('/me', authVerify, authController.getMe);
 
+// Self-service profile: a logged-in user views/completes their OWN profile + docs.
+router.get('/me/profile', authVerify, authController.getMyProfile);
+router.patch(
+  '/me/profile',
+  authVerify,
+  validate(authValidation.updateOwnProfile),
+  authController.updateMyProfile
+);
+router.get('/me/documents', authVerify, authController.getMyDocuments);
+router.post(
+  '/me/documents',
+  authVerify,
+  validate(authValidation.uploadOwnDocument),
+  authController.uploadMyDocument
+);
+
 module.exports = router;

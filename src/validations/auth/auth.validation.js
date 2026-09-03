@@ -1,5 +1,8 @@
 const Joi = require('joi');
 const { password } = require('../custom.validation');
+// Self-service profile/document schemas live with the user validations (single source
+// of truth for the profile shape) and are re-exported here for the /auth/me routes.
+const { updateOwnProfile, uploadOwnDocument } = require('../user/user.validation');
 
 // Open self-registration has been intentionally removed. Users are created via:
 //  - super_admin -> POST /organizations (creates org + org_admin)
@@ -60,4 +63,6 @@ module.exports = {
   resetPassword,
   verifyActivation,
   activate,
+  updateOwnProfile,
+  uploadOwnDocument,
 };

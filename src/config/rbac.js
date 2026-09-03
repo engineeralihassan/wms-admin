@@ -27,6 +27,7 @@ const ROLES = Object.freeze({
   SUPER_ADMIN: 'super_admin',
   ORG_ADMIN: 'org_admin',
   VENDOR: 'vendor',
+  CONSULTANT_W2: 'consultant_w2',
   CONSULTANT_1099: 'consultant_1099',
   CONSULTANT_C2C: 'consultant_c2c',
 });
@@ -196,6 +197,26 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.LEAVE_DELETE,
   ],
 
+  // W2 consultants are direct employees; permission-wise identical to other
+  // consultants (own tickets/expenses/leave + member project visibility). The W2 vs
+  // 1099 vs C2C distinction is a tax/engagement classification, not a permission one.
+  [ROLES.CONSULTANT_W2]: [
+    PERMISSIONS.ORDER_READ,
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
+    PERMISSIONS.PROJECT_READ,
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
+  ],
+
   [ROLES.CONSULTANT_C2C]: [
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.TICKET_CREATE,
@@ -222,12 +243,17 @@ const ROLE_DEFINITIONS = Object.freeze({
   [ROLES.SUPER_ADMIN]: { name: 'Super Admin', scope: ROLE_SCOPES.PLATFORM },
   [ROLES.ORG_ADMIN]: { name: 'Organization Admin', scope: ROLE_SCOPES.ORGANIZATION },
   [ROLES.VENDOR]: { name: 'Vendor', scope: ROLE_SCOPES.ORGANIZATION },
+  [ROLES.CONSULTANT_W2]: { name: 'Consultant (W2)', scope: ROLE_SCOPES.ORGANIZATION },
   [ROLES.CONSULTANT_1099]: { name: 'Consultant (1099)', scope: ROLE_SCOPES.ORGANIZATION },
   [ROLES.CONSULTANT_C2C]: { name: 'Consultant (C2C)', scope: ROLE_SCOPES.ORGANIZATION },
 });
 
 /** Consultant roles (the "owned" roles a vendor manages). */
-const CONSULTANT_ROLES = Object.freeze([ROLES.CONSULTANT_1099, ROLES.CONSULTANT_C2C]);
+const CONSULTANT_ROLES = Object.freeze([
+  ROLES.CONSULTANT_W2,
+  ROLES.CONSULTANT_1099,
+  ROLES.CONSULTANT_C2C,
+]);
 
 /**
  * Which roles each ROLE is allowed to assign when creating a user.
@@ -237,8 +263,13 @@ const CONSULTANT_ROLES = Object.freeze([ROLES.CONSULTANT_1099, ROLES.CONSULTANT_
  *  - super_admin is unrestricted (handled in code, bypasses this map).
  */
 const ASSIGNABLE_ROLES_BY_ROLE = Object.freeze({
-  [ROLES.ORG_ADMIN]: [ROLES.VENDOR, ROLES.CONSULTANT_1099, ROLES.CONSULTANT_C2C],
-  [ROLES.VENDOR]: [ROLES.CONSULTANT_1099, ROLES.CONSULTANT_C2C],
+  [ROLES.ORG_ADMIN]: [
+    ROLES.VENDOR,
+    ROLES.CONSULTANT_W2,
+    ROLES.CONSULTANT_1099,
+    ROLES.CONSULTANT_C2C,
+  ],
+  [ROLES.VENDOR]: [ROLES.CONSULTANT_W2, ROLES.CONSULTANT_1099, ROLES.CONSULTANT_C2C],
 });
 
 /**
@@ -248,6 +279,7 @@ const ASSIGNABLE_ROLES_BY_ROLE = Object.freeze({
 const ORG_ASSIGNABLE_ROLES = Object.freeze([
   ROLES.ORG_ADMIN,
   ROLES.VENDOR,
+  ROLES.CONSULTANT_W2,
   ROLES.CONSULTANT_1099,
   ROLES.CONSULTANT_C2C,
 ]);

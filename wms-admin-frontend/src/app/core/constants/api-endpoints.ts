@@ -19,7 +19,11 @@ export const API_ENDPOINTS = {
   },
   users: {
     root: '/users',
+    vendors: '/users/vendors',
     byUuid: (uuid: string) => `/users/${uuid}`,
+    profile: (uuid: string) => `/users/${uuid}/profile`,
+    documents: (uuid: string) => `/users/${uuid}/documents`,
+    resendInvite: (uuid: string) => `/users/${uuid}/resend-invite`,
   },
   tickets: {
     root: '/tickets',

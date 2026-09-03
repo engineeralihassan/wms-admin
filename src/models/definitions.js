@@ -1,4 +1,7 @@
 const User = require('./user.model');
+const UserProfile = require('./user-profile.model');
+const UserDocument = require('./user-document.model');
+const VendorProfile = require('./vendor-profile.model');
 const Token = require('./token.model');
 const Organization = require('./organization.model');
 const Role = require('./role.model');
@@ -41,6 +44,9 @@ const definitions = (sequelize, Sequelize) => {
   db.sequelize = sequelize;
 
   db.User = User(sequelize);
+  db.UserProfile = UserProfile(sequelize);
+  db.UserDocument = UserDocument(sequelize);
+  db.VendorProfile = VendorProfile(sequelize);
   db.Token = Token(sequelize);
   db.Organization = Organization(sequelize);
   db.Role = Role(sequelize);
@@ -85,6 +91,30 @@ const definitions = (sequelize, Sequelize) => {
   // User <-> Token
   db.User.hasMany(db.Token, { foreignKey: 'user_id', as: 'tokens' });
   db.Token.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+
+  // User <-> UserProfile (1-to-1: the rich Odoo-style profile)
+  db.User.hasOne(db.UserProfile, { foreignKey: 'user_id', as: 'profile' });
+  db.UserProfile.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  db.UserProfile.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  // Profile -> vendor (the vendor user a C2C consultant works through)
+  db.UserProfile.belongsTo(db.User, { foreignKey: 'vendor_id', as: 'vendor' });
+
+  // User <-> UserDocument (1-to-many: profile documents)
+  db.User.hasMany(db.UserDocument, { foreignKey: 'user_id', as: 'documents' });
+  db.UserDocument.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  db.UserDocument.belongsTo(db.User, { foreignKey: 'uploaded_by_id', as: 'uploadedBy' });
+  db.UserDocument.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+
+  // User <-> VendorProfile (1-to-1: a vendor user's company details)
+  db.User.hasOne(db.VendorProfile, { foreignKey: 'user_id', as: 'vendorProfile' });
+  db.VendorProfile.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  db.VendorProfile.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
 
   // User <-> User (ownership hierarchy: a manager owns many managed users)
   db.User.hasMany(db.User, { foreignKey: 'manager_id', as: 'managedUsers' });

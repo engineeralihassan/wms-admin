@@ -11,7 +11,7 @@ const {
   LeaveRequest,
 } = require('../../models');
 const ApiError = require('../../utils/ApiError');
-const { PERMISSIONS } = require('../../config/rbac');
+const { PERMISSIONS, ROLES } = require('../../config/rbac');
 const {
   DASHBOARD_MODULES,
   LEAVE_CHART_BUCKETS,
@@ -94,6 +94,22 @@ const expenseScope = (req) => {
   const where = tenantBase(req);
   if (!has(req.auth, PERMISSIONS.EXPENSE_REVIEW)) {
     where.created_by_id = req.auth.userId;
+  }
+  return where;
+};
+
+/**
+ * User visibility: mirrors buildUserScope in the user service so dashboard user counts
+ * NEVER exceed what the caller can see in the user list.
+ *   - org_admin / super_admin: all users in scope (whole org / all orgs)
+ *   - vendor: ONLY the consultants they manage (manager_id = self)
+ * Without this, a vendor's "Users" chart and "Inactive users" card would leak org-wide
+ * counts even though their user list is correctly narrowed to their own consultants.
+ */
+const userScope = (req) => {
+  const where = tenantBase(req);
+  if (!req.auth.isSuperAdmin && req.auth.role === ROLES.VENDOR) {
+    where.manager_id = req.auth.userId;
   }
   return where;
 };
@@ -239,7 +255,7 @@ const getProjectChart = async (req) => {
  */
 const getUserChart = async (req) => {
   const range = currentMonthUtcRange();
-  const where = tenantBase(req);
+  const where = userScope(req);
   const [total, active, invited, created] = await Promise.all([
     countWhere(User, where),
     countWhere(User, where, { status: 'active' }),
@@ -280,59 +296,96 @@ const getOrganizationChart = async (req, res) => {
  * org-wide pending work, a normal user sees only their own.
  */
 const getSummary = async (req) => {
-  const [
-    leavePending,
-    expensePending,
-    ticketsOpen,
-    usersInactive,
-    projectsActive,
-  ] = await Promise.all([
-    countWhere(LeaveRequest, leaveScope(req), { status: LEAVE_STATUSES.SUBMITTED }),
-    countWhere(Expense, expenseScope(req), { status: EXPENSE_STATUSES.SUBMITTED }),
-    countWhere(Ticket, ticketScope(req), {
-      status: { [Op.in]: [TICKET_STATUSES.OPEN, TICKET_STATUSES.IN_PROGRESS] },
-    }),
-    countWhere(User, tenantBase(req), { status: { [Op.in]: ['invited', 'disabled'] } }),
-    Project.count({ where: { ...projectScope(req), status: PROJECT_STATUSES.ACTIVE } }),
-  ]);
+  const { auth } = req;
 
-  return [
-    {
-      key: 'leave_pending',
-      module: DASHBOARD_MODULES.LEAVES,
-      label: 'Leave pending approvals',
-      value: leavePending,
-      detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.LEAVES],
-    },
-    {
-      key: 'expense_pending',
-      module: DASHBOARD_MODULES.EXPENSES,
-      label: 'Expense pending approvals',
-      value: expensePending,
-      detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.EXPENSES],
-    },
-    {
-      key: 'tickets_open',
-      module: DASHBOARD_MODULES.TICKETS,
-      label: 'Open tickets',
-      value: ticketsOpen,
-      detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.TICKETS],
-    },
-    {
-      key: 'users_inactive',
-      module: DASHBOARD_MODULES.USERS,
-      label: 'Inactive users',
-      value: usersInactive,
-      detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.USERS],
-    },
-    {
-      key: 'projects_active',
-      module: DASHBOARD_MODULES.PROJECTS,
-      label: 'Active projects',
-      value: projectsActive,
-      detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.PROJECTS],
-    },
-  ];
+  // Each card is only meaningful for a caller who can ACT on it. We build the card set
+  // per-permission so, e.g., a vendor (who cannot approve leave/expenses or manage the
+  // whole org's users) doesn't see "pending approvals" / org-wide "inactive users"
+  // cards that look like an org-admin view. The label also adapts: an approver sees
+  // "pending approvals", a normal user sees "my submitted".
+  const canApproveLeave = has(auth, PERMISSIONS.LEAVE_APPROVE);
+  const canReviewExpense = has(auth, PERMISSIONS.EXPENSE_REVIEW);
+  // USER_DELETE is the org-admin-distinguishing capability (vendor has create/read/update
+  // for their own consultants, but NOT delete). Use it to gate the admin "Inactive users"
+  // card so vendors don't get an org-admin-style view.
+  const canManageUsers = has(auth, PERMISSIONS.USER_DELETE);
+  const canReadTickets = has(auth, PERMISSIONS.TICKET_READ);
+  const canReadProjects = has(auth, PERMISSIONS.PROJECT_READ);
+  const canReadLeave = has(auth, PERMISSIONS.LEAVE_READ);
+  const canReadExpense = has(auth, PERMISSIONS.EXPENSE_READ);
+
+  const tasks = [];
+
+  if (canReadLeave) {
+    tasks.push(
+      countWhere(LeaveRequest, leaveScope(req), { status: LEAVE_STATUSES.SUBMITTED }).then((value) => ({
+        key: 'leave_pending',
+        module: DASHBOARD_MODULES.LEAVES,
+        label: canApproveLeave ? 'Leave pending approvals' : 'My submitted leaves',
+        value,
+        detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.LEAVES],
+      }))
+    );
+  }
+
+  if (canReadExpense) {
+    tasks.push(
+      countWhere(Expense, expenseScope(req), { status: EXPENSE_STATUSES.SUBMITTED }).then((value) => ({
+        key: 'expense_pending',
+        module: DASHBOARD_MODULES.EXPENSES,
+        label: canReviewExpense ? 'Expense pending approvals' : 'My submitted expenses',
+        value,
+        detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.EXPENSES],
+      }))
+    );
+  }
+
+  if (canReadTickets) {
+    tasks.push(
+      countWhere(Ticket, ticketScope(req), {
+        status: { [Op.in]: [TICKET_STATUSES.OPEN, TICKET_STATUSES.IN_PROGRESS] },
+      }).then((value) => ({
+        key: 'tickets_open',
+        module: DASHBOARD_MODULES.TICKETS,
+        label: 'Open tickets',
+        value,
+        detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.TICKETS],
+      }))
+    );
+  }
+
+  // "Inactive users" is an admin-style card. Only show it to callers who can actually
+  // manage users org-wide (org_admin). A vendor manages their own consultants but this
+  // card frames an administrative task, so we gate it on user management perms.
+  if (canManageUsers) {
+    tasks.push(
+      countWhere(User, userScope(req), { status: { [Op.in]: ['invited', 'disabled'] } }).then(
+        (value) => ({
+          key: 'users_inactive',
+          module: DASHBOARD_MODULES.USERS,
+          label: 'Inactive users',
+          value,
+          detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.USERS],
+        })
+      )
+    );
+  }
+
+  if (canReadProjects) {
+    tasks.push(
+      Project.count({ where: { ...projectScope(req), status: PROJECT_STATUSES.ACTIVE } }).then(
+        (value) => ({
+          key: 'projects_active',
+          module: DASHBOARD_MODULES.PROJECTS,
+          label: 'Active projects',
+          value,
+          detailPath: DASHBOARD_DETAIL_PATHS[DASHBOARD_MODULES.PROJECTS],
+        })
+      )
+    );
+  }
+
+  return Promise.all(tasks);
 };
 
 // ── Recent side-panel lists ─────────────────────────────────────────────────────

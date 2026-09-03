@@ -3,7 +3,9 @@
 :host { display: block; }
 
 .page-header {
+  @include flex(row, flex-start, space-between, spacing('4'));
   margin-bottom: spacing('6');
+  flex-wrap: wrap;
 
   &__title {
     font-size: font-size('xl');

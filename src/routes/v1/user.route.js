@@ -26,6 +26,17 @@ router
     userController.list
   );
 
+// Vendors in the caller's org — powers the "select vendor" dropdown for C2C consultants.
+// Declared before /:uuid so "vendors" isn't captured as a uuid param.
+router
+  .route('/vendors')
+  .get(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_READ),
+    userController.listVendors
+  );
+
 router
   .route('/:uuid')
   .get(
@@ -34,6 +45,42 @@ router
     requirePermission(PERMISSIONS.USER_READ),
     validate(userValidation.getUser),
     userController.getOne
+  )
+  .patch(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_UPDATE),
+    validate(userValidation.updateUser),
+    userController.update
+  );
+
+// Rich profile (Work / Private / Contract / Settings tabs) upsert.
+router
+  .route('/:uuid/profile')
+  .patch(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_UPDATE),
+    validate(userValidation.updateUserProfile),
+    userController.updateProfile
+  );
+
+// Documents: list the merged checklist; record an uploaded document's metadata.
+router
+  .route('/:uuid/documents')
+  .get(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_READ),
+    validate(userValidation.getUser),
+    userController.listDocuments
+  )
+  .post(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_UPDATE),
+    validate(userValidation.documentUpload),
+    userController.uploadDocument
   );
 
 // Secure fallback for granting access: resend the activation invite (never set a

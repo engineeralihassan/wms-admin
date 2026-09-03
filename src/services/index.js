@@ -3,6 +3,7 @@ module.exports.tokenService = require('./auth/token.service');
 module.exports.authContextService = require('./auth/auth-context.service');
 module.exports.organizationService = require('./organization/organization.service');
 module.exports.userService = require('./user/user.service');
+module.exports.userDocumentService = require('./user/user-document.service');
 module.exports.roleService = require('./role/role.service');
 module.exports.ticketService = require('./tickets/ticket.service');
 module.exports.expenseService = require('./expenses/expense.service');

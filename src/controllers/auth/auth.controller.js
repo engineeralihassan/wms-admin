@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../../utils/catchAsync');
-const { authService } = require('../../services');
+const { authService, userService, userDocumentService } = require('../../services');
+const { toDto: userToDto, documentToDto } = require('../user/user.controller');
 
 const REFRESH_COOKIE = 'wms_refresh_token';
 
@@ -138,6 +139,42 @@ const getMe = catchAsync(async (req, res) => {
   });
 });
 
+/**
+ * GET /auth/me/profile  (protected)
+ * The caller's OWN full profile (Work / Private / Contract / Settings + documents).
+ * This is how a consultant reviews their profile after activating their account.
+ */
+const getMyProfile = catchAsync(async (req, res) => {
+  const user = await userService.getOwnProfile(req.auth.userId);
+  res.status(httpStatus.OK).send({ message: res.__('userFound'), data: userToDto(user) });
+});
+
+/**
+ * PATCH /auth/me/profile  (protected)
+ * The caller fills in / updates their OWN profile. Partial: only provided tabs/keys
+ * are written. This is the consultant-side data-entry path.
+ */
+const updateMyProfile = catchAsync(async (req, res) => {
+  const user = await userService.updateOwnProfile(req.auth.userId, req.body);
+  res.status(httpStatus.OK).send({ message: res.__('userUpdated'), data: userToDto(user) });
+});
+
+/** GET /auth/me/documents  (protected) — the caller's own document checklist. */
+const getMyDocuments = catchAsync(async (req, res) => {
+  const docs = await userDocumentService.listOwnDocuments(req.auth.userId);
+  res.status(httpStatus.OK).send({ message: res.__('success'), data: docs });
+});
+
+/** POST /auth/me/documents  (protected) — the caller records an uploaded document. */
+const uploadMyDocument = catchAsync(async (req, res) => {
+  const doc = await userDocumentService.uploadOwnDocument(
+    req.auth.userId,
+    req.auth.organizationId,
+    req.body
+  );
+  res.status(httpStatus.OK).send({ message: res.__('success'), data: documentToDto(doc) });
+});
+
 module.exports = {
   signIn,
   refresh,
@@ -147,4 +184,8 @@ module.exports = {
   verifyActivation,
   activate,
   getMe,
+  getMyProfile,
+  updateMyProfile,
+  getMyDocuments,
+  uploadMyDocument,
 };
