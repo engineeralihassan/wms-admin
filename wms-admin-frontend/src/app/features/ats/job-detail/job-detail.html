@@ -78,7 +78,12 @@
 
 <!-- Top candidates (AI resume screening) -->
 <app-card title="Top candidates">
-  <div card-actions>
+  <div card-actions class="ranked__actions">
+    @if (canUpdate()) {
+      <app-button variant="secondary" [loading]="screening()" (clicked)="screenCandidates()">
+        Screen candidates
+      </app-button>
+    }
     <app-button variant="ghost" (clicked)="toggleRanked()">
       {{ rankedOpen() ? 'Hide' : 'Show top candidates' }}
     </app-button>

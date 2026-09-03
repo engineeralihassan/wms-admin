@@ -70,6 +70,16 @@ router.get(
   applicationController.listRankedForJob
 );
 
+// Manually (re)screen a job's applications (recruiter action; spends screening credits).
+router.post(
+  '/:uuid/screen',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.APPLICATION_UPDATE),
+  validate(applicationValidation.screenJob),
+  applicationController.screenJob
+);
+
 // ── Single job by uuid ─────────────────────────────────────────────────────────
 router
   .route('/:uuid')

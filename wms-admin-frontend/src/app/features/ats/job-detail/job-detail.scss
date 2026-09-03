@@ -697,3 +697,9 @@
   font-size: font-size('xs');
   color: var(--color-danger-700);
 }
+
+.ranked__actions {
+  display: flex;
+  align-items: center;
+  gap: spacing('2');
+}

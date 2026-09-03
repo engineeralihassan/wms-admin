@@ -1,4 +1,5 @@
 const os = require('os');
+const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
   ResumeScreeningJob,
@@ -9,7 +10,7 @@ const {
   sequelize,
 } = require('../../../models');
 const { config } = require('../../../config/ai');
-const { match, ScreeningError } = require('./rezmatch.client');
+const { match, parseResume, parseJd, ScreeningError } = require('./rezmatch.client');
 const {
   SCREENING_STATUSES,
   APPLICATION_EVENT_TYPES,
@@ -86,6 +87,46 @@ const buildJdText = (job) => {
   }
   if (extras.length) parts.push(`\nMust-have requirements:\n- ${extras.join('\n- ')}`);
   return parts.join('\n\n');
+};
+
+/** Stable hash of the JD text, used to detect when the cached parse is stale. */
+const hashText = (text) => crypto.createHash('sha256').update(text || '').digest('hex');
+
+/**
+ * Get the job's parsed `role` JSON, parsing + caching it if missing or stale. Parsing
+ * the JD is done ONCE per job (and re-done only if the description/criteria changed),
+ * then reused across every applicant — so its ~4-credit cost amortizes to ~0.
+ * @returns {Promise<object>} the parsed role JSON
+ */
+const getRoleJson = async (job) => {
+  const jdText = buildJdText(job);
+  const hash = hashText(jdText);
+  if (job.jd_parsed && job.jd_parsed_hash === hash) {
+    return job.jd_parsed; // cache hit
+  }
+  const { role } = await parseJd({ text: jdText });
+  // Persist the cache. Use a scoped update so we don't clobber concurrent edits.
+  await Job.update({ jd_parsed: role, jd_parsed_hash: hash }, { where: { id: job.id } });
+  return role;
+};
+
+/**
+ * Get the application's parsed `candidate` JSON, parsing + caching it if missing or if
+ * the CV changed. Parsed ONCE per résumé (~6 credits); reused for every future match
+ * (against this or any other job) for just ~3 credits.
+ * @returns {Promise<object>} the parsed candidate JSON
+ */
+const getCandidateJson = async (application, resume) => {
+  if (application.resume_parsed && application.resume_parsed_key === resume.storage_key) {
+    return application.resume_parsed; // cache hit
+  }
+  // Prefer the public URL (Cloudinary is reachable); Rezmatch fetches + parses it.
+  const { candidate } = await parseResume({ url: resume.url });
+  await application.update({
+    resume_parsed: candidate,
+    resume_parsed_key: resume.storage_key,
+  });
+  return candidate;
 };
 
 /** Pick the best CV attachment for an application (prefer a PDF/doc named like a CV). */
@@ -193,6 +234,8 @@ const processJob = async (job) => {
             'skills',
             'experience_min',
             'screening_criteria',
+            'jd_parsed',
+            'jd_parsed_hash',
           ],
         },
       ],
@@ -243,8 +286,12 @@ const processJob = async (job) => {
       return 'skipped';
     }
 
-    const jdText = buildJdText(application.job);
-    const result = await match({ resumeUrl: resume.url, jdText });
+    // Credit-efficient path: parse the JD once per job and the résumé once per
+    // candidate (cached on their rows), then MATCH with the parsed JSON for ~3 credits
+    // instead of re-parsing both documents inline every time (~13 credits).
+    const role = await getRoleJson(application.job);
+    const candidate = await getCandidateJson(application, resume);
+    const result = await match({ candidate, role });
 
     await sequelize.transaction(async (transaction) => {
       await application.update(

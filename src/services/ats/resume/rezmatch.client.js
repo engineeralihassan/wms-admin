@@ -98,42 +98,31 @@ const normalizeResult = (data = {}, envelope = {}) => {
 };
 
 /**
- * Score one resume against one job description.
- * @param {{ resumeUrl?: string, resumeText?: string, jdText: string }} input
- * @returns {Promise<{ score:number|null, band:string|null, breakdown:object }>}
+ * Low-level POST to a Rezmatch endpoint with timeout + error classification. Returns
+ * the parsed JSON envelope { success, data, credits_used, request_id }.
  */
-const match = async ({ resumeUrl, resumeText, jdText }) => {
+const post = async (path, body) => {
   if (!config.enabled) {
     throw new ScreeningError('Resume screening is not enabled/configured', { retryable: false });
   }
-  if (!jdText || (!resumeUrl && !resumeText)) {
-    throw new ScreeningError('match() needs a jd_text and a resume url or text', {
-      retryable: false,
-    });
-  }
-
-  const body = { jd_text: jdText };
-  if (resumeUrl) body.resume_url = resumeUrl;
-  else body.resume_text = resumeText;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.rezmatch.timeoutMs);
 
   let res;
   try {
-    res = await fetch(`${config.rezmatch.baseUrl}${config.rezmatch.matchPath}`, {
+    res = await fetch(`${config.rezmatch.baseUrl}${path}`, {
       method: 'POST',
-      headers: {
-        'x-access-key': config.rezmatch.apiKey,
-        'content-type': 'application/json',
-      },
+      headers: { 'x-access-key': config.rezmatch.apiKey, 'content-type': 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (err) {
     // Network error or timeout — worth retrying.
     throw new ScreeningError(
-      err.name === 'AbortError' ? 'Rezmatch request timed out' : `Rezmatch request failed: ${err.message}`,
+      err.name === 'AbortError'
+        ? `Rezmatch ${path} timed out`
+        : `Rezmatch ${path} request failed: ${err.message}`,
       { retryable: true }
     );
   } finally {
@@ -149,21 +138,92 @@ const match = async ({ resumeUrl, resumeText, jdText }) => {
   }
 
   if (!res.ok) {
-    // 4xx (except 429/408) are our fault (bad input/key/credits) — don't retry.
+    // 402 (no credits) / 4xx (bad input/key) are our fault — don't retry.
     // 408/429/5xx are transient — retry with backoff.
     const retryable = res.status === 408 || res.status === 429 || res.status >= 500;
-    throw new ScreeningError(`Rezmatch /match error (${res.status}): ${errorDetail(json, res.status)}`, {
+    throw new ScreeningError(`Rezmatch ${path} error (${res.status}): ${errorDetail(json, res.status)}`, {
       retryable,
       status: res.status,
     });
   }
-
   if (json && json.success === false) {
-    throw new ScreeningError(`Rezmatch /match unsuccessful: ${errorDetail(json)}`, {
+    throw new ScreeningError(`Rezmatch ${path} unsuccessful: ${errorDetail(json)}`, {
       retryable: false,
     });
   }
+  return json;
+};
 
+/**
+ * Parse a résumé into structured JSON (the `candidate` object reused by /match).
+ * Cost: ~6 credits. Send ONE of file (base64) / url / text.
+ * @returns {Promise<{ candidate: object, creditsUsed: number|null, requestId: string|null }>}
+ */
+const parseResume = async ({ file, url, text }) => {
+  const body = {};
+  if (file) body.file = file;
+  else if (url) body.url = url;
+  else if (text) body.text = text;
+  else throw new ScreeningError('parseResume needs file, url or text', { retryable: false });
+
+  const json = await post('/parse/resume', body);
+  logger.info(
+    `[resume:rezmatch] parsed resume credits=${json.credits_used ?? '?'} req=${json.request_id || '?'}`
+  );
+  return { candidate: json.data || json, creditsUsed: json.credits_used ?? null, requestId: json.request_id || null };
+};
+
+/**
+ * Parse a job description into structured JSON (the `role` object reused by /match).
+ * Cost: ~4 credits, amortized across ALL applicants to the job. Send text or url.
+ * @returns {Promise<{ role: object, creditsUsed: number|null, requestId: string|null }>}
+ */
+const parseJd = async ({ text, url }) => {
+  const body = {};
+  if (text) body.text = text;
+  else if (url) body.url = url;
+  else throw new ScreeningError('parseJd needs text or url', { retryable: false });
+
+  const json = await post('/parse/jd', body);
+  logger.info(
+    `[resume:rezmatch] parsed jd credits=${json.credits_used ?? '?'} req=${json.request_id || '?'}`
+  );
+  return { role: json.data || json, creditsUsed: json.credits_used ?? null, requestId: json.request_id || null };
+};
+
+/**
+ * Score a candidate against a role. PREFER passing pre-parsed JSON (candidate + role)
+ * — that costs only ~3 credits. Passing raw documents (resume_url/jd_text/…) re-parses
+ * inline and costs 3 + 6 + 4 = 13.
+ *
+ * @param {{
+ *   candidate?: object, role?: object,          // parsed JSON (cheapest)
+ *   resumeUrl?: string, resumeText?: string, resumeFile?: string,
+ *   jdText?: string, jdUrl?: string
+ * }} input
+ * @returns {Promise<{ score:number|null, band:string|null, breakdown:object }>}
+ */
+const match = async (input = {}) => {
+  const body = {};
+
+  // Candidate side (precedence: parsed JSON -> file -> text -> url).
+  if (input.candidate) body.candidate = input.candidate;
+  else if (input.resumeFile) body.resume_file = input.resumeFile;
+  else if (input.resumeText) body.resume_text = input.resumeText;
+  else if (input.resumeUrl) body.resume_url = input.resumeUrl;
+  else throw new ScreeningError('match() needs a candidate (parsed) or resume url/text/file', {
+    retryable: false,
+  });
+
+  // Role side (precedence: parsed JSON -> text -> url).
+  if (input.role) body.role = input.role;
+  else if (input.jdText) body.jd_text = input.jdText;
+  else if (input.jdUrl) body.jd_url = input.jdUrl;
+  else throw new ScreeningError('match() needs a role (parsed) or jd text/url', {
+    retryable: false,
+  });
+
+  const json = await post(config.rezmatch.matchPath, body);
   const normalized = normalizeResult(json.data || json, json);
   logger.info(
     `[resume:rezmatch] scored score=${normalized.score} band=${normalized.band} ` +
@@ -172,4 +232,4 @@ const match = async ({ resumeUrl, resumeText, jdText }) => {
   return normalized;
 };
 
-module.exports = { match, ScreeningError };
+module.exports = { match, parseResume, parseJd, ScreeningError };

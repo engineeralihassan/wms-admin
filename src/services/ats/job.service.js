@@ -9,6 +9,7 @@ const {
   APPLICATION_STATUSES,
 } = require('../../utils/ats.constants');
 const resumeScreeningService = require('./resume/resume-screening.service');
+const { config: aiConfig } = require('../../config/ai');
 const {
   buildJobScope,
   generatePublicToken,
@@ -274,12 +275,20 @@ const updateJob = async (uuid, body, req, res) => {
       job.changed('skills') ||
       job.changed('experience_min') ||
       job.changed('screening_criteria');
+    // Invalidate the cached parsed JD so the next screen re-parses against the new text.
+    // (The worker also guards this via a content hash, but clearing it is explicit.)
+    if (rescoreNeeded) {
+      job.jd_parsed = null;
+      job.jd_parsed_hash = null;
+    }
     await job.save({ transaction });
     return { job, rescoreNeeded };
   });
 
-  // Re-screen existing applications against the new criteria (async, once each).
-  if (updated.rescoreNeeded) {
+  // Re-screen existing applications against the new criteria (async, once each) — only
+  // when auto-screen is on. With it off, the recruiter re-screens on demand so an edit
+  // never silently spends credits across a large applicant pool.
+  if (updated.rescoreNeeded && aiConfig.autoScreen) {
     const apps = await JobApplication.findAll({
       where: { job_id: updated.job.id },
       attributes: ['id'],

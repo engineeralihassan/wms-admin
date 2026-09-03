@@ -133,6 +133,30 @@ export class JobDetail implements OnInit {
     if (next && this.rankedItems().length === 0) this.loadRanked();
   }
 
+  protected readonly screening = signal(false);
+
+  /** Manually trigger screening for this job's applications. */
+  protected screenCandidates(): void {
+    this.screening.set(true);
+    this.jobs.screenJob(this.uuid()).subscribe({
+      next: (r) => {
+        this.screening.set(false);
+        if (!r.enabled) {
+          this.notify.info('Resume screening is not configured on the server.');
+          return;
+        }
+        if (r.queued === 0) {
+          this.notify.info('All candidates are already screened.');
+        } else {
+          this.notify.success(`Screening ${r.queued} candidate(s). Scores appear shortly.`);
+        }
+        // Reload after a short delay so early results show up.
+        setTimeout(() => this.loadRanked(), 1500);
+      },
+      error: () => this.screening.set(false),
+    });
+  }
+
   /** CSS modifier for a score band chip. */
   protected bandClass(band?: string | null): string {
     return band ? `band--${band}` : 'band--none';

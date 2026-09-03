@@ -74,6 +74,7 @@ export const API_ENDPOINTS = {
     status: (uuid: string) => `/jobs/${uuid}/status`,
     applications: (uuid: string) => `/jobs/${uuid}/applications`,
     rankedApplications: (uuid: string) => `/jobs/${uuid}/applications/ranked`,
+    screen: (uuid: string) => `/jobs/${uuid}/screen`,
   },
   applications: {
     byUuid: (uuid: string) => `/applications/${uuid}`,

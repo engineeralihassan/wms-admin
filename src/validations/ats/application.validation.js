@@ -41,6 +41,17 @@ const listRankedApplications = {
   }),
 };
 
+// POST /jobs/:uuid/screen — manually (re)screen a job's applications.
+const screenJob = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+  }),
+  body: Joi.object().keys({
+    // When true, re-score everyone (spends credits); default only screens unscored.
+    rescore_all: Joi.boolean().default(false),
+  }),
+};
+
 const getApplication = {
   params: Joi.object().keys({
     uuid: Joi.string().uuid().required(),
@@ -114,6 +125,7 @@ const deleteApplication = {
 module.exports = {
   listApplications,
   listRankedApplications,
+  screenJob,
   getApplication,
   changeApplicationStatus,
   rateApplication,

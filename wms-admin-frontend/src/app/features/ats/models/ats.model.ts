@@ -237,6 +237,13 @@ export interface RankedApplicationsResponse {
   };
 }
 
+/** Response of POST /jobs/:uuid/screen. */
+export interface ScreenJobResult {
+  queued: number;
+  skipped_already_scored: number;
+  enabled: boolean;
+}
+
 export interface ChangeApplicationStatusRequest {
   status: ApplicationStatus;
   stage_key?: string;

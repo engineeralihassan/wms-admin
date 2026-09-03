@@ -24,6 +24,13 @@ const config = Object.freeze({
   /** Whether a key is configured at all (surfaced for diagnostics/health). */
   configured: Boolean(apiKey),
 
+  /**
+   * Auto-screen every new application on submit? Credits cost money, so teams that
+   * want to control spend can turn this OFF and screen on demand via the recruiter's
+   * "Screen candidates" action. Defaults ON (screen as candidates arrive).
+   */
+  autoScreen: String(process.env.RESUME_AUTO_SCREEN ?? 'true').toLowerCase() !== 'false',
+
   rezmatch: {
     apiKey,
     baseUrl: (process.env.REZMATCH_BASE_URL || 'https://api.rezmatch.ai').replace(/\/+$/, ''),

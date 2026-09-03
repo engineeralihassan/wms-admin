@@ -83,6 +83,14 @@ const listRankedForJob = catchAsync(async (req, res) => {
   });
 });
 
+/** POST /jobs/:uuid/screen — manually (re)screen a job's applications. */
+const screenJob = catchAsync(async (req, res) => {
+  const result = await applicationService.triggerScreening(req.params.uuid, req, res, {
+    rescoreAll: req.body?.rescore_all === true,
+  });
+  res.status(httpStatus.OK).send({ message: res.__('success'), data: result });
+});
+
 /** GET /applications/:uuid — full application with attachments + event history. */
 const getOne = catchAsync(async (req, res) => {
   const { application, attachments, events } = await applicationService.getApplicationByUuid(
@@ -149,6 +157,7 @@ module.exports = {
   eventToDto,
   listForJob,
   listRankedForJob,
+  screenJob,
   getOne,
   changeStatus,
   rate,

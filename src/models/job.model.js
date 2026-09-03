@@ -185,13 +185,27 @@ module.exports = (sequelize) => {
       },
 
       // Optional AI/auto-screening criteria used to rank applicants against this job.
-      // JSONB object: { required_skills[], nice_to_have_skills[], keywords[], schools[],
-      // min_experience, preferred_experience, weights{}, use_ai }. Empty {} = no explicit
-      // criteria (scorer falls back to the job's own skills/experience range).
+      // JSONB object: { must_have_skills[], keywords[], min_experience }. Empty {} = no
+      // explicit criteria (matcher uses the job description alone).
       screening_criteria: {
         type: DataTypes.JSONB,
         allowNull: false,
         defaultValue: {},
+      },
+
+      // Cached parsed job description (the matcher's `role` JSON). Parsing the JD once
+      // and reusing it across ALL applicants makes each match cost ~3 credits instead
+      // of re-parsing the JD every time (4 credits) — amortized to ~0 per candidate.
+      jd_parsed: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+
+      // Hash of the JD text + criteria the cached jd_parsed was built from. When it
+      // changes (description/criteria edited), the cache is stale and re-parsed once.
+      jd_parsed_hash: {
+        type: DataTypes.STRING(64),
+        allowNull: true,
       },
 
       status: {

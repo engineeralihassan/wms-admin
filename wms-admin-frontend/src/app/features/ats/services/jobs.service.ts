@@ -11,7 +11,7 @@ import type {
   JobApplication,
   JobStatus,
   RankedApplicationsResponse,
-  ScreeningSummary,
+  ScreenJobResult,
   UpdateJobRequest,
 } from '../models/ats.model';
 
@@ -74,6 +74,17 @@ export class JobsService {
           meta: res.meta as unknown as RankedApplicationsResponse['meta'],
         })),
       );
+  }
+
+  /**
+   * Manually (re)screen a job's applications. By default only screens candidates that
+   * don't already have a score; pass rescoreAll to force a fresh score on everyone
+   * (spends more credits).
+   */
+  screenJob(jobUuid: string, rescoreAll = false): Observable<ScreenJobResult> {
+    return this.api.post<ScreenJobResult>(API_ENDPOINTS.jobs.screen(jobUuid), {
+      rescore_all: rescoreAll,
+    });
   }
 
   /** Move an application through its hiring lifecycle. */

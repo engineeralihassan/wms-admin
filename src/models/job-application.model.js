@@ -180,6 +180,21 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
 
+      // Cached parsed résumé (the matcher's `candidate` JSON). Parsed ONCE (~6 credits);
+      // every subsequent match against any job reuses it for just ~3 credits. Null until
+      // first parsed.
+      resume_parsed: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
+
+      // Storage key the cached resume_parsed was built from — so a replaced CV invalidates
+      // the cache and triggers a re-parse.
+      resume_parsed_key: {
+        type: DataTypes.STRING(1024),
+        allowNull: true,
+      },
+
       // When screening last completed (or failed). Lets us detect a stale score after
       // the job description / criteria changed and re-enqueue.
       screened_at: {

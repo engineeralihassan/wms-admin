@@ -198,11 +198,14 @@ const applyToJob = async (token, body, req, res) => {
     });
 
     // Screen the CV asynchronously (once). Fire-and-forget AFTER commit so a queue or
-    // provider hiccup can never affect the candidate's submission.
-    resumeScreeningService.enqueueSafe(application.id, {
-      organizationId: job.organization_id,
-      reason: 'apply',
-    });
+    // provider hiccup can never affect the candidate's submission. Only when auto-screen
+    // is enabled — otherwise a recruiter triggers screening on demand (saves credits).
+    if (aiConfig.autoScreen) {
+      resumeScreeningService.enqueueSafe(application.id, {
+        organizationId: job.organization_id,
+        reason: 'apply',
+      });
+    }
 
     // Public-safe acknowledgement only (never leak internal ids or org data).
     return {
@@ -241,6 +244,42 @@ const listApplicationsForJob = async (jobUuid, req, res) => {
     attributes: APPLICATION_ATTRIBUTES,
     include: APPLICATION_INCLUDE,
   });
+};
+
+/**
+ * Manually trigger resume screening for a job's applications (recruiter action). Used
+ * when auto-screen is off, or to (re)score after uploading criteria. Enqueues one
+ * screening job per application; the de-dupe in the queue prevents piling up. By
+ * default only screens applications that don't already have a score, so it doesn't
+ * re-spend credits; pass rescoreAll to force a fresh score on everyone.
+ *
+ * @returns {{ queued: number, skipped_already_scored: number, enabled: boolean }}
+ */
+const triggerScreening = async (jobUuid, req, res, opts = {}) => {
+  const job = await resolveOwnedJob(jobUuid, req, res);
+  if (!aiConfig.enabled) {
+    return { queued: 0, skipped_already_scored: 0, enabled: false };
+  }
+
+  const where = { organization_id: job.organization_id, job_id: job.id };
+  if (!opts.rescoreAll) {
+    // Only (re)screen those without a finished score yet.
+    where.screening_status = { [Op.ne]: SCREENING_STATUSES.DONE };
+  }
+
+  const apps = await JobApplication.findAll({ where, attributes: ['id'] });
+  let queued = 0;
+  for (const a of apps) {
+    // eslint-disable-next-line no-await-in-loop
+    await resumeScreeningService.enqueue(a.id, {
+      organizationId: job.organization_id,
+      reason: opts.rescoreAll ? 'rescore' : 'apply',
+    });
+    queued += 1;
+  }
+
+  const total = await JobApplication.count({ where: { organization_id: job.organization_id, job_id: job.id } });
+  return { queued, skipped_already_scored: total - queued, enabled: true };
 };
 
 /**
@@ -575,6 +614,7 @@ module.exports = {
   applyToJob,
   listApplicationsForJob,
   listRankedApplications,
+  triggerScreening,
   getApplicationByUuid,
   findVisibleApplication,
   changeStatus,
