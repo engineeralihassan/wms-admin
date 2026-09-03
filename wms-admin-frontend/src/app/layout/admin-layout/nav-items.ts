@@ -58,4 +58,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permissions: ['leave.read'],
     icon: 'M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2Zm0 16H5V10h14v10Zm0-12H5V6h14v2Zm-9 5h5v5h-5v-5Z',
   },
+  {
+    // ATS — visible only to recruiters and org admins (both hold job.read). Hidden
+    // from everyone else, matching the requested "recruiter/org-admin only" access.
+    label: 'Jobs & Hiring',
+    route: APP_ROUTES.jobs,
+    permissions: ['job.read'],
+    icon: 'M20 6h-4V4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-1.99.9-1.99 2L2 19c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2Zm-6 0h-4V4h4v2Z',
+  },
 ] as const;

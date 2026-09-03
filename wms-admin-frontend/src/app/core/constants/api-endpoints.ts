@@ -68,6 +68,22 @@ export const API_ENDPOINTS = {
     typeByUuid: (uuid: string) => `/leaves/types/${uuid}`,
     balances: '/leaves/balances',
   },
+  jobs: {
+    root: '/jobs',
+    byUuid: (uuid: string) => `/jobs/${uuid}`,
+    status: (uuid: string) => `/jobs/${uuid}/status`,
+    applications: (uuid: string) => `/jobs/${uuid}/applications`,
+  },
+  applications: {
+    byUuid: (uuid: string) => `/applications/${uuid}`,
+    status: (uuid: string) => `/applications/${uuid}/status`,
+    rating: (uuid: string) => `/applications/${uuid}/rating`,
+    notes: (uuid: string) => `/applications/${uuid}/notes`,
+  },
+  careers: {
+    byToken: (token: string) => `/careers/${token}`,
+    apply: (token: string) => `/careers/${token}/apply`,
+  },
   dashboard: {
     me: '/dashboard/me',
     charts: {

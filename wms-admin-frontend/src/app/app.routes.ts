@@ -17,6 +17,14 @@ export const routes: Routes = [
     loadChildren: () => import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES),
   },
   {
+    // PUBLIC careers page — no auth, rendered outside the AdminLayout. Candidates open
+    // the recruiter-shared link (/careers/:token) to view a job and apply.
+    path: 'careers/:token',
+    title: 'Careers',
+    loadComponent: () =>
+      import('./features/careers/careers-page/careers-page').then((m) => m.CareersPage),
+  },
+  {
     path: '',
     component: AdminLayoutComponent,
     canActivate: [authGuard],
@@ -71,6 +79,13 @@ export const routes: Routes = [
           import('./features/leaves/leaves.routes').then(
             (m) => m.LEAVES_ROUTES,
           ),
+      },
+      {
+        // ATS (recruiter + org admin). Only holders of job.read reach it; the nav link
+        // is hidden for everyone else. Recruiters see own jobs; org admins see all.
+        path: 'jobs',
+        canActivate: [permissionGuard('job.read')],
+        loadChildren: () => import('./features/ats/ats.routes').then((m) => m.ATS_ROUTES),
       },
     ],
   },

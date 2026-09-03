@@ -6,3 +6,6 @@ module.exports.expenseValidation = require('./expenses/expense.validation');
 module.exports.projectValidation = require('./projects/project.validation');
 module.exports.leaveValidation = require('./leaves/leave.validation');
 module.exports.fileValidation = require('./files/file.validation');
+module.exports.jobValidation = require('./ats/job.validation');
+module.exports.applicationValidation = require('./ats/application.validation');
+module.exports.careersValidation = require('./ats/careers.validation');

@@ -30,6 +30,9 @@ const ROLES = Object.freeze({
   CONSULTANT_W2: 'consultant_w2',
   CONSULTANT_1099: 'consultant_1099',
   CONSULTANT_C2C: 'consultant_c2c',
+  // Recruiter: owns the ATS. Creates job openings and manages the candidates who
+  // apply to their own jobs. Org-scoped like the other org roles.
+  RECRUITER: 'recruiter',
 });
 
 /**
@@ -97,6 +100,21 @@ const PERMISSIONS = Object.freeze({
   FILE_READ: 'file.read',
   FILE_DELETE: 'file.delete',
 
+  // ATS — Job openings (recruiter-facing).
+  JOB_CREATE: 'job.create',
+  JOB_READ: 'job.read',
+  JOB_UPDATE: 'job.update',
+  JOB_DELETE: 'job.delete',
+  // The manager-distinguishing capability: holders see ALL of their org's jobs and
+  // applications (org admin). Without it, a recruiter sees only their OWN jobs and
+  // the applications to those jobs — enforced at the service layer.
+  JOB_MANAGE_ALL: 'job.manage_all',
+
+  // ATS — Candidate applications (recruiter-facing review + status/stage actions).
+  APPLICATION_READ: 'application.read',
+  APPLICATION_UPDATE: 'application.update',
+  APPLICATION_DELETE: 'application.delete',
+
   // Example domain resource (warehouse/orders will follow this pattern)
   ORDER_CREATE: 'order.create',
   ORDER_READ: 'order.read',
@@ -152,6 +170,55 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_UPDATE,
     PERMISSIONS.ORDER_DELETE,
+    // ATS: org admins oversee the whole ATS — every job and application in the org.
+    PERMISSIONS.JOB_CREATE,
+    PERMISSIONS.JOB_READ,
+    PERMISSIONS.JOB_UPDATE,
+    PERMISSIONS.JOB_DELETE,
+    PERMISSIONS.JOB_MANAGE_ALL,
+    PERMISSIONS.APPLICATION_READ,
+    PERMISSIONS.APPLICATION_UPDATE,
+    PERMISSIONS.APPLICATION_DELETE,
+  ],
+
+  // Recruiter: owns the ATS at the org level but scoped to their OWN jobs. Can create
+  // and manage job openings, and review/act on the candidates who apply to those jobs.
+  // They intentionally do NOT get job.manage_all (that's the org-admin cross-recruiter
+  // view) — the service scopes their reads/writes to jobs they created.
+  //
+  // A recruiter is ALSO a regular employee: like a consultant, they can raise and manage
+  // their OWN tickets, expenses and leave, and upload their own attachments. Everything
+  // there is scoped to "own only" at the service layer (no ticket.assign / expense.review
+  // / leave.approve). They intentionally get NO user/role/organization/project management
+  // permissions, so they never see Users / Vendors / Consultants / Organizations.
+  [ROLES.RECRUITER]: [
+    // ATS
+    PERMISSIONS.JOB_CREATE,
+    PERMISSIONS.JOB_READ,
+    PERMISSIONS.JOB_UPDATE,
+    PERMISSIONS.JOB_DELETE,
+    PERMISSIONS.APPLICATION_READ,
+    PERMISSIONS.APPLICATION_UPDATE,
+    PERMISSIONS.APPLICATION_DELETE,
+    // Employee self-service — tickets (own), like a consultant.
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
+    // Employee self-service — expenses (own), no review capability.
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
+    // Employee self-service — leave (own), no approve/allocate.
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
+    // Own attachments: upload/read/delete (receipts, docs, candidate CVs).
+    PERMISSIONS.FILE_UPLOAD,
+    PERMISSIONS.FILE_READ,
+    PERMISSIONS.FILE_DELETE,
   ],
 
   // A vendor manages their own consultants: create/read/update users (scoped by
@@ -266,6 +333,7 @@ const ROLE_DEFINITIONS = Object.freeze({
   [ROLES.CONSULTANT_W2]: { name: 'Consultant (W2)', scope: ROLE_SCOPES.ORGANIZATION },
   [ROLES.CONSULTANT_1099]: { name: 'Consultant (1099)', scope: ROLE_SCOPES.ORGANIZATION },
   [ROLES.CONSULTANT_C2C]: { name: 'Consultant (C2C)', scope: ROLE_SCOPES.ORGANIZATION },
+  [ROLES.RECRUITER]: { name: 'Recruiter', scope: ROLE_SCOPES.ORGANIZATION },
 });
 
 /** Consultant roles (the "owned" roles a vendor manages). */
@@ -288,6 +356,8 @@ const ASSIGNABLE_ROLES_BY_ROLE = Object.freeze({
     ROLES.CONSULTANT_W2,
     ROLES.CONSULTANT_1099,
     ROLES.CONSULTANT_C2C,
+    // Org admins create recruiters (who then run the ATS).
+    ROLES.RECRUITER,
   ],
   [ROLES.VENDOR]: [ROLES.CONSULTANT_W2, ROLES.CONSULTANT_1099, ROLES.CONSULTANT_C2C],
 });
@@ -302,6 +372,7 @@ const ORG_ASSIGNABLE_ROLES = Object.freeze([
   ROLES.CONSULTANT_W2,
   ROLES.CONSULTANT_1099,
   ROLES.CONSULTANT_C2C,
+  ROLES.RECRUITER,
 ]);
 
 module.exports = {

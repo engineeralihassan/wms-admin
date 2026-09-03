@@ -188,6 +188,8 @@ export const ASSIGNABLE_ROLE_OPTIONS: ReadonlyArray<{ value: string; label: stri
   { value: 'consultant_1099', label: 'Consultant (1099)' },
   { value: 'consultant_c2c', label: 'Consultant (C2C)' },
   { value: 'vendor', label: 'Vendor' },
+  // Recruiter: runs the ATS (creates jobs, manages candidates). Org admins may assign it.
+  { value: 'recruiter', label: 'Recruiter' },
 ];
 
 /** Vendor summary for the C2C "select vendor" dropdown (GET /users/vendors). */

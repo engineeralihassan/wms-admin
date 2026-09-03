@@ -1,0 +1,223 @@
+<header class="page-header">
+  <div class="page-header__lead">
+    <app-button variant="ghost" (clicked)="back()">← Back to jobs</app-button>
+    @if (job(); as j) {
+      <div>
+        <h1 class="page-header__title">{{ j.title }}</h1>
+        <p class="page-header__subtitle">
+          {{ j.job_code }} · {{ statusLabels[j.status] }} · {{ employmentLabels[j.employment_type] }} ·
+          {{ workModeLabels[j.work_mode] }}
+          @if (j.location) { · {{ j.location }} }
+        </p>
+      </div>
+    }
+  </div>
+</header>
+
+@if (job(); as j) {
+  <app-card title="Job Summary" class="job-summary">
+    <div class="summary-grid">
+      <div><span class="summary__label">Department</span><span>{{ j.department || '—' }}</span></div>
+      <div>
+        <span class="summary__label">Experience</span>
+        <span>
+          @if (j.experience_min != null || j.experience_max != null) {
+            {{ j.experience_min ?? 0 }}–{{ j.experience_max ?? '∞' }} yrs
+          } @else { — }
+        </span>
+      </div>
+      <div><span class="summary__label">Openings</span><span>{{ j.openings }}</span></div>
+      <div><span class="summary__label">Applicants</span><span>{{ j.application_count ?? '—' }}</span></div>
+      <div class="summary--wide">
+        <span class="summary__label">Public link</span>
+        <a [href]="j.public_url" target="_blank" rel="noopener" class="summary__link">{{ j.public_url }}</a>
+      </div>
+      <div class="summary--wide">
+        <span class="summary__label">Interview pipeline</span>
+        <span class="pipeline">
+          @for (r of j.interview_rounds; track r.key; let last = $last) {
+            <span class="pipeline__step">{{ r.name }}</span>@if (!last) { <span class="pipeline__arrow">→</span> }
+          }
+          @if (!j.interview_rounds.length) { — }
+        </span>
+      </div>
+    </div>
+  </app-card>
+}
+
+<app-card title="Applicants">
+  <app-data-table
+    caption="Applicants"
+    [columns]="columns"
+    [rows]="list.items()"
+    [rowId]="a => a.uuid"
+    [loading]="list.loading()"
+    emptyMessage="No applications yet. Share the public link to start receiving candidates."
+    searchLabel="Search candidates by name, email or reference"
+    searchPlaceholder="Search candidate…"
+    [searchValue]="searchValue()"
+    [filters]="filters()"
+    [filterValues]="list.filters()"
+    [actions]="actions()"
+    [iconOnlyActions]="true"
+    [page]="list.page()"
+    [totalPages]="list.totalPages()"
+    [total]="list.total()"
+    [limit]="list.limit()"
+    [sortBy]="list.sortBy()"
+    [sortDir]="list.sortDir()"
+    (searchChange)="onSearch($event)"
+    (filterChange)="list.setFilter($event.key, $event.value)"
+    (resetFilters)="onClearFilters()"
+    (sortChange)="list.toggleSort($event)"
+    (pageChange)="list.setPage($event)"
+    (pageSizeChange)="list.setLimit($event)"
+    (action)="onAction($event)"
+  />
+</app-card>
+
+<!-- Applicant drawer -->
+<app-modal
+  [open]="drawerOpen()"
+  [title]="activeApplication()?.candidate_name || 'Application'"
+  size="lg"
+  (closed)="closeDrawer()"
+>
+  @if (activeApplication(); as app) {
+    <div class="applicant">
+      <!-- Candidate details -->
+      <section class="applicant__section">
+        <h3 class="applicant__heading">Candidate</h3>
+        <div class="applicant__grid">
+          <div><span class="summary__label">Reference</span><span>{{ app.application_number }}</span></div>
+          <div><span class="summary__label">Email</span><span>{{ app.candidate_email }}</span></div>
+          <div><span class="summary__label">Phone</span><span>{{ app.candidate_phone || '—' }}</span></div>
+          <div>
+            <span class="summary__label">Experience</span>
+            <span>{{ app.experience_years != null ? app.experience_years + ' yrs' : '—' }}</span>
+          </div>
+          @if (app.linkedin_url) {
+            <div class="summary--wide">
+              <span class="summary__label">LinkedIn</span>
+              <a [href]="app.linkedin_url" target="_blank" rel="noopener" class="summary__link">{{ app.linkedin_url }}</a>
+            </div>
+          }
+          @if (app.portfolio_url) {
+            <div class="summary--wide">
+              <span class="summary__label">Portfolio</span>
+              <a [href]="app.portfolio_url" target="_blank" rel="noopener" class="summary__link">{{ app.portfolio_url }}</a>
+            </div>
+          }
+        </div>
+        @if (app.cover_note) {
+          <p class="applicant__cover">{{ app.cover_note }}</p>
+        }
+      </section>
+
+      <!-- CV / attachments -->
+      <section class="applicant__section">
+        <h3 class="applicant__heading">CV &amp; Attachments</h3>
+        @if (app.attachments?.length) {
+          <ul class="files">
+            @for (f of app.attachments; track f.uuid) {
+              <li class="files__item">
+                <span class="files__name">{{ f.file_name || 'file' }}</span>
+                <a [href]="f.url" target="_blank" rel="noopener" class="files__download">Download</a>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="applicant__muted">No files attached.</p>
+        }
+      </section>
+
+      @if (canUpdate()) {
+        <!-- Status / stage -->
+        <section class="applicant__section">
+          <h3 class="applicant__heading">Update status</h3>
+          <form class="applicant__form" [formGroup]="statusForm">
+            <label class="field">
+              <span class="field__label">Status</span>
+              <select class="field__input" formControlName="status">
+                @for (s of appStatusOptions; track s) {
+                  <option [value]="s">{{ appStatusLabels[s] }}</option>
+                }
+              </select>
+            </label>
+            @if (needsStage()) {
+              <label class="field">
+                <span class="field__label">Interview round</span>
+                <select class="field__input" formControlName="stage_key">
+                  @for (r of rounds(); track r.key) {
+                    <option [value]="r.key">{{ r.name }}</option>
+                  }
+                </select>
+              </label>
+            }
+            @if (needsReason()) {
+              <label class="field">
+                <span class="field__label">Reason</span>
+                <textarea class="field__input" rows="2" formControlName="decision_reason"></textarea>
+              </label>
+            }
+            <label class="field">
+              <span class="field__label">Note (optional)</span>
+              <input class="field__input" type="text" formControlName="note" />
+            </label>
+            <app-button variant="primary" [loading]="submitting()" (clicked)="submitStatus()">
+              Apply status
+            </app-button>
+          </form>
+        </section>
+
+        <!-- Rating -->
+        <section class="applicant__section">
+          <h3 class="applicant__heading">Rating</h3>
+          <form class="applicant__inline" [formGroup]="ratingForm">
+            <select class="field__input" formControlName="rating">
+              @for (n of [1, 2, 3, 4, 5]; track n) {
+                <option [value]="n">{{ n }} ★</option>
+              }
+            </select>
+            <app-button variant="secondary" [loading]="submitting()" (clicked)="submitRating()">
+              Save rating
+            </app-button>
+          </form>
+        </section>
+
+        <!-- Notes -->
+        <section class="applicant__section">
+          <h3 class="applicant__heading">Add note</h3>
+          <form class="applicant__inline" [formGroup]="noteForm">
+            <input class="field__input" type="text" formControlName="note" placeholder="Internal note…" />
+            <app-button variant="secondary" [loading]="submitting()" (clicked)="submitNote()">Add</app-button>
+          </form>
+        </section>
+      }
+
+      <!-- Timeline -->
+      <section class="applicant__section">
+        <h3 class="applicant__heading">History</h3>
+        @if (app.events?.length) {
+          <ol class="timeline">
+            @for (e of app.events; track e.uuid) {
+              <li class="timeline__item">
+                <span class="timeline__dot"></span>
+                <div>
+                  <p class="timeline__text">{{ eventText(e.entry_type, e.from_value, e.to_value) }}</p>
+                  @if (e.note) { <p class="timeline__note">"{{ e.note }}"</p> }
+                  <p class="timeline__meta">
+                    {{ formatDate(e.created_at) }}
+                    @if (e.actor) { · {{ e.actor.first_name }} {{ e.actor.last_name }} }
+                  </p>
+                </div>
+              </li>
+            }
+          </ol>
+        } @else {
+          <p class="applicant__muted">No history yet.</p>
+        }
+      </section>
+    </div>
+  }
+</app-modal>

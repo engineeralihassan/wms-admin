@@ -1,0 +1,96 @@
+.job-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+}
+
+.field__input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border, #d5dbe5);
+  border-radius: 0.5rem;
+  font: inherit;
+  background: var(--color-surface, #fff);
+}
+
+.field-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.rounds {
+  border: 1px dashed var(--color-border, #d5dbe5);
+  border-radius: 0.6rem;
+  padding: 0.9rem;
+}
+
+.rounds__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rounds__hint {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.rounds__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rounds__item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.rounds__order {
+  flex: 0 0 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.rounds__remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-danger, #dc2626);
+  font-size: 0.9rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.rounds__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #64748b);
+}

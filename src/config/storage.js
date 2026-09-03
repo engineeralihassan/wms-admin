@@ -31,6 +31,8 @@ const UPLOAD_FOLDERS = Object.freeze({
   EXPENSES: 'expenses',
   TICKETS: 'tickets',
   LEAVES: 'leaves',
+  // ATS: candidate CVs / résumés and their supporting documents (public uploads).
+  RESUMES: 'resumes',
   MISC: 'misc',
 });
 

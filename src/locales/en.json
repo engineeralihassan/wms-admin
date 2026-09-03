@@ -107,5 +107,31 @@
   "files_uploaded": "Files uploaded successfully",
   "file_deleted": "File deleted successfully",
   "file_not_found": "File not found",
-  "no_files_provided": "No files were provided"
+  "no_files_provided": "No files were provided",
+
+  "job_created": "Job opening created successfully",
+  "job_updated": "Job opening updated successfully",
+  "job_deleted": "Job opening deleted successfully",
+  "job_found": "Job opening found successfully",
+  "job_status_updated": "Job status updated successfully",
+  "job_not_found": "Job opening not found",
+  "job_invalid_experience_range": "The maximum experience must be greater than or equal to the minimum",
+  "job_invalid_salary_range": "The maximum salary must be greater than or equal to the minimum",
+  "job_publish_requires_rounds": "Define at least one interview round before publishing this job",
+  "job_invalid_status_transition": "This job status change is not allowed",
+  "job_round_in_use": "An interview round with candidates in it cannot be removed",
+  "job_has_applications": "This job has applications and cannot be deleted; close it instead",
+  "job_not_accepting": "This position is no longer accepting applications",
+
+  "application_submitted": "Your application has been submitted successfully",
+  "application_found": "Application found successfully",
+  "application_status_updated": "Application status updated successfully",
+  "application_rated": "Candidate rating updated successfully",
+  "application_note_added": "Note added successfully",
+  "application_deleted": "Application deleted successfully",
+  "application_not_found": "Application not found",
+  "application_invalid_transition": "This application status change is not allowed",
+  "application_invalid_stage": "The selected interview round is not part of this job's pipeline",
+  "application_cv_required": "Please attach your CV / resume to apply",
+  "application_too_many_files": "Too many files attached to this application"
 }

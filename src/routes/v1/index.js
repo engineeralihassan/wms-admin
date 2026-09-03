@@ -11,6 +11,9 @@ const projectRoute = require('./project.route');
 const leaveRoute = require('./leave.route');
 const dashboardRoute = require('./dashboard.route');
 const fileRoute = require('./files.route');
+const jobRoute = require('./job.route');
+const applicationRoute = require('./application.route');
+const careersRoute = require('./careers.route');
 const docsRoute = require('./docs.route');
 
 const devRoutes = [
@@ -30,6 +33,10 @@ const routes = [
   { path: '/leaves', route: leaveRoute },
   { path: '/dashboard', route: dashboardRoute },
   { path: '/files', route: fileRoute },
+  // ATS: recruiter-facing jobs + applications, and the PUBLIC careers surface.
+  { path: '/jobs', route: jobRoute },
+  { path: '/applications', route: applicationRoute },
+  { path: '/careers', route: careersRoute },
 ];
 
 routes.forEach((route) => {

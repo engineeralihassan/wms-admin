@@ -105,6 +105,43 @@ const LEAVE_BALANCE_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
+const JOB_QUERY_CONFIG = Object.freeze({
+  sortable: [
+    'created_at',
+    'updated_at',
+    'job_code',
+    'title',
+    'status',
+    'employment_type',
+    'work_mode',
+    'published_at',
+  ],
+  searchable: ['title', 'job_code', 'department', 'location'],
+  filterable: ['status', 'employment_type', 'work_mode', 'department'],
+  rangeFilterable: ['created_at', 'published_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+const APPLICATION_QUERY_CONFIG = Object.freeze({
+  sortable: [
+    'created_at',
+    'updated_at',
+    'application_number',
+    'candidate_name',
+    'status',
+    'rating',
+    'submitted_at',
+  ],
+  searchable: ['candidate_name', 'candidate_email', 'application_number'],
+  filterable: ['status', 'stage_key', 'source', 'job_id'],
+  rangeFilterable: ['created_at', 'submitted_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
 module.exports = {
   USER_QUERY_CONFIG,
   ORGANIZATION_QUERY_CONFIG,
@@ -113,4 +150,6 @@ module.exports = {
   PROJECT_QUERY_CONFIG,
   LEAVE_QUERY_CONFIG,
   LEAVE_BALANCE_QUERY_CONFIG,
+  JOB_QUERY_CONFIG,
+  APPLICATION_QUERY_CONFIG,
 };

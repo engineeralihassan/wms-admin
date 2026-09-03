@@ -98,6 +98,12 @@ async function ensureSearchIndexes() {
     'CREATE INDEX IF NOT EXISTS projects_project_code_trgm ON projects USING gin (project_code gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS leave_requests_leave_number_trgm ON leave_requests USING gin (leave_number gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS leave_requests_reason_trgm ON leave_requests USING gin (reason gin_trgm_ops)',
+    // ATS: fast substring search on job/application list pages.
+    'CREATE INDEX IF NOT EXISTS jobs_title_trgm ON jobs USING gin (title gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS jobs_job_code_trgm ON jobs USING gin (job_code gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS job_applications_candidate_name_trgm ON job_applications USING gin (candidate_name gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS job_applications_candidate_email_trgm ON job_applications USING gin (candidate_email gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS job_applications_application_number_trgm ON job_applications USING gin (application_number gin_trgm_ops)',
   ];
   for (const sql of statements) {
     // eslint-disable-next-line no-await-in-loop

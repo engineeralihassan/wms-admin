@@ -1,0 +1,127 @@
+<main class="careers">
+  <div class="careers__container">
+    @if (loading()) {
+      <div class="careers__state">
+        <p>Loading…</p>
+      </div>
+    } @else if (notFound()) {
+      <div class="careers__state careers__state--empty">
+        <div class="careers__badge">🔍</div>
+        <h1>Position not found</h1>
+        <p>This job posting may have been removed or the link is invalid.</p>
+      </div>
+    } @else if (!available()) {
+      <div class="careers__state careers__state--closed">
+        <div class="careers__badge">✅</div>
+        <h1>{{ job()?.title }}</h1>
+        <p class="careers__closed-msg">{{ unavailableMessage() }}</p>
+        <p class="careers__muted">Thank you for your interest. Please check back for future openings.</p>
+      </div>
+    } @else if (acknowledgement(); as ack) {
+      <div class="careers__state careers__state--success">
+        <div class="careers__badge">🎉</div>
+        <h1>Application received</h1>
+        <p>
+          Thank you, {{ ack.candidate_name }}. Your application for <strong>{{ ack.job_title }}</strong>
+          has been submitted.
+        </p>
+        <p class="careers__ref">Your reference: <strong>{{ ack.application_number }}</strong></p>
+        <p class="careers__muted">Our team will review your application and reach out if there's a match.</p>
+      </div>
+    } @else if (job(); as j) {
+      <!-- Job header -->
+      <header class="careers__header">
+        @if (j.organization?.name) {
+          <span class="careers__org">{{ j.organization?.name }}</span>
+        }
+        <h1 class="careers__title">{{ j.title }}</h1>
+        <div class="careers__tags">
+          <span class="tag">{{ employmentLabels[j.employment_type!] }}</span>
+          <span class="tag">{{ workModeLabels[j.work_mode!] }}</span>
+          @if (j.location) { <span class="tag">{{ j.location }}</span> }
+          @if (j.department) { <span class="tag">{{ j.department }}</span> }
+          @if (j.experience_min != null || j.experience_max != null) {
+            <span class="tag">{{ j.experience_min ?? 0 }}–{{ j.experience_max ?? '∞' }} yrs</span>
+          }
+          @if (j.salary) { <span class="tag tag--salary">{{ salaryText() }}</span> }
+        </div>
+      </header>
+
+      <!-- Description -->
+      <section class="careers__body">
+        <h2>About the role</h2>
+        <p class="careers__description">{{ j.description }}</p>
+
+        @if (j.skills?.length) {
+          <h2>Skills</h2>
+          <div class="careers__skills">
+            @for (s of j.skills; track s) {
+              <span class="skill">{{ s }}</span>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- Apply form -->
+      <section class="careers__apply">
+        <h2>Apply for this position</h2>
+        <form class="apply-form" [formGroup]="form" (ngSubmit)="submit()">
+          <div class="apply-form__row">
+            <label class="field">
+              <span class="field__label">Full name *</span>
+              <input class="field__input" type="text" formControlName="candidate_name" />
+            </label>
+            <label class="field">
+              <span class="field__label">Email *</span>
+              <input class="field__input" type="email" formControlName="candidate_email" />
+            </label>
+          </div>
+
+          <div class="apply-form__row">
+            <label class="field">
+              <span class="field__label">Phone</span>
+              <input class="field__input" type="tel" formControlName="candidate_phone" />
+            </label>
+            <label class="field">
+              <span class="field__label">Years of experience</span>
+              <input class="field__input" type="number" min="0" formControlName="experience_years" />
+            </label>
+          </div>
+
+          <div class="apply-form__row">
+            <label class="field">
+              <span class="field__label">LinkedIn URL</span>
+              <input class="field__input" type="url" formControlName="linkedin_url" placeholder="https://…" />
+            </label>
+            <label class="field">
+              <span class="field__label">Portfolio URL</span>
+              <input class="field__input" type="url" formControlName="portfolio_url" placeholder="https://…" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span class="field__label">Cover note</span>
+            <textarea class="field__input" rows="4" formControlName="cover_note" placeholder="Tell us why you're a great fit…"></textarea>
+          </label>
+
+          <div class="field">
+            <app-file-upload
+              label="CV / Resume *"
+              [config]="cvConfig"
+              (rawFilesChange)="cvFiles.set($event)"
+            />
+            @if (cvFiles().length === 0) {
+              <span class="field__hint">Attach your CV (PDF or Word) to apply.</span>
+            }
+          </div>
+
+          <div class="apply-form__actions">
+            <app-button type="submit" variant="primary" [loading]="submitting()">
+              Submit application
+            </app-button>
+          </div>
+        </form>
+      </section>
+    }
+  </div>
+</main>

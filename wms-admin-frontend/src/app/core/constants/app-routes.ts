@@ -13,4 +13,7 @@ export const APP_ROUTES = {
   expenses: '/expenses',
   projects: '/projects',
   leaves: '/leaves',
+  jobs: '/jobs',
+  /** Public careers page (candidate-facing, outside the admin layout). */
+  careers: (token: string) => `/careers/${token}`,
 } as const;

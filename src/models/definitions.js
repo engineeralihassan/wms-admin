@@ -17,6 +17,9 @@ const LeaveBalance = require('./leave-balance.model');
 const LeaveRequest = require('./leave-request.model');
 const LeaveBalanceLedger = require('./leave-balance-ledger.model');
 const Attachment = require('./attachment.model');
+const Job = require('./job.model');
+const JobApplication = require('./job-application.model');
+const ApplicationEvent = require('./application-event.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -63,6 +66,9 @@ const definitions = (sequelize, Sequelize) => {
   db.LeaveRequest = LeaveRequest(sequelize);
   db.LeaveBalanceLedger = LeaveBalanceLedger(sequelize);
   db.Attachment = Attachment(sequelize);
+  db.Job = Job(sequelize);
+  db.JobApplication = JobApplication(sequelize);
+  db.ApplicationEvent = ApplicationEvent(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -227,6 +233,56 @@ const definitions = (sequelize, Sequelize) => {
     foreignKey: 'leave_request_id',
     as: 'leaveRequest',
   });
+
+  // ── ATS (Jobs & Applications) ──────────────────────────────────────────────
+
+  // Organization <-> Job (tenant scope)
+  db.Organization.hasMany(db.Job, { foreignKey: 'organization_id', as: 'jobs' });
+  db.Job.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  // User(recruiter) <-> Job (creator/owner)
+  db.User.hasMany(db.Job, { foreignKey: 'created_by_id', as: 'createdJobs' });
+  db.Job.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'recruiter' });
+
+  // Organization <-> JobApplication (tenant scope)
+  db.Organization.hasMany(db.JobApplication, {
+    foreignKey: 'organization_id',
+    as: 'jobApplications',
+  });
+  db.JobApplication.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+  // Job <-> JobApplication
+  db.Job.hasMany(db.JobApplication, { foreignKey: 'job_id', as: 'applications' });
+  db.JobApplication.belongsTo(db.Job, { foreignKey: 'job_id', as: 'job' });
+  // User(reviewer) <-> JobApplication (nullable until acted on)
+  db.User.hasMany(db.JobApplication, {
+    foreignKey: 'reviewed_by_id',
+    as: 'reviewedApplications',
+  });
+  db.JobApplication.belongsTo(db.User, { foreignKey: 'reviewed_by_id', as: 'reviewer' });
+
+  // Organization <-> ApplicationEvent (tenant scope)
+  db.Organization.hasMany(db.ApplicationEvent, {
+    foreignKey: 'organization_id',
+    as: 'applicationEvents',
+  });
+  db.ApplicationEvent.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+  // JobApplication <-> ApplicationEvent (audit trail)
+  db.JobApplication.hasMany(db.ApplicationEvent, {
+    foreignKey: 'application_id',
+    as: 'events',
+  });
+  db.ApplicationEvent.belongsTo(db.JobApplication, {
+    foreignKey: 'application_id',
+    as: 'application',
+  });
+  // User(actor) <-> ApplicationEvent
+  db.User.hasMany(db.ApplicationEvent, { foreignKey: 'created_by_id', as: 'applicationEvents' });
+  db.ApplicationEvent.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'actor' });
 
   // Attachment (polymorphic file store). It is NOT tied to any single parent via a
   // FK — owner_type/owner_id resolve the parent at the service layer — so it only

@@ -11,3 +11,5 @@ module.exports.projectService = require('./projects/project.service');
 module.exports.leaveService = require('./leaves/leave.service');
 module.exports.dashboardService = require('./dashboard/dashboard.service');
 module.exports.emailService = require('./email/email.service');
+module.exports.jobService = require('./ats/job.service');
+module.exports.applicationService = require('./ats/application.service');

@@ -1,0 +1,193 @@
+<header class="page-header">
+  <div>
+    <h1 class="page-header__title">Jobs &amp; Hiring</h1>
+    <p class="page-header__subtitle">
+      Post openings, share the public application link, and manage candidates through your interview pipeline.
+    </p>
+  </div>
+  <div class="page-header__actions">
+    @if (canCreate()) {
+      <app-button variant="primary" (clicked)="openCreate()">Post a Job</app-button>
+    }
+  </div>
+</header>
+
+<app-card title="All Job Openings">
+  <app-data-table
+    caption="Job openings"
+    [columns]="columns"
+    [rows]="list.items()"
+    [rowId]="job => job.uuid"
+    [loading]="list.loading()"
+    emptyMessage="No job openings match the current search and filters."
+    searchLabel="Search jobs by title or code"
+    searchPlaceholder="Search title or code…"
+    [searchValue]="searchValue()"
+    [filters]="filters()"
+    [filterValues]="list.filters()"
+    [actions]="actions()"
+    [iconOnlyActions]="true"
+    [page]="list.page()"
+    [totalPages]="list.totalPages()"
+    [total]="list.total()"
+    [limit]="list.limit()"
+    [sortBy]="list.sortBy()"
+    [sortDir]="list.sortDir()"
+    (searchChange)="onSearch($event)"
+    (filterChange)="list.setFilter($event.key, $event.value)"
+    (resetFilters)="onClearFilters()"
+    (sortChange)="list.toggleSort($event)"
+    (pageChange)="list.setPage($event)"
+    (pageSizeChange)="list.setLimit($event)"
+    (action)="onAction($event)"
+  />
+</app-card>
+
+<!-- Create / Edit job -->
+<app-modal
+  [open]="openModal() !== null"
+  [title]="openModal() === 'edit' ? 'Edit Job Opening' : 'Post a Job'"
+  size="lg"
+  (closed)="closeModal()"
+>
+  <form class="job-form" [formGroup]="jobForm">
+    <label class="field">
+      <span class="field__label">Job title</span>
+      <input class="field__input" type="text" formControlName="title" placeholder="e.g. Senior Backend Engineer" />
+    </label>
+
+    <label class="field">
+      <span class="field__label">Job description</span>
+      <textarea
+        class="field__input"
+        rows="6"
+        formControlName="description"
+        placeholder="Responsibilities, requirements, benefits…"
+      ></textarea>
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Department</span>
+        <input class="field__input" type="text" formControlName="department" />
+      </label>
+      <label class="field">
+        <span class="field__label">Location</span>
+        <input class="field__input" type="text" formControlName="location" placeholder="e.g. Remote, New York" />
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Employment type</span>
+        <select class="field__input" formControlName="employment_type">
+          @for (t of employmentOptions; track t) {
+            <option [value]="t">{{ employmentLabels[t] }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Work mode</span>
+        <select class="field__input" formControlName="work_mode">
+          @for (m of workModeOptions; track m) {
+            <option [value]="m">{{ workModeLabels[m] }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Openings</span>
+        <input class="field__input" type="number" min="1" formControlName="openings" />
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Min experience (yrs)</span>
+        <input class="field__input" type="number" min="0" formControlName="experience_min" />
+      </label>
+      <label class="field">
+        <span class="field__label">Max experience (yrs)</span>
+        <input class="field__input" type="number" min="0" formControlName="experience_max" />
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="field__label">Min salary</span>
+        <input class="field__input" type="number" min="0" formControlName="salary_min" />
+      </label>
+      <label class="field">
+        <span class="field__label">Max salary</span>
+        <input class="field__input" type="number" min="0" formControlName="salary_max" />
+      </label>
+      <label class="field">
+        <span class="field__label">Currency</span>
+        <select class="field__input" formControlName="currency">
+          @for (c of currencyOptions; track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Period</span>
+        <select class="field__input" formControlName="salary_period">
+          @for (p of salaryPeriodOptions; track p) {
+            <option [value]="p">{{ p }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <label class="field field--inline">
+      <input type="checkbox" formControlName="show_salary" />
+      <span class="field__label">Show salary on the public careers page</span>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Skills (comma-separated)</span>
+      <input class="field__input" type="text" formControlName="skills" placeholder="Node.js, PostgreSQL, AWS" />
+    </label>
+
+    <!-- Interview pipeline builder -->
+    <div class="rounds">
+      <div class="rounds__header">
+        <span class="field__label">Interview rounds</span>
+        <app-button variant="ghost" (clicked)="addRound()">+ Add round</app-button>
+      </div>
+      <p class="rounds__hint">
+        Define the ordered stages a candidate goes through (e.g. Screening → Technical → CEO → HR).
+        At least one round is required to publish.
+      </p>
+      <div formArrayName="rounds" class="rounds__list">
+        @for (ctrl of rounds.controls; track $index; let i = $index) {
+          <div class="rounds__item" [formGroupName]="i">
+            <span class="rounds__order">{{ i + 1 }}</span>
+            <input class="field__input" type="text" formControlName="name" placeholder="Round name" />
+            <button type="button" class="rounds__remove" (click)="removeRound(i)" aria-label="Remove round">
+              ✕
+            </button>
+          </div>
+        }
+        @if (!rounds.controls.length) {
+          <p class="rounds__empty">No rounds yet. Add at least one to publish this job.</p>
+        }
+      </div>
+    </div>
+  </form>
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
+    @if (openModal() === 'edit') {
+      <app-button variant="primary" [loading]="submitting()" (clicked)="submitEdit('draft')">
+        Save changes
+      </app-button>
+    } @else {
+      <app-button variant="secondary" [loading]="submitting()" (clicked)="submitCreate('draft')">
+        Save draft
+      </app-button>
+      <app-button variant="primary" [loading]="submitting()" (clicked)="submitCreate('publish')">
+        Publish
+      </app-button>
+    }
+  </div>
+</app-modal>
