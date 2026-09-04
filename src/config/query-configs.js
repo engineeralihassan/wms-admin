@@ -105,6 +105,29 @@ const LEAVE_BALANCE_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
+const TIMESHEET_QUERY_CONFIG = Object.freeze({
+  sortable: [
+    'created_at',
+    'updated_at',
+    'timesheet_number',
+    'week_start_date',
+    'week_end_date',
+    'due_date',
+    'total_hours',
+    'status',
+    'submitted_at',
+  ],
+  searchable: ['timesheet_number'],
+  // project_id is resolved from the project's public uuid in the service (ids are
+  // never exposed), then applied as part of the security scope — same pattern the
+  // leave service uses for leave_type. status is a direct enum match.
+  filterable: ['status', 'project_id'],
+  rangeFilterable: ['created_at', 'week_start_date', 'due_date'],
+  defaultSort: 'week_start_date',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
 const JOB_QUERY_CONFIG = Object.freeze({
   sortable: [
     'created_at',
@@ -150,6 +173,7 @@ module.exports = {
   PROJECT_QUERY_CONFIG,
   LEAVE_QUERY_CONFIG,
   LEAVE_BALANCE_QUERY_CONFIG,
+  TIMESHEET_QUERY_CONFIG,
   JOB_QUERY_CONFIG,
   APPLICATION_QUERY_CONFIG,
 };

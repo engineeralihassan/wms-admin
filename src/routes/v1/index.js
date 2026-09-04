@@ -9,6 +9,7 @@ const ticketRoute = require('./ticket.route');
 const expenseRoute = require('./expense.route');
 const projectRoute = require('./project.route');
 const leaveRoute = require('./leave.route');
+const timesheetRoute = require('./timesheet.route');
 const dashboardRoute = require('./dashboard.route');
 const fileRoute = require('./files.route');
 const jobRoute = require('./job.route');
@@ -31,6 +32,7 @@ const routes = [
   { path: '/expenses', route: expenseRoute },
   { path: '/projects', route: projectRoute },
   { path: '/leaves', route: leaveRoute },
+  { path: '/timesheets', route: timesheetRoute },
   { path: '/dashboard', route: dashboardRoute },
   { path: '/files', route: fileRoute },
   // ATS: recruiter-facing jobs + applications, and the PUBLIC careers surface.

@@ -81,6 +81,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'timesheets',
+        canActivate: [permissionGuard('timesheet.read')],
+        loadChildren: () =>
+          import('./features/timesheets/timesheets.routes').then(
+            (m) => m.TIMESHEETS_ROUTES,
+          ),
+      },
+      {
         // ATS (recruiter + org admin). Only holders of job.read reach it; the nav link
         // is hidden for everyone else. Recruiters see own jobs; org admins see all.
         path: 'jobs',

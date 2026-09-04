@@ -68,6 +68,15 @@ export const API_ENDPOINTS = {
     typeByUuid: (uuid: string) => `/leaves/types/${uuid}`,
     balances: '/leaves/balances',
   },
+  timesheets: {
+    root: '/timesheets',
+    projects: '/timesheets/projects',
+    byUuid: (uuid: string) => `/timesheets/${uuid}`,
+    entries: (uuid: string) => `/timesheets/${uuid}/entries`,
+    submit: (uuid: string) => `/timesheets/${uuid}/submit`,
+    withdraw: (uuid: string) => `/timesheets/${uuid}/withdraw`,
+    review: (uuid: string) => `/timesheets/${uuid}/review`,
+  },
   jobs: {
     root: '/jobs',
     byUuid: (uuid: string) => `/jobs/${uuid}`,

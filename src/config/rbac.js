@@ -96,6 +96,16 @@ const PERMISSIONS = Object.freeze({
   // Admin capability to manage leave types and allocate/adjust user leave balances.
   LEAVE_ALLOCATE: 'leave.allocate',
 
+  // Timesheets — weekly time logging against a project.
+  TIMESHEET_CREATE: 'timesheet.create',
+  TIMESHEET_READ: 'timesheet.read',
+  TIMESHEET_UPDATE: 'timesheet.update',
+  TIMESHEET_DELETE: 'timesheet.delete',
+  // The manager-distinguishing capability: holders see ALL of their org's timesheets
+  // and can approve/reject, correct, and backfill locked sheets (analogous to
+  // leave.approve and expense.review). Normal members only see their own timesheets.
+  TIMESHEET_APPROVE: 'timesheet.approve',
+
   FILE_UPLOAD: 'file.upload',
   FILE_READ: 'file.read',
   FILE_DELETE: 'file.delete',
@@ -163,6 +173,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.LEAVE_DELETE,
     PERMISSIONS.LEAVE_APPROVE,
     PERMISSIONS.LEAVE_ALLOCATE,
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
+    PERMISSIONS.TIMESHEET_APPROVE,
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,
@@ -215,6 +230,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.LEAVE_READ,
     PERMISSIONS.LEAVE_UPDATE,
     PERMISSIONS.LEAVE_DELETE,
+    // Employee self-service — timesheets (own), no approve.
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
     // Own attachments: upload/read/delete (receipts, docs, candidate CVs).
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
@@ -243,6 +263,12 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.LEAVE_READ,
     PERMISSIONS.LEAVE_UPDATE,
     PERMISSIONS.LEAVE_DELETE,
+    // Vendors log their OWN timesheets against assigned projects; approval stays with
+    // org admins / project managers.
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,
@@ -272,6 +298,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.LEAVE_READ,
     PERMISSIONS.LEAVE_UPDATE,
     PERMISSIONS.LEAVE_DELETE,
+    // Consultants log their OWN timesheets against assigned projects (no approve).
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
     // Consultants upload/read/delete their own attachments (receipts, docs).
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
@@ -296,6 +327,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.LEAVE_READ,
     PERMISSIONS.LEAVE_UPDATE,
     PERMISSIONS.LEAVE_DELETE,
+    // Own timesheets against assigned projects (no approve).
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,
@@ -319,6 +355,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.LEAVE_READ,
     PERMISSIONS.LEAVE_UPDATE,
     PERMISSIONS.LEAVE_DELETE,
+    // Consultants log their OWN timesheets against assigned projects (no approve).
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,

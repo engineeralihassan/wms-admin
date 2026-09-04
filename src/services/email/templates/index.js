@@ -119,6 +119,172 @@ const TEMPLATES = {
       text: `Hi ${firstName}, your organization "${organizationName}" is ready and you're its admin. Sign in to get started.`,
     };
   },
+
+  // ── Timesheets ──────────────────────────────────────────────────────────────
+
+  /** Sent to approvers when an owner submits a weekly timesheet. */
+  timesheet_submitted: (data) => {
+    const { timesheetNumber = '', weekStart = '', weekEnd = '', totalHours = 0, appName } = data;
+    return {
+      subject: `Timesheet ${timesheetNumber} submitted for approval`,
+      html: wrap({
+        appName,
+        title: 'A timesheet is awaiting your approval',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">Timesheet <strong>${escapeHtml(
+            timesheetNumber
+          )}</strong> for the week ${escapeHtml(weekStart)} to ${escapeHtml(
+          weekEnd
+        )} has been submitted.</p>
+          <p style="margin:0 0 12px;">Total hours: <strong>${Number(totalHours)}</strong></p>
+          <p style="margin:0;">Please review and approve or reject it.</p>
+        `,
+      }),
+      text: `Timesheet ${timesheetNumber} (week ${weekStart} to ${weekEnd}, ${Number(
+        totalHours
+      )}h) has been submitted for your approval.`,
+    };
+  },
+
+  /** Sent to the owner when their timesheet is approved. */
+  timesheet_approved: (data) => {
+    const { timesheetNumber = '', weekStart = '', weekEnd = '', reviewNote, appName } = data;
+    const note = reviewNote
+      ? `<p style="margin:12px 0 0;color:#64748b;">Reviewer note: ${escapeHtml(reviewNote)}</p>`
+      : '';
+    return {
+      subject: `Timesheet ${timesheetNumber} approved`,
+      html: wrap({
+        appName,
+        title: 'Your timesheet was approved',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">Your timesheet <strong>${escapeHtml(
+            timesheetNumber
+          )}</strong> for the week ${escapeHtml(weekStart)} to ${escapeHtml(
+          weekEnd
+        )} has been approved.</p>${note}
+        `,
+      }),
+      text: `Your timesheet ${timesheetNumber} (week ${weekStart} to ${weekEnd}) has been approved.${
+        reviewNote ? ` Note: ${reviewNote}` : ''
+      }`,
+    };
+  },
+
+  /** Sent to the owner when their timesheet is rejected (with a reason). */
+  timesheet_rejected: (data) => {
+    const { timesheetNumber = '', weekStart = '', weekEnd = '', rejectionReason = '', appName } =
+      data;
+    return {
+      subject: `Timesheet ${timesheetNumber} needs changes`,
+      html: wrap({
+        appName,
+        title: 'Your timesheet was sent back',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">Your timesheet <strong>${escapeHtml(
+            timesheetNumber
+          )}</strong> for the week ${escapeHtml(weekStart)} to ${escapeHtml(
+          weekEnd
+        )} was rejected and returned to you for changes.</p>
+          <p style="margin:0 0 12px;">Reason: <strong>${escapeHtml(rejectionReason)}</strong></p>
+          <p style="margin:0;">Please update the hours and resubmit.</p>
+        `,
+      }),
+      text: `Your timesheet ${timesheetNumber} (week ${weekStart} to ${weekEnd}) was rejected. Reason: ${rejectionReason}. Please update and resubmit.`,
+    };
+  },
+
+  /** Sent to the owner when an approver corrects their timesheet for correctness. */
+  timesheet_corrected: (data) => {
+    const { timesheetNumber = '', weekStart = '', weekEnd = '', totalHours = 0, reviewNote, appName } =
+      data;
+    const note = reviewNote
+      ? `<p style="margin:0 0 12px;">Note from the reviewer: <strong>${escapeHtml(
+          reviewNote
+        )}</strong></p>`
+      : '';
+    return {
+      subject: `Timesheet ${timesheetNumber} was updated by an administrator`,
+      html: wrap({
+        appName,
+        title: 'Your timesheet was updated',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">An administrator made changes to your timesheet <strong>${escapeHtml(
+            timesheetNumber
+          )}</strong> for the week ${escapeHtml(weekStart)} to ${escapeHtml(
+          weekEnd
+        )} for correctness.</p>
+          <p style="margin:0 0 12px;">Updated total hours: <strong>${Number(totalHours)}</strong></p>
+          ${note}
+          <p style="margin:0;">Please review the changes.</p>
+        `,
+      }),
+      text: `Your timesheet ${timesheetNumber} (week ${weekStart} to ${weekEnd}) was updated by an administrator for correctness. New total: ${Number(
+        totalHours
+      )}h.${reviewNote ? ` Note: ${reviewNote}` : ''}`,
+    };
+  },
+
+  /** Reminder to an owner to submit an unsubmitted timesheet before it locks. */
+  timesheet_reminder: (data) => {
+    const { timesheetNumber = '', weekStart = '', weekEnd = '', dueDate = '', reminderKind, appName } =
+      data;
+    const urgency =
+      reminderKind === 'due_today'
+        ? 'It is due today.'
+        : `It is due on ${escapeHtml(dueDate)}.`;
+    return {
+      subject: `Reminder: submit timesheet ${timesheetNumber}`,
+      html: wrap({
+        appName,
+        title: 'Please submit your timesheet',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">Your timesheet <strong>${escapeHtml(
+            timesheetNumber
+          )}</strong> for the week ${escapeHtml(weekStart)} to ${escapeHtml(
+          weekEnd
+        )} has not been submitted yet.</p>
+          <p style="margin:0 0 12px;">${urgency}</p>
+          <p style="margin:0;">Please fill in your hours and submit before the deadline to avoid it being locked.</p>
+        `,
+      }),
+      text: `Reminder: your timesheet ${timesheetNumber} (week ${weekStart} to ${weekEnd}) is not submitted. Due ${dueDate}. Please submit before it locks.`,
+    };
+  },
+
+  /** Sent to approvers when a timesheet locks unsubmitted and needs a backfill. */
+  timesheet_locked: (data) => {
+    const {
+      timesheetNumber = '',
+      ownerName = 'A team member',
+      projectName = '',
+      weekStart = '',
+      weekEnd = '',
+      lockDate = '',
+      appName,
+    } = data;
+    return {
+      subject: `Timesheet ${timesheetNumber} locked — action needed`,
+      html: wrap({
+        appName,
+        title: 'A timesheet was locked unsubmitted',
+        bodyHtml: `
+          <p style="margin:0 0 12px;"><strong>${escapeHtml(
+            ownerName
+          )}</strong> did not submit timesheet <strong>${escapeHtml(
+          timesheetNumber
+        )}</strong>${projectName ? ` for "${escapeHtml(projectName)}"` : ''} for the week ${escapeHtml(
+          weekStart
+        )} to ${escapeHtml(weekEnd)}.</p>
+          <p style="margin:0 0 12px;">It passed its lock date (${escapeHtml(
+            lockDate
+          )}) and is now locked. A ticket has been opened to track the backfill request.</p>
+          <p style="margin:0;">Please review and backfill the hours on their behalf if appropriate.</p>
+        `,
+      }),
+      text: `${ownerName} did not submit timesheet ${timesheetNumber} (week ${weekStart} to ${weekEnd}); it locked on ${lockDate}. A ticket was opened. Please review and backfill if appropriate.`,
+    };
+  },
 };
 
 /**

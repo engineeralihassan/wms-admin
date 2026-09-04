@@ -21,6 +21,9 @@ const Job = require('./job.model');
 const JobApplication = require('./job-application.model');
 const ApplicationEvent = require('./application-event.model');
 const ResumeScreeningJob = require('./resume-screening-job.model');
+const Timesheet = require('./timesheet.model');
+const TimesheetEntry = require('./timesheet-entry.model');
+const TimesheetJob = require('./timesheet-job.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -71,6 +74,9 @@ const definitions = (sequelize, Sequelize) => {
   db.JobApplication = JobApplication(sequelize);
   db.ApplicationEvent = ApplicationEvent(sequelize);
   db.ResumeScreeningJob = ResumeScreeningJob(sequelize);
+  db.Timesheet = Timesheet(sequelize);
+  db.TimesheetEntry = TimesheetEntry(sequelize);
+  db.TimesheetJob = TimesheetJob(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -312,6 +318,48 @@ const definitions = (sequelize, Sequelize) => {
   db.Attachment.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
   db.User.hasMany(db.Attachment, { foreignKey: 'uploaded_by_id', as: 'uploadedAttachments' });
   db.Attachment.belongsTo(db.User, { foreignKey: 'uploaded_by_id', as: 'uploadedBy' });
+
+  // ── Timesheets ─────────────────────────────────────────────────────────────
+  // A Timesheet is one user's week of work against one Project (the long-lived
+  // container). Every timesheet is tenant-scoped; it links to a project, an owner, and
+  // (nullable) an approver, and owns 7 daily TimesheetEntry rows.
+
+  // Organization <-> Timesheet (tenant scope)
+  db.Organization.hasMany(db.Timesheet, { foreignKey: 'organization_id', as: 'timesheets' });
+  db.Timesheet.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // Project <-> Timesheet
+  db.Project.hasMany(db.Timesheet, { foreignKey: 'project_id', as: 'timesheets' });
+  db.Timesheet.belongsTo(db.Project, { foreignKey: 'project_id', as: 'project' });
+
+  // User <-> Timesheet (owner + reviewer, two distinct associations)
+  db.User.hasMany(db.Timesheet, { foreignKey: 'user_id', as: 'timesheets' });
+  db.Timesheet.belongsTo(db.User, { foreignKey: 'user_id', as: 'owner' });
+  db.User.hasMany(db.Timesheet, { foreignKey: 'reviewed_by_id', as: 'reviewedTimesheets' });
+  db.Timesheet.belongsTo(db.User, { foreignKey: 'reviewed_by_id', as: 'reviewer' });
+
+  // Timesheet <-> TimesheetEntry (the 7 daily rows; cascade so deleting a sheet
+  // removes its days). Also give entries a direct tenant association for reporting.
+  db.Timesheet.hasMany(db.TimesheetEntry, {
+    foreignKey: 'timesheet_id',
+    as: 'entries',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+  db.TimesheetEntry.belongsTo(db.Timesheet, { foreignKey: 'timesheet_id', as: 'timesheet' });
+  db.Organization.hasMany(db.TimesheetEntry, {
+    foreignKey: 'organization_id',
+    as: 'timesheetEntries',
+  });
+  db.TimesheetEntry.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+
+  // Organization <-> TimesheetJob (durable periodic-work queue; org nullable for
+  // platform-wide sweeps). Mirrors the ResumeScreeningJob wiring.
+  db.Organization.hasMany(db.TimesheetJob, { foreignKey: 'organization_id', as: 'timesheetJobs' });
+  db.TimesheetJob.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
 
   return db;
 };
