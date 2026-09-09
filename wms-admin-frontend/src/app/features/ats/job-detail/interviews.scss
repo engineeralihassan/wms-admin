@@ -1,0 +1,141 @@
+@use 'abstractions' as *;
+
+// Interview scheduling styles for the applicant drawer (kept in a separate stylesheet
+// so job-detail's per-component style budget stays comfortably under the limit).
+
+// ── Interviews (applicant drawer section) ─────────────────────────────────────
+.applicant__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: spacing('3');
+  margin-bottom: spacing('3');
+}
+.interview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: spacing('3');
+}
+.interview-card {
+  @include card-surface;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: spacing('3');
+  padding: spacing('3');
+}
+.interview-card__main {
+  min-width: 0;
+}
+.interview-card__row {
+  display: flex;
+  align-items: center;
+  gap: spacing('2');
+  margin-bottom: spacing('1');
+}
+.interview-card__round {
+  font-weight: font-weight('semibold');
+  color: var(--color-text);
+}
+.interview-card__when {
+  margin: 0;
+  font-size: font-size('sm');
+  color: var(--color-text);
+}
+.interview-card__meta {
+  margin: spacing('1') 0 0;
+  font-size: font-size('xs');
+  color: var(--color-text-muted);
+}
+.interview-card__link {
+  display: inline-block;
+  margin-top: spacing('1');
+  font-size: font-size('sm');
+  color: var(--color-primary-600);
+}
+.interview-card__actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: spacing('2');
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px spacing('2');
+  border-radius: 999px;
+  font-size: font-size('xs');
+  font-weight: font-weight('medium');
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+.badge--scheduled,
+.badge--rescheduled {
+  background: var(--color-info-100, #e0f2fe);
+  color: var(--color-info-700, #0369a1);
+}
+.badge--completed {
+  background: var(--color-success-100, #dcfce7);
+  color: var(--color-success-700, #15803d);
+}
+.badge--cancelled,
+.badge--no_show {
+  background: var(--color-danger-100, #fee2e2);
+  color: var(--color-danger-700, #b91c1c);
+}
+
+// ── Schedule interview modal ──────────────────────────────────────────────────
+.schedule {
+  display: flex;
+  flex-direction: column;
+  gap: spacing('3');
+}
+.schedule__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: spacing('3');
+}
+.schedule__slots {
+  border-top: 1px solid var(--color-border);
+  padding-top: spacing('3');
+}
+.schedule__slots-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: spacing('3');
+  margin-bottom: spacing('2');
+}
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: spacing('2');
+  max-height: 220px;
+  overflow-y: auto;
+}
+.slot {
+  padding: spacing('2');
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: font-size('sm');
+  cursor: pointer;
+  text-align: center;
+}
+.slot:hover {
+  border-color: var(--color-primary-400, #60a5fa);
+}
+.slot--active {
+  border-color: var(--color-primary-600, #2563eb);
+  background: var(--color-primary-50, #eff6ff);
+  font-weight: font-weight('semibold');
+}
+@media (max-width: 640px) {
+  .schedule__grid {
+    grid-template-columns: 1fr;
+  }
+}

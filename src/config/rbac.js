@@ -125,6 +125,14 @@ const PERMISSIONS = Object.freeze({
   APPLICATION_UPDATE: 'application.update',
   APPLICATION_DELETE: 'application.delete',
 
+  // ATS — Interview scheduling (book/reschedule/cancel interviews for an application).
+  // Visibility is inherited from the parent application/job scope at the service layer,
+  // so a recruiter can only schedule on candidates they already see.
+  INTERVIEW_CREATE: 'interview.create',
+  INTERVIEW_READ: 'interview.read',
+  INTERVIEW_UPDATE: 'interview.update',
+  INTERVIEW_DELETE: 'interview.delete',
+
   // Example domain resource (warehouse/orders will follow this pattern)
   ORDER_CREATE: 'order.create',
   ORDER_READ: 'order.read',
@@ -194,6 +202,10 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.APPLICATION_READ,
     PERMISSIONS.APPLICATION_UPDATE,
     PERMISSIONS.APPLICATION_DELETE,
+    PERMISSIONS.INTERVIEW_CREATE,
+    PERMISSIONS.INTERVIEW_READ,
+    PERMISSIONS.INTERVIEW_UPDATE,
+    PERMISSIONS.INTERVIEW_DELETE,
   ],
 
   // Recruiter: owns the ATS at the org level but scoped to their OWN jobs. Can create
@@ -215,6 +227,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.APPLICATION_READ,
     PERMISSIONS.APPLICATION_UPDATE,
     PERMISSIONS.APPLICATION_DELETE,
+    // ATS: schedule/manage interviews for candidates on their own jobs.
+    PERMISSIONS.INTERVIEW_CREATE,
+    PERMISSIONS.INTERVIEW_READ,
+    PERMISSIONS.INTERVIEW_UPDATE,
+    PERMISSIONS.INTERVIEW_DELETE,
     // Employee self-service — tickets (own), like a consultant.
     PERMISSIONS.TICKET_CREATE,
     PERMISSIONS.TICKET_READ,

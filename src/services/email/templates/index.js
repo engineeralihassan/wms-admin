@@ -252,6 +252,133 @@ const TEMPLATES = {
     };
   },
 
+  // ── Interview scheduling ──────────────────────────────────────────────────────
+
+  /** Sent to the candidate + panel when an interview is booked. */
+  interview_scheduled: (data) => {
+    const {
+      recipientName = 'there',
+      roundName = 'Interview',
+      jobTitle = '',
+      candidateName = '',
+      start = '',
+      timezone = '',
+      mode = 'video',
+      meetingUrl = '',
+      location = '',
+      appName,
+    } = data;
+    const when = start ? new Date(start).toUTCString() : '';
+    const joinLine = meetingUrl
+      ? `<p style="margin:0 0 12px;">Join link: <a href="${escapeHtml(meetingUrl)}">${escapeHtml(
+          meetingUrl
+        )}</a></p>`
+      : '';
+    const locLine = location
+      ? `<p style="margin:0 0 12px;">Location: <strong>${escapeHtml(location)}</strong></p>`
+      : '';
+    return {
+      subject: `Interview scheduled: ${roundName}${jobTitle ? ` — ${jobTitle}` : ''}`,
+      html: wrap({
+        appName,
+        title: 'Your interview is scheduled',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">Hi ${escapeHtml(recipientName)},</p>
+          <p style="margin:0 0 12px;">A <strong>${escapeHtml(
+            roundName
+          )}</strong> interview${jobTitle ? ` for <strong>${escapeHtml(jobTitle)}</strong>` : ''}${
+          candidateName ? ` with ${escapeHtml(candidateName)}` : ''
+        } has been scheduled.</p>
+          <p style="margin:0 0 12px;">When: <strong>${escapeHtml(when)}</strong> (${escapeHtml(
+          timezone
+        )})</p>
+          <p style="margin:0 0 12px;">Mode: <strong>${escapeHtml(mode)}</strong></p>
+          ${joinLine}${locLine}
+        `,
+      }),
+      text: `Hi ${recipientName}, a ${roundName} interview${
+        jobTitle ? ` for ${jobTitle}` : ''
+      } is scheduled for ${when} (${timezone}). Mode: ${mode}.${
+        meetingUrl ? ` Join: ${meetingUrl}` : ''
+      }${location ? ` Location: ${location}` : ''}`,
+    };
+  },
+
+  /** Sent to the candidate + panel when an interview is moved to a new time. */
+  interview_rescheduled: (data) => {
+    const {
+      recipientName = 'there',
+      roundName = 'Interview',
+      jobTitle = '',
+      start = '',
+      timezone = '',
+      meetingUrl = '',
+      location = '',
+      appName,
+    } = data;
+    const when = start ? new Date(start).toUTCString() : '';
+    const joinLine = meetingUrl
+      ? `<p style="margin:0 0 12px;">Join link: <a href="${escapeHtml(meetingUrl)}">${escapeHtml(
+          meetingUrl
+        )}</a></p>`
+      : '';
+    const locLine = location
+      ? `<p style="margin:0 0 12px;">Location: <strong>${escapeHtml(location)}</strong></p>`
+      : '';
+    return {
+      subject: `Interview rescheduled: ${roundName}${jobTitle ? ` — ${jobTitle}` : ''}`,
+      html: wrap({
+        appName,
+        title: 'Your interview was rescheduled',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">Hi ${escapeHtml(recipientName)},</p>
+          <p style="margin:0 0 12px;">Your <strong>${escapeHtml(
+            roundName
+          )}</strong> interview has been moved to a new time.</p>
+          <p style="margin:0 0 12px;">New time: <strong>${escapeHtml(when)}</strong> (${escapeHtml(
+          timezone
+        )})</p>
+          ${joinLine}${locLine}
+        `,
+      }),
+      text: `Hi ${recipientName}, your ${roundName} interview was rescheduled to ${when} (${timezone}).${
+        meetingUrl ? ` Join: ${meetingUrl}` : ''
+      }${location ? ` Location: ${location}` : ''}`,
+    };
+  },
+
+  /** Sent to the candidate + panel when an interview is cancelled. */
+  interview_cancelled: (data) => {
+    const {
+      recipientName = 'there',
+      roundName = 'Interview',
+      jobTitle = '',
+      reason = '',
+      appName,
+    } = data;
+    const reasonLine = reason
+      ? `<p style="margin:0 0 12px;">Reason: <strong>${escapeHtml(reason)}</strong></p>`
+      : '';
+    return {
+      subject: `Interview cancelled: ${roundName}${jobTitle ? ` — ${jobTitle}` : ''}`,
+      html: wrap({
+        appName,
+        title: 'Your interview was cancelled',
+        bodyHtml: `
+          <p style="margin:0 0 12px;">Hi ${escapeHtml(recipientName)},</p>
+          <p style="margin:0 0 12px;">The <strong>${escapeHtml(
+            roundName
+          )}</strong> interview${jobTitle ? ` for <strong>${escapeHtml(jobTitle)}</strong>` : ''} has been cancelled.</p>
+          ${reasonLine}
+          <p style="margin:0;">If this was unexpected, please reach out to the recruiter.</p>
+        `,
+      }),
+      text: `Hi ${recipientName}, the ${roundName} interview${
+        jobTitle ? ` for ${jobTitle}` : ''
+      } has been cancelled.${reason ? ` Reason: ${reason}` : ''}`,
+    };
+  },
+
   /** Sent to approvers when a timesheet locks unsubmitted and needs a backfill. */
   timesheet_locked: (data) => {
     const {

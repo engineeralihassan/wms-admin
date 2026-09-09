@@ -15,3 +15,6 @@ config.PRODUCTION.env
 
 # Locally-stored uploads (dev only; production uses Cloudinary/S3)
 /uploads
+
+# Google OAuth client secret JSON (never commit)
+client_secret*.json

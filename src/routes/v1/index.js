@@ -14,6 +14,7 @@ const dashboardRoute = require('./dashboard.route');
 const fileRoute = require('./files.route');
 const jobRoute = require('./job.route');
 const applicationRoute = require('./application.route');
+const interviewRoute = require('./interview.route');
 const careersRoute = require('./careers.route');
 const docsRoute = require('./docs.route');
 
@@ -38,6 +39,7 @@ const routes = [
   // ATS: recruiter-facing jobs + applications, and the PUBLIC careers surface.
   { path: '/jobs', route: jobRoute },
   { path: '/applications', route: applicationRoute },
+  { path: '/interviews', route: interviewRoute },
   { path: '/careers', route: careersRoute },
 ];
 

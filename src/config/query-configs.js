@@ -165,6 +165,16 @@ const APPLICATION_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
+const INTERVIEW_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'interview_number', 'scheduled_start', 'status'],
+  searchable: ['interview_number', 'title'],
+  filterable: ['status', 'mode', 'provider', 'stage_key'],
+  rangeFilterable: ['created_at', 'scheduled_start'],
+  defaultSort: 'scheduled_start',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
 module.exports = {
   USER_QUERY_CONFIG,
   ORGANIZATION_QUERY_CONFIG,
@@ -176,4 +186,5 @@ module.exports = {
   TIMESHEET_QUERY_CONFIG,
   JOB_QUERY_CONFIG,
   APPLICATION_QUERY_CONFIG,
+  INTERVIEW_QUERY_CONFIG,
 };

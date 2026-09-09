@@ -1,7 +1,8 @@
 const express = require('express');
 const validate = require('../../middlewares/validate');
-const { applicationValidation } = require('../../validations');
+const { applicationValidation, interviewValidation } = require('../../validations');
 const applicationController = require('../../controllers/ats/application.controller');
+const interviewController = require('../../controllers/ats/interview.controller');
 const { authVerify, requirePermission, tenantScope } = require('../../middlewares/auth');
 const { PERMISSIONS } = require('../../config/rbac');
 
@@ -62,6 +63,51 @@ router.post(
   requirePermission(PERMISSIONS.APPLICATION_UPDATE),
   validate(applicationValidation.addApplicationNote),
   applicationController.addNote
+);
+
+// ── Interview scheduling (nested under an application) ──────────────────────────
+// Availability + listing + booking are addressed under the parent application; the
+// single-interview lifecycle actions live in interview.route.js (/interviews/:uuid/...).
+
+// Org users offered as interviewer options for scheduling (guarded by interview.create,
+// NOT user.read, so a recruiter can pick a panel without seeing the Users module).
+router.get(
+  '/:uuid/interviewers',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.INTERVIEW_CREATE),
+  validate(interviewValidation.listInterviewers),
+  interviewController.listInterviewers
+);
+
+// Bookable time slots for the application's next interview.
+router.get(
+  '/:uuid/interviews/availability',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.INTERVIEW_READ),
+  validate(interviewValidation.getAvailability),
+  interviewController.getAvailability
+);
+
+// List interviews for the application.
+router.get(
+  '/:uuid/interviews',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.INTERVIEW_READ),
+  validate(interviewValidation.listInterviews),
+  interviewController.listForApplication
+);
+
+// Schedule a new interview for a shortlisted/interviewing candidate.
+router.post(
+  '/:uuid/interviews',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.INTERVIEW_CREATE),
+  validate(interviewValidation.scheduleInterview),
+  interviewController.schedule
 );
 
 module.exports = router;

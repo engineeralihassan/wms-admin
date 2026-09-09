@@ -197,7 +197,143 @@ const APPLICATION_EVENT_TYPES = Object.freeze({
   RATING_UPDATED: 'rating_updated',
   // The screening pipeline finished parsing + scoring this application's resume.
   SCREENED: 'screened',
+  // Interview scheduling lifecycle (see interview.model.js). These append to the same
+  // immutable audit trail so the full hiring history — including every interview
+  // booking, reschedule, cancellation and outcome — is reconstructable in one place.
+  INTERVIEW_SCHEDULED: 'interview_scheduled',
+  INTERVIEW_RESCHEDULED: 'interview_rescheduled',
+  INTERVIEW_CANCELLED: 'interview_cancelled',
+  INTERVIEW_COMPLETED: 'interview_completed',
 });
+
+// ── Interview scheduling ────────────────────────────────────────────────────────
+
+/**
+ * Once an application is SHORTLISTED (or already INTERVIEWING), a recruiter can book
+ * one or more interviews against the job's interview_rounds. An Interview is a concrete
+ * calendar event: a time window, a mode, a delivery provider, and a participant panel.
+ *
+ * Lifecycle of a single interview:
+ *   SCHEDULED    — booked; invites sent (initial state).
+ *   RESCHEDULED  — moved to a new time (still active; kept distinct for reporting).
+ *   COMPLETED    — the interview took place (recruiter marks it; can attach feedback).
+ *   CANCELLED    — called off before it happened (terminal).
+ *   NO_SHOW      — the candidate did not attend (terminal, negative signal).
+ *
+ * SCHEDULED/RESCHEDULED are the "active" states that occupy a time slot and count
+ * toward interviewer conflict detection; the terminal states do not.
+ */
+const INTERVIEW_STATUSES = Object.freeze({
+  SCHEDULED: 'scheduled',
+  RESCHEDULED: 'rescheduled',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  NO_SHOW: 'no_show',
+});
+
+/** Statuses that still occupy the calendar (block the interviewers' time). */
+const INTERVIEW_ACTIVE_STATUSES = Object.freeze([
+  INTERVIEW_STATUSES.SCHEDULED,
+  INTERVIEW_STATUSES.RESCHEDULED,
+]);
+
+/** Statuses from which no further transition is allowed. */
+const INTERVIEW_TERMINAL_STATUSES = Object.freeze([
+  INTERVIEW_STATUSES.COMPLETED,
+  INTERVIEW_STATUSES.CANCELLED,
+  INTERVIEW_STATUSES.NO_SHOW,
+]);
+
+/**
+ * How the interview is delivered. Independent of the calendar provider: a `video`
+ * interview can be hosted by Google Meet or MS Teams; `phone`/`onsite` still get a
+ * calendar hold (and a manual location) but no meeting URL.
+ */
+const INTERVIEW_MODES = Object.freeze({
+  VIDEO: 'video',
+  PHONE: 'phone',
+  ONSITE: 'onsite',
+});
+
+/**
+ * Calendar / meeting providers. This is the extension point: adding Zoom later is a
+ * new value here + a new provider module in services/ats/calendar. `manual` is always
+ * available (no third-party credentials needed) — the recruiter supplies the link or
+ * location themselves, so the whole feature works before any integration is configured.
+ */
+const INTERVIEW_PROVIDERS = Object.freeze({
+  GOOGLE: 'google',
+  TEAMS: 'teams',
+  MANUAL: 'manual',
+});
+
+/** Which providers can mint a video meeting link automatically. */
+const INTERVIEW_VIDEO_PROVIDERS = Object.freeze([
+  INTERVIEW_PROVIDERS.GOOGLE,
+  INTERVIEW_PROVIDERS.TEAMS,
+]);
+
+/** Role a participant plays on an interview (see interview-participant.model.js). */
+const INTERVIEW_PARTICIPANT_ROLES = Object.freeze({
+  ORGANIZER: 'organizer',
+  INTERVIEWER: 'interviewer',
+  CANDIDATE: 'candidate',
+});
+
+/** Participant RSVP state (mirrors calendar attendee responses). */
+const INTERVIEW_RESPONSE_STATUSES = Object.freeze({
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  TENTATIVE: 'tentative',
+});
+
+/**
+ * Application statuses from which a new interview may be booked. Booking the FIRST
+ * interview also advances SHORTLISTED -> INTERVIEWING (handled in the service).
+ */
+const INTERVIEW_SCHEDULABLE_APPLICATION_STATUSES = Object.freeze([
+  APPLICATION_STATUSES.SHORTLISTED,
+  APPLICATION_STATUSES.INTERVIEWING,
+]);
+
+/** Slot/availability + booking guardrails (shared by model, service and validation). */
+const INTERVIEW_LIMITS = Object.freeze({
+  // Duration bounds for a single interview (minutes).
+  MIN_DURATION_MINUTES: 10,
+  MAX_DURATION_MINUTES: 480,
+  DEFAULT_DURATION_MINUTES: 60,
+  // Slot generation granularity for the availability endpoint (minutes).
+  DEFAULT_SLOT_GRANULARITY_MINUTES: 30,
+  // Buffer enforced between two interviews for the same interviewer (minutes).
+  DEFAULT_BUFFER_MINUTES: 15,
+  // How far ahead availability may be queried in one call (days).
+  MAX_AVAILABILITY_WINDOW_DAYS: 60,
+  // Cap on how many slots a single availability response returns.
+  MAX_SLOTS_RETURNED: 500,
+  // Interviewer panel size bounds.
+  MIN_INTERVIEWERS: 1,
+  MAX_INTERVIEWERS: 15,
+  // Text field caps.
+  LOCATION_MAX_LENGTH: 500,
+  MEETING_URL_MAX_LENGTH: 1000,
+  TITLE_MAX_LENGTH: 200,
+  NOTES_MAX_LENGTH: 2000,
+  TIMEZONE_MAX_LENGTH: 64,
+});
+
+/**
+ * Default org working hours used to generate bookable slots when no per-org override
+ * exists. 24h "HH:mm" local to the requested timezone; days are 0=Sun..6=Sat.
+ */
+const INTERVIEW_DEFAULT_WORKING_HOURS = Object.freeze({
+  days: Object.freeze([1, 2, 3, 4, 5]), // Mon–Fri
+  start: '09:00',
+  end: '18:00',
+});
+
+/** Sequence-code prefix for the human-friendly interview number (e.g. INT-000123). */
+const INTERVIEW_CODE_PREFIX = 'INT';
 
 // ── Resume screening ────────────────────────────────────────────────────────────
 
@@ -297,6 +433,18 @@ module.exports = {
   APPLICATION_INTERRUPTIBLE_STATUSES,
   APPLICATION_SOURCES,
   APPLICATION_EVENT_TYPES,
+  INTERVIEW_STATUSES,
+  INTERVIEW_ACTIVE_STATUSES,
+  INTERVIEW_TERMINAL_STATUSES,
+  INTERVIEW_MODES,
+  INTERVIEW_PROVIDERS,
+  INTERVIEW_VIDEO_PROVIDERS,
+  INTERVIEW_PARTICIPANT_ROLES,
+  INTERVIEW_RESPONSE_STATUSES,
+  INTERVIEW_SCHEDULABLE_APPLICATION_STATUSES,
+  INTERVIEW_LIMITS,
+  INTERVIEW_DEFAULT_WORKING_HOURS,
+  INTERVIEW_CODE_PREFIX,
   JOB_TITLE_MAX_LENGTH,
   JOB_DESCRIPTION_MAX_LENGTH,
   JOB_SHORT_TEXT_MAX_LENGTH,

@@ -26,18 +26,30 @@ import { markAllAsTouched } from '../../../shared/utils/form.utils';
 import { createListState } from '../../../shared/list/list-state';
 import { APP_ROUTES } from '../../../core/constants/app-routes';
 import { JobsService } from '../services/jobs.service';
+import { InterviewsService } from '../services/interviews.service';
 import {
   APPLICATION_STATUS_LABELS,
   APPLICATION_STATUS_OPTIONS,
   ATS_PERMISSIONS,
   EMPLOYMENT_TYPE_LABELS,
+  INTERVIEW_ACTIVE_STATUSES,
+  INTERVIEW_MODE_LABELS,
+  INTERVIEW_MODE_OPTIONS,
+  INTERVIEW_PROVIDER_LABELS,
+  INTERVIEW_STATUS_LABELS,
   JOB_STATUS_LABELS,
   SCREENING_BAND_LABELS,
   WORK_MODE_LABELS,
   type ApplicationStatus,
+  type AvailabilitySlot,
+  type Interview,
+  type InterviewMode,
+  type InterviewProvider,
+  type InterviewProviderInfo,
   type InterviewRound,
   type Job,
   type JobApplication,
+  type InterviewerOption,
   type ScreeningBand,
   type ScreeningSummary,
 } from '../models/ats.model';
@@ -62,11 +74,12 @@ import {
     DataTableComponent,
   ],
   templateUrl: './job-detail.html',
-  styleUrl: './job-detail.scss',
+  styleUrls: ['./job-detail.scss', './interviews.scss'],
 })
 export class JobDetail implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly jobs = inject(JobsService);
+  private readonly interviews = inject(InterviewsService);
   private readonly auth = inject(AuthService);
   private readonly notify = inject(NotificationService);
   private readonly modal = inject(ModalService);
@@ -87,6 +100,15 @@ export class JobDetail implements OnInit {
   protected readonly canDelete = computed(() =>
     this.auth.hasPermission(ATS_PERMISSIONS.applicationDelete),
   );
+  protected readonly canReadInterviews = computed(() =>
+    this.auth.hasPermission(ATS_PERMISSIONS.interviewRead),
+  );
+  protected readonly canScheduleInterview = computed(() =>
+    this.auth.hasPermission(ATS_PERMISSIONS.interviewCreate),
+  );
+  protected readonly canManageInterview = computed(() =>
+    this.auth.hasPermission(ATS_PERMISSIONS.interviewUpdate),
+  );
 
   protected readonly job = signal<Job | null>(null);
   protected readonly loadingJob = signal(true);
@@ -99,6 +121,85 @@ export class JobDetail implements OnInit {
 
   /** Interview rounds of the current job (drives the stage picker). */
   protected readonly rounds = computed<InterviewRound[]>(() => this.job()?.interview_rounds ?? []);
+
+  // ── Interview scheduling ────────────────────────────────────────────────────
+  protected readonly interviewStatusLabels = INTERVIEW_STATUS_LABELS;
+  protected readonly interviewModeLabels = INTERVIEW_MODE_LABELS;
+  protected readonly interviewModeOptions = INTERVIEW_MODE_OPTIONS;
+  protected readonly interviewProviderLabels = INTERVIEW_PROVIDER_LABELS;
+
+  /** Interviews booked for the open application. */
+  protected readonly appInterviews = signal<Interview[]>([]);
+  protected readonly interviewsLoading = signal(false);
+
+  /** Providers enabled on the server (loaded once). */
+  protected readonly providers = signal<InterviewProviderInfo[]>([]);
+  /** Only providers the server reports as enabled — offered in the picker. */
+  protected readonly enabledProviders = computed<InterviewProvider[]>(() => {
+    const enabled = this.providers()
+      .filter((p) => p.enabled)
+      .map((p) => p.key);
+    // Manual is always usable even if the snapshot hasn't loaded yet.
+    return enabled.length ? enabled : ['manual'];
+  });
+
+  /** Schedule-interview modal state. */
+  protected readonly scheduleOpen = signal(false);
+  protected readonly scheduling = signal(false);
+
+  /** Interviewer directory (org users) for the panel picker. */
+  protected readonly interviewerOptions = signal<InterviewerOption[]>([]);
+
+  /** Availability results for the picked window + interviewers. */
+  protected readonly slots = signal<AvailabilitySlot[]>([]);
+  protected readonly slotsLoading = signal(false);
+  protected readonly selectedSlotStart = signal<string | null>(null);
+
+  /** Default the timezone selector to the browser's zone. */
+  protected readonly browserTimezone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  /** A reasonable IANA timezone list for the selector (browser-supported). */
+  protected readonly timezoneOptions: string[] = ((): string[] => {
+    const supported =
+      typeof (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
+        .supportedValuesOf === 'function'
+        ? (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf(
+            'timeZone',
+          )
+        : [];
+    const tz = this.browserTimezone;
+    return supported.length ? supported : [tz, 'UTC'];
+  })();
+
+  protected readonly scheduleForm = this.fb.nonNullable.group({
+    stage_key: ['', [Validators.required]],
+    provider: ['manual' as InterviewProvider, [Validators.required]],
+    mode: ['video' as InterviewMode, [Validators.required]],
+    timezone: [this.browserTimezone, [Validators.required]],
+    duration_minutes: [60, [Validators.required, Validators.min(10), Validators.max(480)]],
+    date_from: ['', [Validators.required]],
+    date_to: ['', [Validators.required]],
+    // A single interviewer uuid picker (kept simple; backend accepts a panel array).
+    interviewer_uuid: ['', [Validators.required]],
+    meeting_url: [''],
+    location: [''],
+    notes: [''],
+  });
+
+  /**
+   * True when the chosen mode needs a manual meeting link (manual provider + video).
+   * Read as a method (not a computed) because a reactive form's value is not a signal —
+   * a computed would freeze on its first read and ignore later dropdown changes.
+   */
+  protected needsManualLink(): boolean {
+    const v = this.scheduleForm.getRawValue();
+    return v.mode === 'video' && v.provider === 'manual';
+  }
+
+  /** True when the chosen mode needs a physical location (onsite). */
+  protected needsLocation(): boolean {
+    return this.scheduleForm.getRawValue().mode === 'onsite';
+  }
 
   protected readonly list = createListState<JobApplication>(
     (query) => this.jobs.listApplications(this.uuid(), query),
@@ -284,6 +385,13 @@ export class JobDetail implements OnInit {
     // so both the job load and the applications list (which read uuid()) must start here.
     this.loadJob();
     this.list.init();
+    // Load provider availability once (best-effort; the manual provider always works).
+    if (this.canScheduleInterview()) {
+      this.interviews.getProviders().subscribe({
+        next: (p) => this.providers.set(p),
+        error: () => this.providers.set([{ key: 'manual', enabled: true, configured: true }]),
+      });
+    }
   }
 
   private loadJob(): void {
@@ -350,11 +458,225 @@ export class JobDetail implements OnInit {
       },
       error: () => this.notify.error('Could not load the application.'),
     });
+    // Load interviews for this candidate (if the user may see them).
+    if (this.canReadInterviews()) this.loadInterviews(app.uuid);
   }
 
   protected closeDrawer(): void {
     this.drawerOpen.set(false);
     this.activeApplication.set(null);
+    this.appInterviews.set([]);
+    this.scheduleOpen.set(false);
+  }
+
+  // ── Interview: list ──────────────────────────────────────────────────────
+  private loadInterviews(applicationUuid: string): void {
+    this.interviewsLoading.set(true);
+    this.interviews.listForApplication(applicationUuid).subscribe({
+      next: (items) => {
+        this.appInterviews.set(items);
+        this.interviewsLoading.set(false);
+      },
+      error: () => this.interviewsLoading.set(false),
+    });
+  }
+
+  /** Whether an interview is still active (can be managed). */
+  protected isInterviewActive(i: Interview): boolean {
+    return INTERVIEW_ACTIVE_STATUSES.includes(i.status);
+  }
+
+  protected interviewerNames(i: Interview): string {
+    const names = i.participants
+      .filter((p) => p.role === 'interviewer')
+      .map((p) => p.name || p.email);
+    return names.length ? names.join(', ') : '—';
+  }
+
+  // ── Interview: schedule modal ────────────────────────────────────────────
+  protected openSchedule(): void {
+    const app = this.activeApplication();
+    if (!app) return;
+    // Default the round to the application's current stage, else the first round.
+    const defaultStage = app.stage_key ?? this.rounds()[0]?.key ?? '';
+    const today = new Date();
+    const inTwoWeeks = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const provider = this.enabledProviders().includes('google')
+      ? 'google'
+      : this.enabledProviders()[0];
+    this.scheduleForm.reset({
+      stage_key: defaultStage,
+      provider: provider as InterviewProvider,
+      mode: 'video',
+      timezone: this.browserTimezone,
+      duration_minutes: 60,
+      date_from: this.toDateInput(today),
+      date_to: this.toDateInput(inTwoWeeks),
+      interviewer_uuid: '',
+      meeting_url: '',
+      location: '',
+      notes: '',
+    });
+    this.slots.set([]);
+    this.selectedSlotStart.set(null);
+    this.scheduleOpen.set(true);
+    // Load interviewer options lazily on first open (scoped to this application's org).
+    if (this.interviewerOptions().length === 0) this.loadInterviewers(app.uuid);
+  }
+
+  protected closeSchedule(): void {
+    this.scheduleOpen.set(false);
+  }
+
+  private loadInterviewers(applicationUuid: string): void {
+    this.interviews.listInterviewers(applicationUuid).subscribe({
+      next: (options) => this.interviewerOptions.set(options),
+      error: () => this.notify.error('Could not load interviewers.'),
+    });
+  }
+
+  /** Display name for an interviewer option. */
+  protected interviewerLabel(u: InterviewerOption): string {
+    return [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.email;
+  }
+
+  /** Fetch bookable slots for the chosen window + interviewer. */
+  protected findSlots(): void {
+    const app = this.activeApplication();
+    if (!app) return;
+    const v = this.scheduleForm.getRawValue();
+    if (!v.interviewer_uuid) {
+      this.notify.error('Pick an interviewer first.');
+      return;
+    }
+    if (!v.date_from || !v.date_to) {
+      this.notify.error('Choose a date range.');
+      return;
+    }
+    this.slotsLoading.set(true);
+    this.selectedSlotStart.set(null);
+    this.interviews
+      .getAvailability(app.uuid, {
+        date_from: new Date(v.date_from).toISOString(),
+        // include the whole end day
+        date_to: new Date(new Date(v.date_to).getTime() + 24 * 60 * 60 * 1000 - 1).toISOString(),
+        timezone: v.timezone,
+        duration_minutes: Number(v.duration_minutes),
+        interviewer_uuids: [v.interviewer_uuid],
+      })
+      .subscribe({
+        next: (res) => {
+          this.slots.set(res.slots);
+          this.slotsLoading.set(false);
+          if (res.slots.length === 0) {
+            this.notify.info('No free slots in that range. Try widening it.');
+          }
+        },
+        error: () => this.slotsLoading.set(false),
+      });
+  }
+
+  protected selectSlot(slot: AvailabilitySlot): void {
+    this.selectedSlotStart.set(slot.start);
+  }
+
+  protected submitSchedule(): void {
+    const app = this.activeApplication();
+    if (!app) return;
+    if (this.scheduleForm.invalid) {
+      markAllAsTouched(this.scheduleForm);
+      return;
+    }
+    const start = this.selectedSlotStart();
+    if (!start) {
+      this.notify.error('Pick a time slot.');
+      return;
+    }
+    const v = this.scheduleForm.getRawValue();
+    if (this.needsManualLink() && !v.meeting_url.trim()) {
+      this.notify.error('Paste a meeting link for a manual video interview.');
+      return;
+    }
+    if (this.needsLocation() && !v.location.trim()) {
+      this.notify.error('A location is required for an on-site interview.');
+      return;
+    }
+    this.scheduling.set(true);
+    this.interviews
+      .schedule(app.uuid, {
+        stage_key: v.stage_key,
+        start,
+        duration_minutes: Number(v.duration_minutes),
+        timezone: v.timezone,
+        mode: v.mode,
+        provider: v.provider,
+        interviewer_uuids: [v.interviewer_uuid],
+        meeting_url: v.meeting_url.trim() || undefined,
+        location: v.location.trim() || undefined,
+        notes: v.notes.trim() || undefined,
+      })
+      .subscribe({
+        next: () => {
+          this.notify.success('Interview scheduled. Invites are on their way.');
+          this.scheduling.set(false);
+          this.scheduleOpen.set(false);
+          this.loadInterviews(app.uuid);
+          // Booking advances the application to interviewing — refresh the record + list.
+          this.jobs.getApplication(app.uuid).subscribe((full) => this.activeApplication.set(full));
+          this.list.reload();
+        },
+        error: () => this.scheduling.set(false),
+      });
+  }
+
+  // ── Interview: reschedule / cancel / complete ────────────────────────────
+  protected async cancelInterview(i: Interview): Promise<void> {
+    const app = this.activeApplication();
+    if (!app) return;
+    const confirmed = await this.modal.confirm({
+      title: 'Cancel interview',
+      message: `Cancel ${i.interview_number} (${this.roundName(i.stage_key)})? The calendar event will be removed and participants notified.`,
+      confirmText: 'Cancel interview',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
+    this.interviews.cancel(i.uuid, {}).subscribe({
+      next: () => {
+        this.notify.success('Interview cancelled.');
+        this.loadInterviews(app.uuid);
+      },
+    });
+  }
+
+  protected completeInterview(i: Interview, outcome: 'completed' | 'no_show'): void {
+    const app = this.activeApplication();
+    if (!app) return;
+    this.interviews.complete(i.uuid, { outcome }).subscribe({
+      next: () => {
+        this.notify.success(outcome === 'no_show' ? 'Marked as no-show.' : 'Interview completed.');
+        this.loadInterviews(app.uuid);
+      },
+    });
+  }
+
+  /** Format a Date as a yyyy-MM-dd string for a native date input. */
+  private toDateInput(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  /** Format a slot's start instant in the chosen timezone for display. */
+  protected formatSlot(iso: string): string {
+    const tz = this.scheduleForm.getRawValue().timezone;
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+        timeZone: tz,
+      }).format(new Date(iso));
+    } catch {
+      return new Date(iso).toLocaleString();
+    }
   }
 
   /** True when the chosen status needs an interview round selection. */

@@ -345,6 +345,10 @@ export const ATS_PERMISSIONS = {
   applicationRead: 'application.read',
   applicationUpdate: 'application.update',
   applicationDelete: 'application.delete',
+  interviewCreate: 'interview.create',
+  interviewRead: 'interview.read',
+  interviewUpdate: 'interview.update',
+  interviewDelete: 'interview.delete',
 } as const;
 
 export const JOB_STATUS_OPTIONS: JobStatus[] = ['draft', 'open', 'closed', 'filled'];
@@ -369,3 +373,159 @@ export const APPLICATION_STATUS_OPTIONS: ApplicationStatus[] = [
   'rejected',
   'on_hold',
 ];
+
+// ── Interview scheduling ─────────────────────────────────────────────────────────
+// Mirrors the backend (src/utils/ats.constants.js + interview.model.js). All datetimes
+// are ISO strings; the UI sends/receives absolute instants plus an IANA `timezone`.
+
+export type InterviewStatus =
+  | 'scheduled'
+  | 'rescheduled'
+  | 'completed'
+  | 'cancelled'
+  | 'no_show';
+
+export type InterviewMode = 'video' | 'phone' | 'onsite';
+
+export type InterviewProvider = 'google' | 'teams' | 'manual';
+
+export type InterviewParticipantRole = 'organizer' | 'interviewer' | 'candidate';
+
+export type InterviewResponseStatus = 'pending' | 'accepted' | 'declined' | 'tentative';
+
+export interface InterviewParticipant {
+  uuid: string;
+  role: InterviewParticipantRole;
+  email: string;
+  name: string | null;
+  response_status: InterviewResponseStatus;
+  user: UserSummary | null;
+}
+
+export interface Interview {
+  uuid: string;
+  interview_number: string;
+  stage_key: string;
+  title: string | null;
+  scheduled_start: string;
+  scheduled_end: string;
+  duration_minutes: number;
+  timezone: string;
+  mode: InterviewMode;
+  provider: InterviewProvider;
+  meeting_url: string | null;
+  location: string | null;
+  status: InterviewStatus;
+  notes: string | null;
+  outcome_note: string | null;
+  cancel_reason: string | null;
+  external_event_id: string | null;
+  created_at: string;
+  updated_at: string;
+  organizer: UserSummary | null;
+  job?: { uuid: string; job_code: string; title: string } | null;
+  application?: {
+    uuid: string;
+    application_number: string;
+    candidate_name: string;
+    candidate_email: string;
+    status: ApplicationStatus;
+    stage_key: string | null;
+  } | null;
+  participants: InterviewParticipant[];
+}
+
+/** One bookable slot returned by the availability endpoint (absolute ISO instants). */
+export interface AvailabilitySlot {
+  start: string;
+  end: string;
+}
+
+export interface AvailabilityResponse {
+  timezone: string;
+  duration_minutes: number;
+  slot_granularity_minutes: number;
+  buffer_minutes: number;
+  interviewers: { uuid: string; name: string; email: string }[];
+  slots: AvailabilitySlot[];
+}
+
+export interface AvailabilityQuery {
+  date_from: string;
+  date_to: string;
+  timezone: string;
+  duration_minutes?: number;
+  interviewer_uuids: string[];
+}
+
+export interface CreateInterviewRequest {
+  stage_key: string;
+  start: string;
+  duration_minutes?: number;
+  timezone: string;
+  mode: InterviewMode;
+  provider?: InterviewProvider;
+  interviewer_uuids: string[];
+  meeting_url?: string | null;
+  location?: string | null;
+  title?: string | null;
+  notes?: string | null;
+}
+
+export interface RescheduleInterviewRequest {
+  start: string;
+  duration_minutes?: number;
+  timezone?: string;
+  meeting_url?: string | null;
+  location?: string | null;
+}
+
+export interface CancelInterviewRequest {
+  reason?: string | null;
+}
+
+export interface CompleteInterviewRequest {
+  outcome: 'completed' | 'no_show';
+  outcome_note?: string | null;
+}
+
+/** Provider availability snapshot from GET /interviews/providers. */
+export interface InterviewProviderInfo {
+  key: InterviewProvider;
+  enabled: boolean;
+  configured: boolean;
+}
+
+/** One org user offered as an interviewer (from GET /applications/:uuid/interviewers). */
+export interface InterviewerOption {
+  uuid: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+export const INTERVIEW_STATUS_LABELS: Record<InterviewStatus, string> = {
+  scheduled: 'Scheduled',
+  rescheduled: 'Rescheduled',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'No-show',
+};
+
+export const INTERVIEW_MODE_LABELS: Record<InterviewMode, string> = {
+  video: 'Video call',
+  phone: 'Phone',
+  onsite: 'On-site',
+};
+
+export const INTERVIEW_PROVIDER_LABELS: Record<InterviewProvider, string> = {
+  google: 'Google Calendar (Meet)',
+  teams: 'Microsoft Teams',
+  manual: 'Manual (paste link)',
+};
+
+export const INTERVIEW_MODE_OPTIONS: InterviewMode[] = ['video', 'phone', 'onsite'];
+export const INTERVIEW_PROVIDER_OPTIONS: InterviewProvider[] = ['google', 'teams', 'manual'];
+
+/** Interview statuses that are still active (can be rescheduled/cancelled/completed). */
+export const INTERVIEW_ACTIVE_STATUSES: InterviewStatus[] = ['scheduled', 'rescheduled'];

@@ -9,4 +9,5 @@ module.exports.timesheetValidation = require('./timesheets/timesheet.validation'
 module.exports.fileValidation = require('./files/file.validation');
 module.exports.jobValidation = require('./ats/job.validation');
 module.exports.applicationValidation = require('./ats/application.validation');
+module.exports.interviewValidation = require('./ats/interview.validation');
 module.exports.careersValidation = require('./ats/careers.validation');

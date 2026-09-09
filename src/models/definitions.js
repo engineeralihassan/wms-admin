@@ -21,6 +21,8 @@ const Job = require('./job.model');
 const JobApplication = require('./job-application.model');
 const ApplicationEvent = require('./application-event.model');
 const ResumeScreeningJob = require('./resume-screening-job.model');
+const Interview = require('./interview.model');
+const InterviewParticipant = require('./interview-participant.model');
 const Timesheet = require('./timesheet.model');
 const TimesheetEntry = require('./timesheet-entry.model');
 const TimesheetJob = require('./timesheet-job.model');
@@ -74,6 +76,8 @@ const definitions = (sequelize, Sequelize) => {
   db.JobApplication = JobApplication(sequelize);
   db.ApplicationEvent = ApplicationEvent(sequelize);
   db.ResumeScreeningJob = ResumeScreeningJob(sequelize);
+  db.Interview = Interview(sequelize);
+  db.InterviewParticipant = InterviewParticipant(sequelize);
   db.Timesheet = Timesheet(sequelize);
   db.TimesheetEntry = TimesheetEntry(sequelize);
   db.TimesheetJob = TimesheetJob(sequelize);
@@ -310,6 +314,47 @@ const definitions = (sequelize, Sequelize) => {
     foreignKey: 'organization_id',
     as: 'organization',
   });
+
+  // ── Interview scheduling ────────────────────────────────────────────────────
+  // An Interview belongs to a tenant, a job, an application and an organizer (the
+  // recruiter). It owns a panel of InterviewParticipant rows (interviewers + candidate).
+
+  db.Organization.hasMany(db.Interview, { foreignKey: 'organization_id', as: 'interviews' });
+  db.Interview.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  db.Job.hasMany(db.Interview, { foreignKey: 'job_id', as: 'interviews' });
+  db.Interview.belongsTo(db.Job, { foreignKey: 'job_id', as: 'job' });
+
+  db.JobApplication.hasMany(db.Interview, { foreignKey: 'application_id', as: 'interviews' });
+  db.Interview.belongsTo(db.JobApplication, { foreignKey: 'application_id', as: 'application' });
+
+  db.User.hasMany(db.Interview, { foreignKey: 'organizer_id', as: 'organizedInterviews' });
+  db.Interview.belongsTo(db.User, { foreignKey: 'organizer_id', as: 'organizer' });
+
+  // Interview <-> InterviewParticipant (the panel + candidate; cascade on delete).
+  db.Interview.hasMany(db.InterviewParticipant, {
+    foreignKey: 'interview_id',
+    as: 'participants',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+  db.InterviewParticipant.belongsTo(db.Interview, {
+    foreignKey: 'interview_id',
+    as: 'interview',
+  });
+  db.Organization.hasMany(db.InterviewParticipant, {
+    foreignKey: 'organization_id',
+    as: 'interviewParticipants',
+  });
+  db.InterviewParticipant.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+  db.User.hasMany(db.InterviewParticipant, {
+    foreignKey: 'user_id',
+    as: 'interviewParticipations',
+  });
+  db.InterviewParticipant.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
 
   // Attachment (polymorphic file store). It is NOT tied to any single parent via a
   // FK — owner_type/owner_id resolve the parent at the service layer — so it only

@@ -90,6 +90,16 @@ export const API_ENDPOINTS = {
     status: (uuid: string) => `/applications/${uuid}/status`,
     rating: (uuid: string) => `/applications/${uuid}/rating`,
     notes: (uuid: string) => `/applications/${uuid}/notes`,
+    interviews: (uuid: string) => `/applications/${uuid}/interviews`,
+    interviewAvailability: (uuid: string) => `/applications/${uuid}/interviews/availability`,
+    interviewers: (uuid: string) => `/applications/${uuid}/interviewers`,
+  },
+  interviews: {
+    providers: '/interviews/providers',
+    byUuid: (uuid: string) => `/interviews/${uuid}`,
+    reschedule: (uuid: string) => `/interviews/${uuid}/reschedule`,
+    cancel: (uuid: string) => `/interviews/${uuid}/cancel`,
+    complete: (uuid: string) => `/interviews/${uuid}/complete`,
   },
   careers: {
     byToken: (token: string) => `/careers/${token}`,

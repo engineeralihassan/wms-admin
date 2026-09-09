@@ -315,6 +315,70 @@
         </section>
       }
 
+      @if (canReadInterviews()) {
+        <!-- Interviews -->
+        <section class="applicant__section">
+          <div class="applicant__section-head">
+            <h3 class="applicant__heading">Interviews</h3>
+            @if (canScheduleInterview()) {
+              <app-button variant="primary" (clicked)="openSchedule()">
+                Schedule interview
+              </app-button>
+            }
+          </div>
+
+          @if (interviewsLoading()) {
+            <p class="applicant__muted">Loading interviews…</p>
+          } @else if (appInterviews().length) {
+            <ul class="interview-list">
+              @for (iv of appInterviews(); track iv.uuid) {
+                <li class="interview-card">
+                  <div class="interview-card__main">
+                    <div class="interview-card__row">
+                      <span class="interview-card__round">{{ roundName(iv.stage_key) }}</span>
+                      <span class="badge badge--{{ iv.status }}">
+                        {{ interviewStatusLabels[iv.status] }}
+                      </span>
+                    </div>
+                    <p class="interview-card__when">
+                      {{ formatDate(iv.scheduled_start) }} · {{ iv.duration_minutes }} min ·
+                      {{ interviewModeLabels[iv.mode] }}
+                    </p>
+                    <p class="interview-card__meta">
+                      {{ interviewProviderLabels[iv.provider] }} ·
+                      Interviewer(s): {{ interviewerNames(iv) }}
+                    </p>
+                    @if (iv.meeting_url) {
+                      <a class="interview-card__link" [href]="iv.meeting_url" target="_blank" rel="noopener">
+                        Join link
+                      </a>
+                    }
+                    @if (iv.location) {
+                      <p class="interview-card__meta">Location: {{ iv.location }}</p>
+                    }
+                  </div>
+                  @if (canManageInterview() && isInterviewActive(iv)) {
+                    <div class="interview-card__actions">
+                      <app-button variant="secondary" (clicked)="completeInterview(iv, 'completed')">
+                        Mark done
+                      </app-button>
+                      <app-button variant="ghost" (clicked)="completeInterview(iv, 'no_show')">
+                        No-show
+                      </app-button>
+                      <app-button variant="danger" (clicked)="cancelInterview(iv)">
+                        Cancel
+                      </app-button>
+                    </div>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="applicant__muted">No interviews scheduled yet.</p>
+          }
+        </section>
+      }
+
       <!-- Timeline -->
       <section class="applicant__section">
         <h3 class="applicant__heading">History</h3>
@@ -340,4 +404,129 @@
       </section>
     </div>
   }
+</app-modal>
+
+<!-- Schedule interview modal -->
+<app-modal
+  [open]="scheduleOpen()"
+  title="Schedule interview"
+  size="lg"
+  (closed)="closeSchedule()"
+>
+  <form class="schedule" [formGroup]="scheduleForm">
+    <div class="schedule__grid">
+      <label class="field">
+        <span class="field__label">Interview round</span>
+        <select class="field__input" formControlName="stage_key">
+          @for (r of rounds(); track r.key) {
+            <option [value]="r.key">{{ r.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Interviewer</span>
+        <select class="field__input" formControlName="interviewer_uuid">
+          <option value="">Select…</option>
+          @for (u of interviewerOptions(); track u.uuid) {
+            <option [value]="u.uuid">{{ interviewerLabel(u) }} ({{ u.email }})</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Mode</span>
+        <select class="field__input" formControlName="mode">
+          @for (m of interviewModeOptions; track m) {
+            <option [value]="m">{{ interviewModeLabels[m] }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Provider</span>
+        <select class="field__input" formControlName="provider">
+          @for (p of enabledProviders(); track p) {
+            <option [value]="p">{{ interviewProviderLabels[p] }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Duration (minutes)</span>
+        <input class="field__input" type="number" min="10" max="480" formControlName="duration_minutes" />
+      </label>
+
+      <label class="field">
+        <span class="field__label">Timezone</span>
+        <select class="field__input" formControlName="timezone">
+          @for (tz of timezoneOptions; track tz) {
+            <option [value]="tz">{{ tz }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">From date</span>
+        <input class="field__input" type="date" formControlName="date_from" />
+      </label>
+
+      <label class="field">
+        <span class="field__label">To date</span>
+        <input class="field__input" type="date" formControlName="date_to" />
+      </label>
+    </div>
+
+    @if (needsManualLink()) {
+      <label class="field">
+        <span class="field__label">Meeting link</span>
+        <input class="field__input" type="url" formControlName="meeting_url" placeholder="https://…" />
+      </label>
+    }
+    @if (needsLocation()) {
+      <label class="field">
+        <span class="field__label">Location</span>
+        <input class="field__input" type="text" formControlName="location" placeholder="Office / room" />
+      </label>
+    }
+
+    <label class="field">
+      <span class="field__label">Notes (optional)</span>
+      <textarea class="field__input" rows="2" formControlName="notes"></textarea>
+    </label>
+
+    <div class="schedule__slots">
+      <div class="schedule__slots-head">
+        <span class="field__label">Available slots</span>
+        <app-button variant="secondary" [loading]="slotsLoading()" (clicked)="findSlots()">
+          Find slots
+        </app-button>
+      </div>
+      @if (slotsLoading()) {
+        <p class="applicant__muted">Finding free times…</p>
+      } @else if (slots().length) {
+        <div class="slot-grid">
+          @for (s of slots(); track s.start) {
+            <button
+              type="button"
+              class="slot"
+              [class.slot--active]="selectedSlotStart() === s.start"
+              (click)="selectSlot(s)"
+            >
+              {{ formatSlot(s.start) }}
+            </button>
+          }
+        </div>
+      } @else {
+        <p class="applicant__muted">Pick an interviewer and range, then "Find slots".</p>
+      }
+    </div>
+  </form>
+
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeSchedule()">Cancel</app-button>
+    <app-button variant="primary" [loading]="scheduling()" (clicked)="submitSchedule()">
+      Schedule
+    </app-button>
+  </div>
 </app-modal>
