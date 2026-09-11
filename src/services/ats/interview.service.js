@@ -106,21 +106,19 @@ const resolveRound = (job, stageKey, res) => {
 };
 
 /**
- * Resolve requested interviewer users (by uuid) within the caller's org. Throws if any
- * uuid is unknown or belongs to another tenant. Returns [{ id, uuid, name, email }].
+ * Resolve requested interviewer users (by uuid) within a specific organization. The org
+ * is derived from the parent application (the resource), NOT the caller's token — so a
+ * super-admin acting on an application in org A can't attach a panelist from org B, and
+ * the panel always belongs to the same tenant as the interview. Throws if any uuid is
+ * unknown or outside that org. Returns [{ id, uuid, name, email }].
  */
-const resolveInterviewers = async (interviewerUuids, req, res, transaction) => {
+const resolveInterviewers = async (interviewerUuids, organizationId, res, transaction) => {
   const uuids = [...new Set(interviewerUuids || [])];
   if (!uuids.length) {
     throw new ApiError(httpStatus.BAD_REQUEST, res.__('interview_interviewers_required'));
   }
-  const where = { uuid: { [Op.in]: uuids } };
-  // Non-super-admins are constrained to their own organization.
-  if (req.auth && !req.auth.isSuperAdmin && req.auth.organizationId) {
-    where.organization_id = req.auth.organizationId;
-  }
   const users = await User.findAll({
-    where,
+    where: { uuid: { [Op.in]: uuids }, organization_id: organizationId },
     attributes: ['id', 'uuid', 'first_name', 'last_name', 'email'],
     transaction,
   });
@@ -136,15 +134,45 @@ const resolveInterviewers = async (interviewerUuids, req, res, transaction) => {
 };
 
 /**
+ * Load the acting user's identity (email + name) for the organizer participant row.
+ * The auth token only carries id/uuid, so we must read the real record — otherwise the
+ * organizer email is invalid and the participant insert fails.
+ */
+const loadOrganizer = async (userId, transaction) => {
+  const user = await User.findByPk(userId, {
+    attributes: ['id', 'first_name', 'last_name', 'email'],
+    transaction,
+  });
+  return {
+    id: userId,
+    email: user?.email || null,
+    name: user ? [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || null : null,
+  };
+};
+
+/**
  * Existing active-interview windows for a set of interviewer user ids in a tenant,
  * optionally excluding one interview (for reschedule). Powers conflict detection and
  * the availability endpoint's busy list.
+ *
+ * ALWAYS bounded by [rangeStart, rangeEnd] so the scan is proportional to the queried
+ * window, not the interviewer's lifetime history. Overlap is `start <= rangeEnd AND
+ * end >= rangeStart`. Callers pass the availability window, or the single-slot window
+ * (widened by the buffer) for the commit-time conflict check.
  */
-const busyWindowsForUsers = async (organizationId, userIds, { excludeInterviewId, transaction } = {}) => {
+const busyWindowsForUsers = async (
+  organizationId,
+  userIds,
+  rangeStart,
+  rangeEnd,
+  { excludeInterviewId, transaction } = {}
+) => {
   if (!userIds.length) return [];
   const interviewWhere = {
     organization_id: organizationId,
     status: { [Op.in]: INTERVIEW_ACTIVE_STATUSES },
+    scheduled_start: { [Op.lte]: rangeEnd },
+    scheduled_end: { [Op.gte]: rangeStart },
   };
   if (excludeInterviewId) interviewWhere.id = { [Op.ne]: excludeInterviewId };
 
@@ -249,10 +277,16 @@ const getAvailability = async (uuid, query, req, res) => {
   }
 
   const duration = query.duration_minutes || calendarConfig.scheduling.defaultDurationMinutes;
-  const interviewers = await resolveInterviewers(query.interviewer_uuids, req, res);
+  const interviewers = await resolveInterviewers(
+    query.interviewer_uuids,
+    application.organization_id,
+    res
+  );
   const busy = await busyWindowsForUsers(
     application.organization_id,
-    interviewers.map((i) => i.id)
+    interviewers.map((i) => i.id),
+    rangeStart,
+    rangeEnd
   );
 
   const slots = availability.generateSlots({
@@ -287,13 +321,33 @@ const listForApplication = async (uuid, req, res) => {
   });
 };
 
-/** Resolve one interview by uuid, enforcing visibility through its parent application. */
+/**
+ * Resolve one interview by uuid, enforcing visibility through its parent application,
+ * and return it WITH its associations (job/application/organizer/participants).
+ *
+ * When `lock` is requested we must NOT combine `FOR UPDATE` with the participant join:
+ * Postgres rejects a row lock on the nullable side of an outer join (the candidate
+ * participant has a null user_id). So we take the row lock on the BASE interview row
+ * only (no includes), then load the full graph in a second, unlocked read within the
+ * same transaction. The lock still guarantees no concurrent lifecycle change.
+ */
 const findVisibleInterview = async (uuid, req, res, { transaction, lock } = {}) => {
+  if (lock) {
+    // 1) Lock the base row only (no joins) — safe for FOR UPDATE.
+    const locked = await Interview.findOne({
+      where: { uuid, ...req.tenantWhere },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (!locked) {
+      throw new ApiError(httpStatus.NOT_FOUND, res.__('interview_not_found'));
+    }
+  }
+
   const interview = await Interview.findOne({
     where: { uuid, ...req.tenantWhere },
     include: INTERVIEW_INCLUDE,
     transaction,
-    lock: lock ? transaction.LOCK.UPDATE : undefined,
   });
   if (!interview) {
     throw new ApiError(httpStatus.NOT_FOUND, res.__('interview_not_found'));
@@ -327,10 +381,14 @@ const scheduleInterview = async (uuid, payload, req, res) => {
   }
   const duration = payload.duration_minutes || calendarConfig.scheduling.defaultDurationMinutes;
   const end = new Date(start.getTime() + duration * 60000);
+  const bufferMinutes = calendarConfig.scheduling.bufferMinutes;
+  // The window the conflict check needs to look at: the slot widened by the buffer.
+  const conflictRangeStart = new Date(start.getTime() - bufferMinutes * 60000);
+  const conflictRangeEnd = new Date(end.getTime() + bufferMinutes * 60000);
 
-  // Interviewers resolved up-front (outside the txn) — a read that needn't hold a lock.
-  const interviewers = await resolveInterviewers(payload.interviewer_uuids, req, res);
-
+  // Phase 1 — book atomically (row rows + status advance + audit). NO external HTTP here:
+  // the calendar call is deferred to phase 2 so we never hold a row lock across a slow
+  // third-party request (which would pin a DB connection under load).
   const result = await sequelize.transaction(async (transaction) => {
     const application = await findVisibleApplication(uuid, req, res, { transaction, lock: true });
 
@@ -339,27 +397,31 @@ const scheduleInterview = async (uuid, payload, req, res) => {
     }
     const round = resolveRound(application.job, payload.stage_key, res);
 
-    // Conflict check inside the txn against a fresh busy list.
+    // Interviewers scoped to the application's org (not the caller's token).
+    const interviewers = await resolveInterviewers(
+      payload.interviewer_uuids,
+      application.organization_id,
+      res,
+      transaction
+    );
+    const organizer = await loadOrganizer(req.auth.userId, transaction);
+
+    // Conflict check inside the txn against a fresh, date-bounded busy list.
     const busy = await busyWindowsForUsers(
       application.organization_id,
       interviewers.map((i) => i.id),
+      conflictRangeStart,
+      conflictRangeEnd,
       { transaction }
     );
-    if (
-      availability.hasConflict({
-        start,
-        end,
-        busy,
-        bufferMinutes: calendarConfig.scheduling.bufferMinutes,
-      })
-    ) {
+    if (availability.hasConflict({ start, end, busy, bufferMinutes })) {
       throw new ApiError(httpStatus.CONFLICT, res.__('interview_slot_conflict'));
     }
 
     const interviewNumber = await nextSequenceCode(Interview, INTERVIEW_CODE_PREFIX, transaction);
-    const candidate = { email: application.candidate_email, name: application.candidate_name };
+    // Resolve the provider now (for the stored provider key) but call it AFTER commit.
+    const { effectiveKey } = providerRegistry.resolve(payload.provider || calendarConfig.defaultProvider);
 
-    // Create the DB row first (manual-safe values), then enrich with provider output.
     const interview = await Interview.create(
       {
         interview_number: interviewNumber,
@@ -374,7 +436,7 @@ const scheduleInterview = async (uuid, payload, req, res) => {
         duration_minutes: duration,
         timezone: payload.timezone,
         mode: payload.mode || INTERVIEW_MODES.VIDEO,
-        provider: payload.provider || calendarConfig.defaultProvider,
+        provider: effectiveKey,
         meeting_url: payload.meeting_url || null,
         location: payload.location || null,
         notes: payload.notes || null,
@@ -383,15 +445,15 @@ const scheduleInterview = async (uuid, payload, req, res) => {
       { transaction }
     );
 
-    // Participant rows: organizer, interviewers, candidate.
+    // Participant rows: organizer (real identity), interviewers, candidate.
     const participantRows = [
       {
         organization_id: application.organization_id,
         interview_id: interview.id,
         user_id: req.auth.userId,
         role: INTERVIEW_PARTICIPANT_ROLES.ORGANIZER,
-        email: req.user?.email || 'organizer@unknown',
-        name: [req.user?.first_name, req.user?.last_name].filter(Boolean).join(' ').trim() || null,
+        email: organizer.email,
+        name: organizer.name,
         response_status: INTERVIEW_RESPONSE_STATUSES.ACCEPTED,
       },
       ...interviewers.map((i) => ({
@@ -414,24 +476,6 @@ const scheduleInterview = async (uuid, payload, req, res) => {
       },
     ];
     await InterviewParticipant.bulkCreate(participantRows, { transaction });
-
-    // Create the external calendar event via the resolved provider (falls back to manual).
-    const { provider, effectiveKey } = providerRegistry.resolve(interview.provider);
-    let providerOut = { external_event_id: null, meeting_url: interview.meeting_url, location: interview.location, provider_meta: null };
-    try {
-      providerOut = await provider.createEvent(
-        buildProviderContext(interview, round, application, interviewers, candidate)
-      );
-    } catch (err) {
-      // Never fail the booking because of a calendar hiccup — persist as manual-style.
-      logger.error(`[interview] provider "${effectiveKey}" createEvent failed: ${err.message}`);
-    }
-    interview.provider = effectiveKey;
-    interview.external_event_id = providerOut.external_event_id || null;
-    interview.meeting_url = providerOut.meeting_url || interview.meeting_url || null;
-    if (providerOut.location) interview.location = providerOut.location;
-    interview.provider_meta = providerOut.provider_meta || null;
-    await interview.save({ transaction });
 
     // Advance the application into INTERVIEWING at this round (if not already there).
     const fromStatus = application.status;
@@ -484,20 +528,32 @@ const scheduleInterview = async (uuid, payload, req, res) => {
       { transaction }
     );
 
-    return { interviewId: interview.id, round, application, interviewers, candidate };
+    return { interview, round, application, interviewers, candidate: { email: application.candidate_email, name: application.candidate_name } };
   });
 
-  // Post-commit: notify + reload with associations.
-  notifyParticipants(
-    'interview_scheduled',
-    await Interview.findByPk(result.interviewId),
-    result.round,
-    result.application,
-    result.interviewers,
-    result.candidate
-  );
+  // Phase 2 — create the external calendar event OUTSIDE the transaction, then patch the
+  // interview with the event id / meeting link. A slow or failing provider no longer
+  // holds any DB lock; on failure the booking simply stays "manual-style".
+  const { interview, round, application, interviewers, candidate } = result;
+  const { provider, effectiveKey } = providerRegistry.resolve(interview.provider);
+  try {
+    const providerOut = await provider.createEvent(
+      buildProviderContext(interview, round, application, interviewers, candidate)
+    );
+    interview.external_event_id = providerOut.external_event_id || null;
+    interview.meeting_url = providerOut.meeting_url || interview.meeting_url || null;
+    if (providerOut.location) interview.location = providerOut.location;
+    interview.provider_meta = providerOut.provider_meta || null;
+    await interview.save();
+  } catch (err) {
+    logger.error(`[interview] provider "${effectiveKey}" createEvent failed: ${err.message}`);
+  }
 
-  return Interview.findOne({ where: { id: result.interviewId }, include: INTERVIEW_INCLUDE });
+  // Notify the panel + candidate (fire-and-forget).
+  notifyParticipants('interview_scheduled', interview, round, application, interviewers, candidate);
+
+  // Return the full graph for the response.
+  return Interview.findOne({ where: { id: interview.id }, include: INTERVIEW_INCLUDE });
 };
 
 // ── Public: reschedule ────────────────────────────────────────────────────────
@@ -511,6 +567,9 @@ const rescheduleInterview = async (uuid, payload, req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, res.__('interview_invalid_timezone'));
   }
 
+  const bufferMinutes = calendarConfig.scheduling.bufferMinutes;
+
+  // Phase 1 — validate + move the booking atomically (no external HTTP under the lock).
   const result = await sequelize.transaction(async (transaction) => {
     const interview = await findVisibleInterview(uuid, req, res, { transaction, lock: true });
     if (INTERVIEW_TERMINAL_STATUSES.includes(interview.status)) {
@@ -523,11 +582,14 @@ const rescheduleInterview = async (uuid, payload, req, res) => {
       .filter((p) => p.role === INTERVIEW_PARTICIPANT_ROLES.INTERVIEWER && p.user_id)
       .map((p) => p.user_id);
 
-    const busy = await busyWindowsForUsers(interview.organization_id, interviewerIds, {
-      excludeInterviewId: interview.id,
-      transaction,
-    });
-    if (availability.hasConflict({ start, end, busy, bufferMinutes: calendarConfig.scheduling.bufferMinutes })) {
+    const busy = await busyWindowsForUsers(
+      interview.organization_id,
+      interviewerIds,
+      new Date(start.getTime() - bufferMinutes * 60000),
+      new Date(end.getTime() + bufferMinutes * 60000),
+      { excludeInterviewId: interview.id, transaction }
+    );
+    if (availability.hasConflict({ start, end, busy, bufferMinutes })) {
       throw new ApiError(httpStatus.CONFLICT, res.__('interview_slot_conflict'));
     }
 
@@ -539,26 +601,6 @@ const rescheduleInterview = async (uuid, payload, req, res) => {
     if (payload.meeting_url !== undefined) interview.meeting_url = payload.meeting_url;
     if (payload.location !== undefined) interview.location = payload.location;
     interview.status = INTERVIEW_STATUSES.RESCHEDULED;
-
-    const round = resolveRound(interview.job, interview.stage_key, res);
-    const interviewers = (interview.participants || [])
-      .filter((p) => p.role === INTERVIEW_PARTICIPANT_ROLES.INTERVIEWER)
-      .map((p) => ({ id: p.user_id, email: p.email, name: p.name }));
-    const candidate = (interview.participants || []).find(
-      (p) => p.role === INTERVIEW_PARTICIPANT_ROLES.CANDIDATE
-    );
-
-    const { provider, effectiveKey } = providerRegistry.resolve(interview.provider);
-    try {
-      const out = await provider.updateEvent(
-        buildProviderContext(interview, round, interview.application, interviewers, candidate)
-      );
-      interview.external_event_id = out.external_event_id || interview.external_event_id;
-      interview.meeting_url = out.meeting_url || interview.meeting_url;
-      if (out.provider_meta) interview.provider_meta = out.provider_meta;
-    } catch (err) {
-      logger.error(`[interview] provider "${effectiveKey}" updateEvent failed: ${err.message}`);
-    }
     await interview.save({ transaction });
 
     await ApplicationEvent.create(
@@ -574,24 +616,41 @@ const rescheduleInterview = async (uuid, payload, req, res) => {
       { transaction }
     );
 
-    return { interviewId: interview.id, round, application: interview.application, interviewers, candidate };
+    return { interview };
   });
 
-  notifyParticipants(
-    'interview_rescheduled',
-    await Interview.findByPk(result.interviewId),
-    result.round,
-    result.application,
-    result.interviewers,
-    result.candidate
+  // Phase 2 — update the external calendar event OUTSIDE the transaction, then patch.
+  const { interview } = result;
+  const round = resolveRound(interview.job, interview.stage_key, res);
+  const interviewers = (interview.participants || [])
+    .filter((p) => p.role === INTERVIEW_PARTICIPANT_ROLES.INTERVIEWER)
+    .map((p) => ({ id: p.user_id, email: p.email, name: p.name }));
+  const candidate = (interview.participants || []).find(
+    (p) => p.role === INTERVIEW_PARTICIPANT_ROLES.CANDIDATE
   );
 
-  return Interview.findOne({ where: { id: result.interviewId }, include: INTERVIEW_INCLUDE });
+  const { provider, effectiveKey } = providerRegistry.resolve(interview.provider);
+  try {
+    const out = await provider.updateEvent(
+      buildProviderContext(interview, round, interview.application, interviewers, candidate)
+    );
+    interview.external_event_id = out.external_event_id || interview.external_event_id;
+    interview.meeting_url = out.meeting_url || interview.meeting_url;
+    if (out.provider_meta) interview.provider_meta = out.provider_meta;
+    await interview.save();
+  } catch (err) {
+    logger.error(`[interview] provider "${effectiveKey}" updateEvent failed: ${err.message}`);
+  }
+
+  notifyParticipants('interview_rescheduled', interview, round, interview.application, interviewers, candidate);
+
+  return Interview.findOne({ where: { id: interview.id }, include: INTERVIEW_INCLUDE });
 };
 
 // ── Public: cancel + complete ─────────────────────────────────────────────────
 
 const cancelInterview = async (uuid, payload, req, res) => {
+  // Phase 1 — mark cancelled + audit atomically (no external HTTP under the lock).
   const result = await sequelize.transaction(async (transaction) => {
     const interview = await findVisibleInterview(uuid, req, res, { transaction, lock: true });
     if (INTERVIEW_TERMINAL_STATUSES.includes(interview.status)) {
@@ -599,13 +658,6 @@ const cancelInterview = async (uuid, payload, req, res) => {
     }
     interview.status = INTERVIEW_STATUSES.CANCELLED;
     interview.cancel_reason = payload.reason || null;
-
-    const { provider, effectiveKey } = providerRegistry.resolve(interview.provider);
-    try {
-      await provider.cancelEvent({ externalEventId: interview.external_event_id });
-    } catch (err) {
-      logger.error(`[interview] provider "${effectiveKey}" cancelEvent failed: ${err.message}`);
-    }
     await interview.save({ transaction });
 
     await ApplicationEvent.create(
@@ -621,27 +673,30 @@ const cancelInterview = async (uuid, payload, req, res) => {
       { transaction }
     );
 
-    const round = resolveRound(interview.job, interview.stage_key, res);
-    const interviewers = (interview.participants || [])
-      .filter((p) => p.role === INTERVIEW_PARTICIPANT_ROLES.INTERVIEWER)
-      .map((p) => ({ email: p.email, name: p.name }));
-    const candidate = (interview.participants || []).find(
-      (p) => p.role === INTERVIEW_PARTICIPANT_ROLES.CANDIDATE
-    );
-    return { interviewId: interview.id, round, application: interview.application, interviewers, candidate, reason: payload.reason };
+    return { interview };
   });
 
-  notifyParticipants(
-    'interview_cancelled',
-    await Interview.findByPk(result.interviewId),
-    result.round,
-    result.application,
-    result.interviewers,
-    result.candidate,
-    { reason: result.reason || '' }
-  );
+  // Phase 2 — cancel the external calendar event OUTSIDE the transaction.
+  const { interview } = result;
+  const { provider, effectiveKey } = providerRegistry.resolve(interview.provider);
+  try {
+    await provider.cancelEvent({ externalEventId: interview.external_event_id });
+  } catch (err) {
+    logger.error(`[interview] provider "${effectiveKey}" cancelEvent failed: ${err.message}`);
+  }
 
-  return Interview.findOne({ where: { id: result.interviewId }, include: INTERVIEW_INCLUDE });
+  const round = resolveRound(interview.job, interview.stage_key, res);
+  const interviewers = (interview.participants || [])
+    .filter((p) => p.role === INTERVIEW_PARTICIPANT_ROLES.INTERVIEWER)
+    .map((p) => ({ email: p.email, name: p.name }));
+  const candidate = (interview.participants || []).find(
+    (p) => p.role === INTERVIEW_PARTICIPANT_ROLES.CANDIDATE
+  );
+  notifyParticipants('interview_cancelled', interview, round, interview.application, interviewers, candidate, {
+    reason: payload.reason || '',
+  });
+
+  return Interview.findOne({ where: { id: interview.id }, include: INTERVIEW_INCLUDE });
 };
 
 /** Mark an interview completed (or no_show) and record the outcome. */

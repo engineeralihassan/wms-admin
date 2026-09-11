@@ -4,25 +4,6 @@ const {
   INTERVIEW_RESPONSE_STATUSES,
 } = require('../utils/ats.constants');
 
-/**
- * InterviewParticipant = one attendee on an Interview.
- *
- * Two kinds of attendee share this table:
- *   - Platform users (interviewers + the organizer): identified by `user_id`, with
- *     their email snapshot copied to `email` for the calendar invite.
- *   - The candidate: NOT a platform user, so `user_id` is null and the identity comes
- *     from the parent application (copied into `email`/`name` at booking time).
- *
- * Keeping interviewers as first-class rows (rather than a JSONB array on the interview)
- * is what makes conflict detection cheap and correct: to answer "is interviewer X free
- * at time T?" we join this table to active interviews and check overlap. It also lets
- * us track each attendee's RSVP independently.
- *
- * Relationships:
- *   Organization  1───* InterviewParticipant   (organization_id)
- *   Interview     1───* InterviewParticipant   (interview_id, cascade on delete)
- *   User          1───* InterviewParticipant   (user_id, nullable for the candidate)
- */
 module.exports = (sequelize) => {
   const InterviewParticipant = sequelize.define(
     'InterviewParticipant',
@@ -93,8 +74,7 @@ module.exports = (sequelize) => {
         { unique: true, fields: ['uuid'] },
         { fields: ['organization_id'] },
         { fields: ['interview_id'] },
-        // The conflict-detection lookup: all active interviews a user participates in.
-        { fields: ['user_id'] },
+        { fields: ['user_id', 'interview_id'] },
         // A user appears once per interview.
         { unique: true, fields: ['interview_id', 'user_id'] },
       ],

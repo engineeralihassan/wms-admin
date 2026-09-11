@@ -435,10 +435,25 @@ export interface Interview {
   participants: InterviewParticipant[];
 }
 
-/** One bookable slot returned by the availability endpoint (absolute ISO instants). */
+/**
+ * Why a slot can't be booked:
+ *   past      — the time has already started.
+ *   busy      — overlaps an actual booking (shown at the exact booked time).
+ *   too_close — clears the booking but falls inside the required gap (buffer) between
+ *               interviews. Unbookable, but not itself a booked time.
+ */
+export type SlotUnavailableReason = 'past' | 'busy' | 'too_close';
+
+/**
+ * One slot returned by the availability endpoint (absolute ISO instants). Every
+ * working-hour slot is returned; `available` is false for past/busy ones so the UI can
+ * show them greyed-out with a reason (Calendly-style) instead of hiding them.
+ */
 export interface AvailabilitySlot {
   start: string;
   end: string;
+  available: boolean;
+  reason: SlotUnavailableReason | null;
 }
 
 export interface AvailabilityResponse {

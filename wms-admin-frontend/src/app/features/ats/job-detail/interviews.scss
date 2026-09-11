@@ -117,6 +117,10 @@
   overflow-y: auto;
 }
 .slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   padding: spacing('2');
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
@@ -126,13 +130,49 @@
   cursor: pointer;
   text-align: center;
 }
-.slot:hover {
+.slot:hover:not(:disabled) {
   border-color: var(--color-primary-400, #60a5fa);
 }
 .slot--active {
   border-color: var(--color-primary-600, #2563eb);
   background: var(--color-primary-50, #eff6ff);
   font-weight: font-weight('semibold');
+}
+.slot:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.slot--busy .slot__time,
+.slot--past .slot__time {
+  text-decoration: line-through;
+  color: var(--color-text-muted);
+}
+.slot--too-close .slot__time {
+  color: var(--color-text-muted);
+}
+.slot--busy {
+  background: var(--color-danger-100, #fee2e2);
+  border-color: var(--color-danger-100, #fee2e2);
+}
+.slot--too-close {
+  background: var(--color-warning-100, #fef3c7);
+  border-color: var(--color-warning-100, #fef3c7);
+}
+.slot--past {
+  background: var(--color-surface-muted);
+}
+.slot__tag {
+  font-size: font-size('xs');
+  font-weight: font-weight('medium');
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.slot--busy .slot__tag {
+  color: var(--color-danger-700, #b91c1c);
+}
+.slot--too-close .slot__tag {
+  color: var(--color-warning-700, #b45309);
 }
 @media (max-width: 640px) {
   .schedule__grid {

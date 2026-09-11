@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { OrganizationsService } from '../services/organizations.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { ModalService } from '../../../core/services/modal.service';
 import { CardComponent } from '../../../shared/components/card/card.component';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { DataTableComponent, type DataTableAction, type DataTableColumn, type DataTableDateRangeFilter, type DataTableFilter } from '../../../shared/components/data-table/data-table.component';
@@ -29,6 +30,7 @@ export class OrganizationListComponent {
   private readonly fb = inject(FormBuilder);
   private readonly orgs = inject(OrganizationsService);
   private readonly notify = inject(NotificationService);
+  private readonly modal = inject(ModalService);
 
   protected readonly submitting = signal(false);
   protected readonly showForm = signal(false);
@@ -89,12 +91,18 @@ export class OrganizationListComponent {
     this.list.clearFilters();
   }
 
-  protected onAction(event: { actionId: string; row: Organization }): void {
+  protected async onAction(event: { actionId: string; row: Organization }): Promise<void> {
     if (event.actionId !== 'toggle-status') return;
 
     const nextStatus = !event.row.is_active;
     const action = nextStatus ? 'activate' : 'deactivate';
-    if (!globalThis.confirm(`Are you sure you want to ${action} ${event.row.name}?`)) return;
+    const confirmed = await this.modal.confirm({
+      title: `${nextStatus ? 'Activate' : 'Deactivate'} organization`,
+      message: `Are you sure you want to ${action} ${event.row.name}?`,
+      confirmText: nextStatus ? 'Activate' : 'Deactivate',
+      confirmVariant: nextStatus ? 'primary' : 'danger',
+    });
+    if (!confirmed) return;
 
     this.orgs.updateStatus(event.row.uuid, nextStatus).subscribe({
       next: () => {

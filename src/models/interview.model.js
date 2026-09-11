@@ -191,8 +191,7 @@ module.exports = (sequelize) => {
         { fields: ['application_id'] },
         { fields: ['application_id', 'status'] },
         { fields: ['job_id'] },
-        // Supports conflict/availability scans by time window within a tenant.
-        { fields: ['organization_id', 'scheduled_start'] },
+        { fields: ['organization_id', 'status', 'scheduled_start'] },
       ],
     }
   );

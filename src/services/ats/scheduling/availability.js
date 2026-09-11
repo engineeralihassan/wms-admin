@@ -132,7 +132,10 @@ const overlaps = (aStart, aEnd, bStart, bEnd) => aStart < bEnd && bStart < aEnd;
  * @param {number} [p.granularityMinutes]
  * @param {number} [p.bufferMinutes] gap enforced around each busy block
  * @param {Date}   [p.now]           earliest allowed start (defaults to current time)
- * @returns {Array<{ start: string, end: string }>} ISO instants, capped.
+ * @returns {Array<{ start: string, end: string, available: boolean, reason: string|null }>}
+ *          EVERY working-hour slot in range, classified. `available` is true only when
+ *          `reason` is null; `reason` is 'past' | 'busy' | 'too_close' otherwise. Capped
+ *          at MAX_SLOTS_RETURNED.
  */
 const generateSlots = ({
   rangeStart,
@@ -153,7 +156,14 @@ const generateSlots = ({
   const { h: startH, m: startM } = parseHm(workingHours.start || INTERVIEW_DEFAULT_WORKING_HOURS.start);
   const { h: endH, m: endM } = parseHm(workingHours.end || INTERVIEW_DEFAULT_WORKING_HOURS.end);
 
-  // Pre-expand busy windows by the buffer on both sides.
+  // Two views of each booking:
+  //  - `booked`  = the exact interview window (what's REALLY taken). A slot overlapping
+  //                this is hard 'busy' and shown struck-through at that exact time.
+  //  - `blocked` = the window widened by the buffer. A slot that clears `booked` but hits
+  //                `blocked` is only 'too_close' (the gap the buffer enforces), so the UI
+  //                doesn't mislead the recruiter into thinking a neighboring time is
+  //                actually booked. Both are unbookable; the distinction is display-only.
+  const booked = busy.map((b) => ({ start: b.start.getTime(), end: b.end.getTime() }));
   const blocked = busy.map((b) => ({
     start: b.start.getTime() - bufMs,
     end: b.end.getTime() + bufMs,
@@ -174,13 +184,28 @@ const generateSlots = ({
       for (let t = dayStart.getTime(); t + durMs <= dayEnd.getTime(); t += stepMs) {
         const slotStart = t;
         const slotEnd = t + durMs;
-        if (slotStart < now.getTime()) continue;
         if (slotStart < rangeStart.getTime() || slotEnd > rangeEnd.getTime()) continue;
-        const collides = blocked.some((b) => overlaps(slotStart, slotEnd, b.start, b.end));
-        if (collides) continue;
+
+        // Classify every working-hour slot rather than dropping unavailable ones, so the
+        // UI can show them with a reason (Calendly-style). Precedence:
+        //   'past'      — the slot has already started.
+        //   'busy'      — it overlaps an actual booking (shown at the exact booked time).
+        //   'too_close' — it clears the booking itself but falls within the buffer gap.
+        //   null        — bookable.
+        let reason = null;
+        if (slotStart < now.getTime()) {
+          reason = 'past';
+        } else if (booked.some((b) => overlaps(slotStart, slotEnd, b.start, b.end))) {
+          reason = 'busy';
+        } else if (blocked.some((b) => overlaps(slotStart, slotEnd, b.start, b.end))) {
+          reason = 'too_close';
+        }
+
         slots.push({
           start: new Date(slotStart).toISOString(),
           end: new Date(slotEnd).toISOString(),
+          available: reason === null,
+          reason,
         });
         if (slots.length >= INTERVIEW_LIMITS.MAX_SLOTS_RETURNED) return slots;
       }

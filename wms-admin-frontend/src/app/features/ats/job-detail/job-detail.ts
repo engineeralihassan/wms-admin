@@ -568,8 +568,9 @@ export class JobDetail implements OnInit {
         next: (res) => {
           this.slots.set(res.slots);
           this.slotsLoading.set(false);
-          if (res.slots.length === 0) {
-            this.notify.info('No free slots in that range. Try widening it.');
+          const openCount = res.slots.filter((s) => s.available).length;
+          if (openCount === 0) {
+            this.notify.info('No free slots in that range — all times are booked or past. Try widening it.');
           }
         },
         error: () => this.slotsLoading.set(false),
@@ -577,7 +578,17 @@ export class JobDetail implements OnInit {
   }
 
   protected selectSlot(slot: AvailabilitySlot): void {
+    // Guard: never select a past/busy slot even if the click somehow reaches here.
+    if (!slot.available) return;
     this.selectedSlotStart.set(slot.start);
+  }
+
+  /** Short label for why a slot can't be picked (shown on the disabled chip). */
+  protected slotReasonLabel(slot: AvailabilitySlot): string {
+    if (slot.available) return '';
+    if (slot.reason === 'past') return 'Past';
+    if (slot.reason === 'too_close') return 'Gap';
+    return 'Busy';
   }
 
   protected submitSchedule(): void {
@@ -616,12 +627,14 @@ export class JobDetail implements OnInit {
         notes: v.notes.trim() || undefined,
       })
       .subscribe({
-        next: () => {
+        next: (created) => {
           this.notify.success('Interview scheduled. Invites are on their way.');
           this.scheduling.set(false);
           this.scheduleOpen.set(false);
-          this.loadInterviews(app.uuid);
-          // Booking advances the application to interviewing — refresh the record + list.
+          // Reuse the created interview from the response instead of re-fetching the list.
+          this.appInterviews.update((list) => [...list, created]);
+          // Booking advances the application to interviewing — refresh the drawer record
+          // and the applicants table so the status badge reflects it.
           this.jobs.getApplication(app.uuid).subscribe((full) => this.activeApplication.set(full));
           this.list.reload();
         },
@@ -641,9 +654,9 @@ export class JobDetail implements OnInit {
     });
     if (!confirmed) return;
     this.interviews.cancel(i.uuid, {}).subscribe({
-      next: () => {
+      next: (updated) => {
         this.notify.success('Interview cancelled.');
-        this.loadInterviews(app.uuid);
+        this.replaceInterview(updated);
       },
     });
   }
@@ -652,11 +665,18 @@ export class JobDetail implements OnInit {
     const app = this.activeApplication();
     if (!app) return;
     this.interviews.complete(i.uuid, { outcome }).subscribe({
-      next: () => {
+      next: (updated) => {
         this.notify.success(outcome === 'no_show' ? 'Marked as no-show.' : 'Interview completed.');
-        this.loadInterviews(app.uuid);
+        this.replaceInterview(updated);
       },
     });
+  }
+
+  /** Patch a single interview in the local list from a mutation response (no refetch). */
+  private replaceInterview(updated: Interview): void {
+    this.appInterviews.update((list) =>
+      list.map((iv) => (iv.uuid === updated.uuid ? updated : iv)),
+    );
   }
 
   /** Format a Date as a yyyy-MM-dd string for a native date input. */

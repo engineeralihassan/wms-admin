@@ -511,9 +511,17 @@
               type="button"
               class="slot"
               [class.slot--active]="selectedSlotStart() === s.start"
+              [class.slot--busy]="!s.available && s.reason === 'busy'"
+              [class.slot--too-close]="!s.available && s.reason === 'too_close'"
+              [class.slot--past]="!s.available && s.reason === 'past'"
+              [disabled]="!s.available"
+              [attr.title]="s.available ? null : slotReasonLabel(s)"
               (click)="selectSlot(s)"
             >
-              {{ formatSlot(s.start) }}
+              <span class="slot__time">{{ formatSlot(s.start) }}</span>
+              @if (!s.available) {
+                <span class="slot__tag">{{ slotReasonLabel(s) }}</span>
+              }
             </button>
           }
         </div>
