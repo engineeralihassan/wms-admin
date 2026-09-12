@@ -75,8 +75,19 @@ module.exports = (sequelize) => {
       emergency_contact: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
       // { certificate_level, field_of_study, school }
       education: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
-      // { visa_no, visa_type, work_permit_no, visa_expiration_date, work_permit_expiration_date }
+      // { visa_status, visa_no, visa_type, work_permit_no, visa_expiration_date,
+      //   work_permit_expiration_date }. `visa_status` is a canonical key from
+      // config/profile.constants VISA_STATUSES and drives the conditional UI
+      // (e.g. permanent statuses hide the expiration date).
       work_permit: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
+
+      // ── Bank details ────────────────────────────────────────────────────────
+      // Cohesive but rarely-queried, and sensitive. Stored as a JSONB block (same
+      // pattern as the other groups). Account/routing numbers are stored raw but
+      // MASKED in the self-service DTO (only last 4 returned to the browser).
+      // { bank_name, account_holder_name, account_type, routing_number,
+      //   account_number, cheque_document_id }
+      bank_details: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
 
       // ── Contract ────────────────────────────────────────────────────────────
       contract_reference: { type: DataTypes.STRING(150), allowNull: true },
@@ -109,6 +120,15 @@ module.exports = (sequelize) => {
 
       // Completion tracking so the UI can nudge the consultant to finish their profile.
       profile_completed: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+
+      // ── Section locking (Option A) ──────────────────────────────────────────
+      // JSONB map of { <section_key>: { status, verified_by_id, verified_at, note } }
+      // for the structured, lockable sections (bank_details, work_authorization,
+      // emergency_contact). A section with status 'verified' is LOCKED: self-service
+      // writes to it are rejected server-side until an admin unlocks it. Documents
+      // lock independently via UserDocument.status. Keys come from
+      // config/profile.constants PROFILE_SECTIONS.
+      verified_sections: { type: DataTypes.JSONB, allowNull: false, defaultValue: {} },
     },
     {
       tableName: 'user_profiles',

@@ -49,12 +49,36 @@ export interface Education {
 }
 
 export interface WorkPermit {
+  visa_status?: string;
   visa_no?: string;
   visa_type?: string;
   work_permit_no?: string;
-  visa_expiration_date?: string;
-  work_permit_expiration_date?: string;
+  visa_expiration_date?: string | null;
+  work_permit_expiration_date?: string | null;
 }
+
+/** Bank block as returned by the backend (numbers masked). */
+export interface BankDetailsDto {
+  bank_name: string | null;
+  account_holder_name: string | null;
+  account_type: string | null;
+  routing_number_masked: string | null;
+  account_number_masked: string | null;
+  cheque_document_id: string | null;
+  has_routing_number: boolean;
+  has_account_number: boolean;
+}
+
+/** Lock state for a structured, verifiable profile section. */
+export interface SectionLock {
+  locked: boolean;
+  status: string;
+  verified_at: string | null;
+  note: string | null;
+}
+
+/** Keys of the lockable structured sections. */
+export type ProfileSectionKey = 'bank_details' | 'work_authorization' | 'emergency_contact';
 
 export interface PrivateInformation {
   private_address?: Address;
@@ -98,6 +122,8 @@ export interface UserProfile {
   profile_completed?: boolean;
   employee_type?: string;
   vendor_id?: number | null;
+  bank_details?: BankDetailsDto;
+  section_locks?: Record<ProfileSectionKey, SectionLock>;
   work_information: WorkInformation;
   private_information: PrivateInformation;
   contract: Contract;
@@ -109,13 +135,32 @@ export interface UserDocument {
   doc_type: string;
   label: string;
   required?: boolean;
+  /** True once an admin verifies it (locked). */
+  locked?: boolean;
+  /** Optional link to a blank sample the user downloads, fills, and re-uploads. */
+  sample_url?: string | null;
   status: 'pending' | 'uploaded' | 'verified' | 'rejected';
   file_name?: string | null;
   file_mime?: string | null;
   file_size?: number | null;
+  /** Delivery link to the uploaded file (for the admin to view). */
+  file_url?: string | null;
   expires_on?: string | null;
   uploaded_at?: string | null;
   note?: string | null;
+}
+
+/** Body for the admin document approve/reject/unlock call. */
+export interface DocumentStatusPayload {
+  status: 'verified' | 'rejected' | 'uploaded' | 'pending';
+  note?: string;
+}
+
+/** Body for the admin section lock/unlock call. */
+export interface SectionStatusPayload {
+  section: ProfileSectionKey;
+  status: 'verified' | 'unverified';
+  note?: string;
 }
 
 export interface VendorProfile {

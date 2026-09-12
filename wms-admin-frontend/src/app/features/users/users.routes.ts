@@ -21,13 +21,16 @@ export const USERS_ROUTES: Routes = [
   {
     path: ':uuid/edit',
     title: 'Edit user',
+    data: { mode: 'edit' },
     loadComponent: () =>
       import('./user-form/user-form.component').then((m) => m.UserFormComponent),
   },
   {
+    // View = the same tabbed form as edit, but read-only + admin verification actions.
     path: ':uuid',
-    title: 'User details',
+    title: 'User profile',
+    data: { mode: 'view' },
     loadComponent: () =>
-      import('./user-detail/user-detail.component').then((m) => m.UserDetailComponent),
+      import('./user-form/user-form.component').then((m) => m.UserFormComponent),
   },
 ];

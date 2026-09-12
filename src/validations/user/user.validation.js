@@ -1,6 +1,11 @@
 const Joi = require('joi');
 const { ORG_ASSIGNABLE_ROLES } = require('../../config/rbac');
 const { USER_DOCUMENT_TYPE_KEYS } = require('../../config/user-documents');
+const {
+  VISA_STATUS_KEYS,
+  BANK_ACCOUNT_TYPES,
+  PROFILE_SECTION_KEYS,
+} = require('../../config/profile.constants');
 const { listQuery } = require('../common.validation');
 
 // ── Reusable nested sub-schemas (shared by create + update) ───────────────────
@@ -52,12 +57,33 @@ const privateInformationSchema = Joi.object().keys({
     school: Joi.string().allow('').max(200),
   }),
   work_permit: Joi.object().keys({
+    visa_status: Joi.string()
+      .allow('')
+      .valid(...VISA_STATUS_KEYS, ''),
     visa_no: Joi.string().allow('').max(80),
     visa_type: Joi.string().allow('').max(80),
     work_permit_no: Joi.string().allow('').max(80),
-    visa_expiration_date: Joi.date().iso(),
-    work_permit_expiration_date: Joi.date().iso(),
+    visa_expiration_date: Joi.date().iso().allow(null),
+    work_permit_expiration_date: Joi.date().iso().allow(null),
   }),
+});
+
+// Bank details block (its own section). Numbers are stored raw, masked on read.
+const bankDetailsSchema = Joi.object().keys({
+  bank_name: Joi.string().allow('').max(150),
+  account_holder_name: Joi.string().allow('').max(150),
+  account_type: Joi.string()
+    .allow('')
+    .valid(...BANK_ACCOUNT_TYPES, ''),
+  routing_number: Joi.string()
+    .allow('')
+    .pattern(/^[0-9]{0,17}$/)
+    .messages({ 'string.pattern.base': 'Routing number must be digits only.' }),
+  account_number: Joi.string()
+    .allow('')
+    .pattern(/^[0-9]{0,34}$/)
+    .messages({ 'string.pattern.base': 'Account number must be digits only.' }),
+  cheque_document_id: Joi.string().uuid().allow('', null),
 });
 
 const contractSchema = Joi.object().keys({
@@ -90,6 +116,7 @@ const profileSchema = Joi.object().keys({
   private_information: privateInformationSchema,
   contract: contractSchema,
   settings: settingsSchema,
+  bank_details: bankDetailsSchema,
 });
 
 const vendorProfileSchema = Joi.object().keys({
@@ -177,6 +204,31 @@ const documentUpload = {
   }),
 };
 
+// Admin approves/rejects (locks/unlocks) a single document.
+// verified => locked (user can no longer edit); rejected/uploaded => unlocked.
+const setDocumentStatus = {
+  params: Joi.object().keys({
+    uuid: Joi.string().required().uuid(),
+    docUuid: Joi.string().required().uuid(),
+  }),
+  body: Joi.object().keys({
+    status: Joi.string().required().valid('verified', 'rejected', 'uploaded', 'pending'),
+    note: Joi.string().allow('').max(500),
+  }),
+};
+
+// Admin locks/unlocks a STRUCTURED section (bank_details / work_authorization / emergency_contact).
+const setSectionStatus = {
+  params: Joi.object().keys({ uuid: Joi.string().required().uuid() }),
+  body: Joi.object().keys({
+    section: Joi.string()
+      .required()
+      .valid(...PROFILE_SECTION_KEYS),
+    status: Joi.string().required().valid('verified', 'unverified'),
+    note: Joi.string().allow('').max(500),
+  }),
+};
+
 // ── Self-service (/auth/me) schemas ──────────────────────────────────────────
 
 const updateOwnProfile = {
@@ -206,6 +258,8 @@ module.exports = {
   updateUser,
   updateUserProfile,
   documentUpload,
+  setDocumentStatus,
+  setSectionStatus,
   updateOwnProfile,
   uploadOwnDocument,
 };

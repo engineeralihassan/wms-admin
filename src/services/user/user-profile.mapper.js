@@ -1,5 +1,6 @@
 const { CONSULTANT_ROLES, ROLES } = require('../../config/rbac');
 const { USER_DOCUMENT_CATALOGUE } = require('../../config/user-documents');
+const { PROFILE_SECTIONS } = require('../../config/profile.constants');
 
 /**
  * Maps the validated `profile` payload (nested, UI-shaped) onto UserProfile columns.
@@ -37,6 +38,9 @@ const buildProfileAttributes = (profile = {}) => {
   if (priv.emergency_contact !== undefined) out.emergency_contact = priv.emergency_contact || {};
   if (priv.education !== undefined) out.education = priv.education || {};
   if (priv.work_permit !== undefined) out.work_permit = priv.work_permit || {};
+
+  // Bank details live at the top level of the friendly payload (their own tab/section).
+  if (profile.bank_details !== undefined) out.bank_details = profile.bank_details || {};
 
   const contract = profile.contract || {};
   set('contract_reference', contract.contract_reference);
@@ -96,9 +100,32 @@ const buildInitialDocumentRows = (userId, organizationId) =>
     uploaded_by_id: null,
   }));
 
+/**
+ * Maps a friendly profile payload to the STRUCTURED sections it would write, so the
+ * lock guard can tell which locked sections a self-service update is trying to touch.
+ * Returns the set of PROFILE_SECTIONS keys present in the payload.
+ */
+const sectionsTouchedByPayload = (profile = {}) => {
+  const touched = new Set();
+  if (profile.bank_details !== undefined) touched.add(PROFILE_SECTIONS.BANK_DETAILS);
+  const priv = profile.private_information || {};
+  if (priv.work_permit !== undefined) touched.add(PROFILE_SECTIONS.WORK_AUTHORIZATION);
+  if (priv.emergency_contact !== undefined) touched.add(PROFILE_SECTIONS.EMERGENCY_CONTACT);
+  return [...touched];
+};
+
+/** Is a structured section currently locked (admin-verified) on this profile? */
+const isSectionLocked = (profile, sectionKey) => {
+  const map = (profile && profile.verified_sections) || {};
+  const entry = map[sectionKey];
+  return !!(entry && entry.status === 'verified');
+};
+
 module.exports = {
   buildProfileAttributes,
   defaultEmployeeTypeForRole,
   isConsultantRole,
   buildInitialDocumentRows,
+  sectionsTouchedByPayload,
+  isSectionLocked,
 };

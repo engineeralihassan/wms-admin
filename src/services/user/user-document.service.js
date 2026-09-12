@@ -1,7 +1,12 @@
 const httpStatus = require('http-status');
-const { User, UserDocument } = require('../../models');
+const { User, UserProfile, UserDocument } = require('../../models');
 const ApiError = require('../../utils/ApiError');
-const { USER_DOCUMENT_CATALOGUE, USER_DOCUMENT_TYPE_KEYS } = require('../../config/user-documents');
+const {
+  USER_DOCUMENT_CATALOGUE,
+  USER_DOCUMENT_TYPE_KEYS,
+  catalogueForEmployeeType,
+} = require('../../config/user-documents');
+const { visaRequiresExpiry } = require('../../config/profile.constants');
 const { buildUserScope } = require('./user.service');
 
 /**
@@ -27,20 +32,35 @@ const resolveScopedUser = async (uuid, req, res) => {
 /**
  * Merge the fixed catalogue with the user's stored rows so the FE always renders the
  * full expected checklist, even for slots that have no row yet.
+ *
+ * @param {Array} rows            the user's UserDocument rows.
+ * @param {Object} ctx
+ * @param {string|null} ctx.employeeType  filters slots by `appliesTo` (w2/1099/c2c).
+ * @param {string|null} ctx.visaStatus    hides `visaOnly` slots for permanent statuses.
  */
-const mergeWithCatalogue = (rows) => {
+const mergeWithCatalogue = (rows, ctx = {}) => {
+  const { employeeType = null, visaStatus = null } = ctx;
   const byType = new Map(rows.map((r) => [r.doc_type, r]));
-  const catalogue = USER_DOCUMENT_CATALOGUE.map((def) => {
+  // Scope the catalogue to this employee type (empty appliesTo = universal).
+  const scoped = catalogueForEmployeeType(employeeType).filter((def) => {
+    // Work authorization docs only apply to time-bound visa statuses.
+    if (def.visaOnly && visaStatus && !visaRequiresExpiry(visaStatus)) return false;
+    return true;
+  });
+  const catalogue = scoped.map((def) => {
     const row = byType.get(def.type);
     return {
       doc_type: def.type,
       label: (row && row.label) || def.label,
       required: def.required,
+      sample_url: def.sampleUrl || null,
       status: row ? row.status : 'pending',
+      locked: row ? row.status === 'verified' : false,
       uuid: row ? row.uuid : null,
       file_name: row ? row.file_name : null,
       file_mime: row ? row.file_mime : null,
       file_size: row ? row.file_size : null,
+      file_url: row ? row.file_url : null,
       expires_on: row ? row.expires_on : null,
       uploaded_at: row ? row.uploaded_at : null,
       note: row ? row.note : null,
@@ -53,16 +73,31 @@ const mergeWithCatalogue = (rows) => {
       doc_type: r.doc_type,
       label: r.label,
       required: false,
+      sample_url: null,
       status: r.status,
+      locked: r.status === 'verified',
       uuid: r.uuid,
       file_name: r.file_name,
       file_mime: r.file_mime,
       file_size: r.file_size,
+      file_url: r.file_url,
       expires_on: r.expires_on,
       uploaded_at: r.uploaded_at,
       note: r.note,
     }));
   return [...catalogue, ...extra];
+};
+
+/** Load the profile context (employee_type + visa status) used to scope the catalogue. */
+const loadProfileContext = async (userId) => {
+  const profile = await UserProfile.findOne({
+    where: { user_id: userId },
+    attributes: ['employee_type', 'work_permit'],
+  });
+  return {
+    employeeType: profile ? profile.employee_type : null,
+    visaStatus: profile && profile.work_permit ? profile.work_permit.visa_status || null : null,
+  };
 };
 
 /** List a target user's documents (admin/vendor path), scoped. */
@@ -72,7 +107,8 @@ const listUserDocuments = async (uuid, req, res) => {
     where: { user_id: user.id },
     order: [['createdAt', 'ASC']],
   });
-  return mergeWithCatalogue(rows);
+  const ctx = await loadProfileContext(user.id);
+  return mergeWithCatalogue(rows, ctx);
 };
 
 /** List the caller's OWN documents (self-service path). */
@@ -81,7 +117,8 @@ const listOwnDocuments = async (userId) => {
     where: { user_id: userId },
     order: [['createdAt', 'ASC']],
   });
-  return mergeWithCatalogue(rows);
+  const ctx = await loadProfileContext(userId);
+  return mergeWithCatalogue(rows, ctx);
 };
 
 /**
@@ -89,7 +126,14 @@ const listOwnDocuments = async (userId) => {
  * slot is updated in place; an 'other' document creates a new row.
  * `actingUserId` is who performed the upload (self or admin).
  */
-const upsertDocument = async ({ targetUserId, organizationId, actingUserId, payload }) => {
+const upsertDocument = async ({
+  targetUserId,
+  organizationId,
+  actingUserId,
+  payload,
+  enforceLock = false,
+  res = null,
+}) => {
   const {
     doc_type,
     label,
@@ -116,6 +160,13 @@ const upsertDocument = async ({ targetUserId, organizationId, actingUserId, payl
       label: label || null,
     },
   });
+
+  // LOCK RULE: a verified document is locked. Self-service (enforceLock) callers may
+  // not replace it — they must request a change via a ticket so an admin unlocks it.
+  if (enforceLock && row.status === 'verified') {
+    const msg = res ? res.__('document_locked') : 'This document is locked and cannot be changed.';
+    throw new ApiError(httpStatus.CONFLICT, msg);
+  }
 
   await row.update({
     label: label || row.label,
@@ -145,14 +196,34 @@ const uploadUserDocument = async (uuid, payload, req, res) => {
   });
 };
 
-/** Caller records an upload for their OWN document. */
-const uploadOwnDocument = async (userId, organizationId, payload) => {
+/** Caller records an upload for their OWN document. Locked (verified) slots are rejected. */
+const uploadOwnDocument = async (userId, organizationId, payload, res = null) => {
   return upsertDocument({
     targetUserId: userId,
     organizationId,
     actingUserId: userId,
     payload,
+    enforceLock: true,
+    res,
   });
+};
+
+/**
+ * Admin approves/rejects a document (locks/unlocks it). Tenant + ownership scoped
+ * through the parent user. 'verified' => locked; anything else unlocks it and lets the
+ * user re-upload. Requires user.update (enforced at the route).
+ */
+const setDocumentStatus = async (uuid, docUuid, { status, note }, req, res) => {
+  const user = await resolveScopedUser(uuid, req, res);
+  const row = await UserDocument.findOne({ where: { uuid: docUuid, user_id: user.id } });
+  if (!row) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('document_not_found'));
+  }
+  await row.update({
+    status,
+    note: note !== undefined ? note : row.note,
+  });
+  return row;
 };
 
 module.exports = {
@@ -160,5 +231,6 @@ module.exports = {
   listOwnDocuments,
   uploadUserDocument,
   uploadOwnDocument,
+  setDocumentStatus,
   mergeWithCatalogue,
 };

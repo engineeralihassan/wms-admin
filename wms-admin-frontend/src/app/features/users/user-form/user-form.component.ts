@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CardComponent } from '../../../shared/components/card/card.component';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+import { ModalComponent } from '../../../shared/components/modal/modal.component';
 import { NotificationService } from '../../../core/services/notification.service';
 import { markAllAsTouched } from '../../../shared/utils/form.utils';
 import { APP_ROUTES } from '../../../core/constants/app-routes';
@@ -17,11 +18,17 @@ import {
   EMPLOYEE_TYPE_OPTIONS,
   type CreateUserPayload,
   type LeaveAllocationInput,
+  type ProfileSectionKey,
   type UserDetail,
+  type UserDocument,
   type VendorOption,
 } from '../models/user.model';
+import { VISA_STATUS_OPTIONS } from '../../profile/models/profile.model';
 
 type TabId = 'work' | 'private' | 'contract' | 'documents' | 'timeoff' | 'settings';
+
+/** The three ways this one component is used. */
+export type UserFormMode = 'create' | 'edit' | 'view';
 
 /**
  * Tabbed create/edit form for a user (Odoo-style, trimmed to the fields we keep).
@@ -39,7 +46,14 @@ type TabId = 'work' | 'private' | 'contract' | 'documents' | 'timeoff' | 'settin
 @Component({
   selector: 'app-user-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink, CardComponent, ButtonComponent, SpinnerComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    CardComponent,
+    ButtonComponent,
+    SpinnerComponent,
+    ModalComponent,
+  ],
   templateUrl: './user-form.component.html',
   styleUrl: './user-form.component.scss',
 })
@@ -49,11 +63,31 @@ export class UserFormComponent {
   private readonly leaves = inject(LeavesService);
   private readonly notify = inject(NotificationService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
-  /** Present in edit mode (bound from the `:uuid` route segment). */
+  /** Present in edit/view mode (bound from the `:uuid` route segment). */
   readonly uuid = input<string | undefined>(undefined);
 
-  protected readonly isEdit = computed(() => !!this.uuid());
+  /**
+   * create | edit | view. Read from the route's static `data.mode` (robust —
+   * doesn't depend on input-binding-from-data). Falls back to inferring from the URL.
+   */
+  protected readonly mode = signal<UserFormMode>(this.resolveMode());
+
+  private resolveMode(): UserFormMode {
+    const dataMode = this.route.snapshot.data?.['mode'] as UserFormMode | undefined;
+    if (dataMode) return dataMode;
+    // Fallback from the URL shape: /users/new, /users/:uuid/edit, /users/:uuid
+    const url = this.route.snapshot.url.map((s) => s.path);
+    if (url.includes('new')) return 'create';
+    if (url.includes('edit')) return 'edit';
+    return this.route.snapshot.paramMap.get('uuid') ? 'view' : 'create';
+  }
+
+  protected readonly isEdit = computed(() => this.mode() === 'edit');
+  protected readonly isView = computed(() => this.mode() === 'view');
+  /** True when we're loading an existing user (edit or view). */
+  protected readonly isExisting = computed(() => this.mode() !== 'create');
   protected readonly loading = signal(false);
   protected readonly submitting = signal(false);
   protected readonly activeTab = signal<TabId>('work');
@@ -63,6 +97,23 @@ export class UserFormComponent {
   protected readonly employeeTypeOptions = EMPLOYEE_TYPE_OPTIONS;
   protected readonly contractTypeOptions = CONTRACT_TYPE_OPTIONS;
   protected readonly advantageTooltips = ADVANTAGE_TOOLTIPS;
+  protected readonly visaStatusOptions = VISA_STATUS_OPTIONS;
+
+  // ── View-mode (admin verification) state ─────────────────────────────────────
+  /** The loaded user (view mode) — carries section_locks + bank masked values. */
+  protected readonly detail = signal<UserDetail | null>(null);
+  protected readonly busyDoc = signal<string | null>(null);
+  protected readonly busySection = signal<ProfileSectionKey | null>(null);
+
+  protected readonly sectionLocks = computed(
+    () => this.detail()?.profile?.section_locks ?? null,
+  );
+  protected readonly bankMasked = computed(() => this.detail()?.profile?.bank_details ?? null);
+
+  // Reject-reason modal
+  protected readonly rejectOpen = signal(false);
+  protected readonly rejectReason = signal('');
+  private rejectTarget: UserDocument | null = null;
 
   /** Vendors in the org, loaded lazily when the C2C role is selected. */
   protected readonly vendors = signal<VendorOption[]>([]);
@@ -74,7 +125,7 @@ export class UserFormComponent {
   /** The period year the initial grant applies to (defaults to the current year). */
   protected readonly periodYear = new Date().getFullYear();
 
-  protected readonly tabs: ReadonlyArray<{ id: TabId; label: string }> = [
+  private readonly allTabs: ReadonlyArray<{ id: TabId; label: string }> = [
     { id: 'work', label: 'Work Information' },
     { id: 'private', label: 'Private Information' },
     { id: 'contract', label: 'Contract' },
@@ -82,6 +133,11 @@ export class UserFormComponent {
     { id: 'timeoff', label: 'Time Off' },
     { id: 'settings', label: 'Settings' },
   ];
+
+  /** Tabs shown for the current mode (Time Off is a create-time concern). */
+  protected readonly tabs = computed(() =>
+    this.isView() ? this.allTabs.filter((t) => t.id !== 'timeoff') : this.allTabs,
+  );
 
   protected readonly documents = signal<UserDetail['documents']>([]);
 
@@ -134,12 +190,22 @@ export class UserFormComponent {
         school: [''],
       }),
       work_permit: this.fb.nonNullable.group({
+        visa_status: [''],
         visa_no: [''],
         visa_type: [''],
         work_permit_no: [''],
         visa_expiration_date: [''],
         work_permit_expiration_date: [''],
       }),
+    }),
+
+    // Bank details (shown read-only to the admin; numbers arrive masked from the API).
+    bank_details: this.fb.nonNullable.group({
+      bank_name: [''],
+      account_holder_name: [''],
+      account_type: [''],
+      routing_number: [''],
+      account_number: [''],
     }),
 
     // Contract
@@ -180,7 +246,7 @@ export class UserFormComponent {
 
   constructor() {
     queueMicrotask(() => {
-      if (this.isEdit()) this.load();
+      if (this.isExisting()) this.load();
       else {
         this.onRoleChange(this.form.controls.role.value);
         // Time-off allocation is a create-time concern; load the org's leave types so
@@ -261,11 +327,21 @@ export class UserFormComponent {
     this.loading.set(true);
     this.users.getDetail(id).subscribe({
       next: (u) => {
+        this.detail.set(u);
         this.patchFromDetail(u);
-        this.documents.set(u.documents ?? []);
+        this.loadDocuments();
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  /** Reload just the documents checklist (after an approve/reject). */
+  private loadDocuments(): void {
+    const id = this.uuid();
+    if (!id) return;
+    this.users.listDocuments(id).subscribe({
+      next: (docs) => this.documents.set(docs),
     });
   }
 
@@ -283,10 +359,28 @@ export class UserFormComponent {
         contract: u.profile.contract as never,
         settings: u.profile.settings as never,
       });
+      // Bank numbers arrive MASKED from the API; show them as-is (read-only).
+      const bank = u.profile.bank_details;
+      if (bank) {
+        this.form.controls.bank_details.patchValue({
+          bank_name: bank.bank_name ?? '',
+          account_holder_name: bank.account_holder_name ?? '',
+          account_type: bank.account_type ?? '',
+          routing_number: bank.routing_number_masked ?? '',
+          account_number: bank.account_number_masked ?? '',
+        });
+      }
     }
-    // Email + role are fixed after creation.
-    this.form.controls.email.disable();
-    this.form.controls.role.disable();
+
+    if (this.isView()) {
+      // View = read-only snapshot. Disable EVERY control so nothing can be edited;
+      // the admin acts via the verification buttons instead.
+      this.form.disable({ emitEvent: false });
+    } else {
+      // Edit mode: email + role are fixed after creation.
+      this.form.controls.email.disable();
+      this.form.controls.role.disable();
+    }
   }
 
   /** Strip empty strings/nulls so we never send noise; keeps the payload clean. */
@@ -326,11 +420,18 @@ export class UserFormComponent {
       return;
     }
     const raw = this.form.getRawValue();
+    // Only send bank numbers the admin actually changed. Masked placeholders (•••1234)
+    // must never be written back, so drop any value containing a bullet char.
+    const bank = { ...raw.bank_details } as Record<string, string>;
+    for (const key of ['routing_number', 'account_number']) {
+      if (typeof bank[key] === 'string' && bank[key].includes('•')) delete bank[key];
+    }
     const profile = this.prune({
       work_information: raw.work_information,
       private_information: raw.private_information,
       contract: raw.contract,
       settings: raw.settings,
+      bank_details: bank,
     });
 
     this.submitting.set(true);
@@ -394,5 +495,129 @@ export class UserFormComponent {
 
   protected cancel(): void {
     this.router.navigate([this.usersHome]);
+  }
+
+  // ── View mode: navigation + admin verification actions ──────────────────────
+
+  /** Switch from view to the edit form for the same user. */
+  protected goToEdit(): void {
+    const id = this.uuid();
+    if (id) this.router.navigate([this.usersHome, id, 'edit']);
+  }
+
+  protected isSectionLocked(key: ProfileSectionKey): boolean {
+    return !!this.sectionLocks()?.[key]?.locked;
+  }
+
+  private setSection(key: ProfileSectionKey, status: 'verified' | 'unverified'): void {
+    const id = this.uuid();
+    if (!id) return;
+    this.busySection.set(key);
+    this.users.setProfileSection(id, { section: key, status }).subscribe({
+      next: (u) => {
+        this.detail.set(u);
+        this.busySection.set(null);
+        this.notify.success(status === 'verified' ? 'Section approved and locked.' : 'Section unlocked.');
+      },
+      error: () => {
+        this.busySection.set(null);
+        this.notify.error('Could not update the section.');
+      },
+    });
+  }
+
+  protected lockSection(key: ProfileSectionKey): void {
+    this.setSection(key, 'verified');
+  }
+
+  protected unlockSection(key: ProfileSectionKey): void {
+    this.setSection(key, 'unverified');
+  }
+
+  private setDocStatus(doc: UserDocument, status: 'verified' | 'uploaded', note?: string): void {
+    const id = this.uuid();
+    if (!id || !doc.uuid) return;
+    this.busyDoc.set(doc.doc_type);
+    this.users.setDocumentStatus(id, doc.uuid, { status, note }).subscribe({
+      next: () => {
+        this.busyDoc.set(null);
+        this.loadDocuments();
+      },
+      error: () => {
+        this.busyDoc.set(null);
+        this.notify.error('Could not update the document.');
+      },
+    });
+  }
+
+  protected approveDoc(doc: UserDocument): void {
+    this.setDocStatus(doc, 'verified');
+    this.notify.success(`${doc.label} approved.`);
+  }
+
+  protected unlockDoc(doc: UserDocument): void {
+    this.setDocStatus(doc, 'uploaded');
+    this.notify.success(`${doc.label} unlocked.`);
+  }
+
+  /** True when the doc has a file the admin can act on. */
+  protected hasFile(doc: UserDocument): boolean {
+    return !!doc.uuid && doc.status !== 'pending';
+  }
+
+  protected docBadge(status: string): string {
+    switch (status) {
+      case 'verified':
+        return 'Approved';
+      case 'uploaded':
+        return 'Under review';
+      case 'rejected':
+        return 'Rejected';
+      default:
+        return 'Not uploaded';
+    }
+  }
+
+  // Reject-reason modal
+  protected openReject(doc: UserDocument): void {
+    if (!doc.uuid) return;
+    this.rejectTarget = doc;
+    this.rejectReason.set('');
+    this.rejectOpen.set(true);
+  }
+
+  protected closeReject(): void {
+    this.rejectOpen.set(false);
+    this.rejectTarget = null;
+    this.rejectReason.set('');
+  }
+
+  protected get rejectDocLabel(): string {
+    return this.rejectTarget?.label ?? '';
+  }
+
+  protected confirmReject(): void {
+    const id = this.uuid();
+    const doc = this.rejectTarget;
+    const note = this.rejectReason().trim();
+    if (!id || !doc || !doc.uuid) return;
+    if (!note) {
+      this.notify.error('Please enter a reason for rejection.');
+      return;
+    }
+    this.busyDoc.set(doc.doc_type);
+    this.rejectOpen.set(false);
+    this.users.setDocumentStatus(id, doc.uuid, { status: 'rejected', note }).subscribe({
+      next: () => {
+        this.busyDoc.set(null);
+        this.rejectTarget = null;
+        this.notify.success(`${doc.label} rejected.`);
+        this.loadDocuments();
+      },
+      error: () => {
+        this.busyDoc.set(null);
+        this.notify.error('Could not reject the document.');
+      },
+    });
   }
 }

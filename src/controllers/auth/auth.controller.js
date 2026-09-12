@@ -1,6 +1,8 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../../utils/catchAsync');
 const { authService, userService, userDocumentService } = require('../../services');
+const fileService = require('../../services/storage/file.service');
+const { UPLOAD_FOLDERS } = require('../../config/storage');
 const { toDto: userToDto, documentToDto } = require('../user/user.controller');
 
 const REFRESH_COOKIE = 'wms_refresh_token';
@@ -155,7 +157,7 @@ const getMyProfile = catchAsync(async (req, res) => {
  * are written. This is the consultant-side data-entry path.
  */
 const updateMyProfile = catchAsync(async (req, res) => {
-  const user = await userService.updateOwnProfile(req.auth.userId, req.body);
+  const user = await userService.updateOwnProfile(req.auth.userId, req.body, res);
   res.status(httpStatus.OK).send({ message: res.__('userUpdated'), data: userToDto(user) });
 });
 
@@ -165,12 +167,31 @@ const getMyDocuments = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('success'), data: docs });
 });
 
-/** POST /auth/me/documents  (protected) — the caller records an uploaded document. */
+/**
+ * POST /auth/me/documents  (protected) — the caller uploads/records a document for
+ * their OWN profile. Accepts a multipart `file` part (pushed to object storage here)
+ * or pre-uploaded JSON metadata. A verified (locked) slot is rejected server-side.
+ */
 const uploadMyDocument = catchAsync(async (req, res) => {
+  const payload = { ...req.body };
+
+  if (req.file) {
+    const [descriptor] = await fileService.uploadMany(
+      [{ ...req.file, field: req.file.fieldname }],
+      { folder: UPLOAD_FOLDERS.USER_DOCUMENTS }
+    );
+    payload.storage_key = descriptor.key;
+    payload.file_url = descriptor.url;
+    payload.file_name = payload.file_name || descriptor.name;
+    payload.file_mime = payload.file_mime || descriptor.mime;
+    payload.file_size = payload.file_size != null ? payload.file_size : descriptor.size;
+  }
+
   const doc = await userDocumentService.uploadOwnDocument(
     req.auth.userId,
     req.auth.organizationId,
-    req.body
+    payload,
+    res
   );
   res.status(httpStatus.OK).send({ message: res.__('success'), data: documentToDto(doc) });
 });

@@ -21,7 +21,10 @@ const {
   defaultEmployeeTypeForRole,
   isConsultantRole,
   buildInitialDocumentRows,
+  sectionsTouchedByPayload,
+  isSectionLocked,
 } = require('./user-profile.mapper');
+const { PROFILE_SECTIONS } = require('../../config/profile.constants');
 
 /** Columns returned for user list/detail (never password/salt). */
 const USER_PUBLIC_ATTRIBUTES = [
@@ -415,11 +418,29 @@ const getOwnProfile = async (userId) => {
   return user;
 };
 
-/** Upsert the caller's OWN profile. Same partial-write semantics as the admin path. */
-const updateOwnProfile = async (userId, profilePayload) => {
+/**
+ * Upsert the caller's OWN profile. Same partial-write semantics as the admin path,
+ * PLUS the section-lock guard: if the payload tries to modify a structured section
+ * (bank_details / work_authorization / emergency_contact) that an admin has verified
+ * (locked), the write is rejected. The user must request a change via a ticket.
+ */
+const updateOwnProfile = async (userId, profilePayload, res = null) => {
   const user = await User.findByPk(userId, {
     include: [{ model: UserProfile, as: 'profile' }],
   });
+
+  // Enforce locks before writing anything.
+  if (user.profile) {
+    const touched = sectionsTouchedByPayload(profilePayload || {});
+    const lockedTouched = touched.filter((s) => isSectionLocked(user.profile, s));
+    if (lockedTouched.length) {
+      const msg = res
+        ? res.__('section_locked')
+        : 'This section is locked and cannot be changed. Please raise a ticket to request an update.';
+      throw new ApiError(httpStatus.CONFLICT, msg);
+    }
+  }
+
   const attrs = buildProfileAttributes(profilePayload || {});
   if (user.profile) {
     await user.profile.update(attrs);
@@ -433,6 +454,39 @@ const updateOwnProfile = async (userId, profilePayload) => {
   return getOwnProfile(userId);
 };
 
+/**
+ * Admin locks/unlocks a structured profile section. 'verified' writes a lock marker
+ * into verified_sections; 'unverified' removes it (letting the user edit again).
+ * Tenant + ownership scoped through the parent user.
+ */
+const setProfileSectionStatus = async (uuid, { section, status, note }, req, res) => {
+  const user = await findScopedUserOrThrow(uuid, req, res, {
+    include: [{ model: UserProfile, as: 'profile' }],
+  });
+  if (!user.profile) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('user_not_found'));
+  }
+  const known = Object.values(PROFILE_SECTIONS);
+  if (!known.includes(section)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid profile section');
+  }
+
+  // JSONB must be replaced wholesale for Sequelize to detect the change.
+  const map = { ...(user.profile.verified_sections || {}) };
+  if (status === 'verified') {
+    map[section] = {
+      status: 'verified',
+      verified_by_id: req.auth.userId,
+      verified_at: new Date().toISOString(),
+      note: note || null,
+    };
+  } else {
+    delete map[section];
+  }
+  await user.profile.update({ verified_sections: map });
+  return getUserByUuid(uuid, req, res);
+};
+
 module.exports = {
   createUser,
   listUsers,
@@ -440,6 +494,7 @@ module.exports = {
   getUserByUuid,
   updateUser,
   updateUserProfile,
+  setProfileSectionStatus,
   resendInvite,
   getOwnProfile,
   updateOwnProfile,

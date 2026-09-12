@@ -3,6 +3,33 @@ const catchAsync = require('../../utils/catchAsync');
 const { userService, userDocumentService } = require('../../services');
 const fileService = require('../../services/storage/file.service');
 const { UPLOAD_FOLDERS } = require('../../config/storage');
+const { maskNumber, PROFILE_SECTIONS } = require('../../config/profile.constants');
+
+/** Lock state for a structured section, derived from verified_sections. */
+const sectionLock = (p, key) => {
+  const entry = (p.verified_sections || {})[key];
+  return {
+    locked: !!(entry && entry.status === 'verified'),
+    status: entry ? entry.status : 'unverified',
+    verified_at: entry ? entry.verified_at : null,
+    note: entry ? entry.note : null,
+  };
+};
+
+/**
+ * Mask the bank block for client display: never echo raw account/routing numbers
+ * back to the browser once stored. Only last 4 are shown.
+ */
+const bankToDto = (bank = {}) => ({
+  bank_name: bank.bank_name || null,
+  account_holder_name: bank.account_holder_name || null,
+  account_type: bank.account_type || null,
+  routing_number_masked: maskNumber(bank.routing_number),
+  account_number_masked: maskNumber(bank.account_number),
+  cheque_document_id: bank.cheque_document_id || null,
+  has_routing_number: !!bank.routing_number,
+  has_account_number: !!bank.account_number,
+});
 
 /** Shape the UserProfile row back into the nested, tab-grouped API shape. */
 const profileToDto = (p) => {
@@ -11,6 +38,12 @@ const profileToDto = (p) => {
     profile_completed: p.profile_completed,
     employee_type: p.employee_type,
     vendor_id: p.vendor_id,
+    bank_details: bankToDto(p.bank_details || {}),
+    section_locks: {
+      [PROFILE_SECTIONS.BANK_DETAILS]: sectionLock(p, PROFILE_SECTIONS.BANK_DETAILS),
+      [PROFILE_SECTIONS.WORK_AUTHORIZATION]: sectionLock(p, PROFILE_SECTIONS.WORK_AUTHORIZATION),
+      [PROFILE_SECTIONS.EMERGENCY_CONTACT]: sectionLock(p, PROFILE_SECTIONS.EMERGENCY_CONTACT),
+    },
     work_information: {
       job_title: p.job_title,
       job_position: p.job_position,
@@ -56,6 +89,10 @@ const documentToDto = (d) => ({
   doc_type: d.doc_type,
   label: d.label,
   status: d.status,
+  // A verified document is LOCKED: the user can no longer replace it (server-enforced).
+  locked: d.status === 'verified',
+  required: d.required !== undefined ? d.required : undefined,
+  sample_url: d.sample_url !== undefined ? d.sample_url : undefined,
   file_name: d.file_name,
   file_mime: d.file_mime,
   file_size: d.file_size,
@@ -194,6 +231,31 @@ const uploadDocument = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('success'), data: documentToDto(doc) });
 });
 
+/**
+ * PATCH /users/:uuid/documents/:docUuid/status  (requires user.update)
+ * Admin approves (verified => LOCKED) or rejects/unlocks a user's document.
+ */
+const setDocumentStatus = catchAsync(async (req, res) => {
+  const doc = await userDocumentService.setDocumentStatus(
+    req.params.uuid,
+    req.params.docUuid,
+    req.body,
+    req,
+    res
+  );
+  res.status(httpStatus.OK).send({ message: res.__('success'), data: documentToDto(doc) });
+});
+
+/**
+ * PATCH /users/:uuid/profile/sections  (requires user.update)
+ * Admin locks (verified) or unlocks (unverified) a structured profile section
+ * (bank_details / work_authorization / emergency_contact).
+ */
+const setSectionStatus = catchAsync(async (req, res) => {
+  const user = await userService.setProfileSectionStatus(req.params.uuid, req.body, req, res);
+  res.status(httpStatus.OK).send({ message: res.__('userUpdated'), data: toDto(user) });
+});
+
 /** POST /users/:uuid/resend-invite  (requires user.create) — re-send activation email. */
 const resendInvite = catchAsync(async (req, res) => {
   await userService.resendInvite(req.params.uuid, req, res);
@@ -209,6 +271,8 @@ module.exports = {
   updateProfile,
   listDocuments,
   uploadDocument,
+  setDocumentStatus,
+  setSectionStatus,
   resendInvite,
   // Exported so the auth (self-service) controller can reuse the same DTOs.
   toDto,

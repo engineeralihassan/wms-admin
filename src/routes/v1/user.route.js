@@ -66,6 +66,17 @@ router
     userController.updateProfile
   );
 
+// Structured section lock/unlock (bank_details / work_authorization / emergency_contact).
+router
+  .route('/:uuid/profile/sections')
+  .patch(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_UPDATE),
+    validate(userValidation.setSectionStatus),
+    userController.setSectionStatus
+  );
+
 // Documents: list the merged checklist; record an uploaded document's metadata.
 router
   .route('/:uuid/documents')
@@ -85,6 +96,17 @@ router
     uploadFiles('file'),
     validate(userValidation.documentUpload),
     userController.uploadDocument
+  );
+
+// Admin approves/rejects (locks/unlocks) a single document.
+router
+  .route('/:uuid/documents/:docUuid/status')
+  .patch(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.USER_UPDATE),
+    validate(userValidation.setDocumentStatus),
+    userController.setDocumentStatus
   );
 
 // Secure fallback for granting access: resend the activation invite (never set a

@@ -7,6 +7,7 @@ export const APP_ROUTES = {
   resetPassword: '/auth/reset-password',
   activate: '/auth/activate',
   dashboard: '/dashboard',
+  profile: '/profile',
   users: '/users',
   organizations: '/organizations',
   tickets: '/tickets',

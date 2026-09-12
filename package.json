@@ -8,7 +8,9 @@
     "dev": "NODE_ENV=DEVELOPMENT nodemon ./src/server.js",
     "start": "NODE_ENV=PRODUCTION node ./src/server.js",
     "seed": "NODE_ENV=DEVELOPMENT node ./src/seeders/rbac.seeder.js",
-    "seed:prod": "NODE_ENV=PRODUCTION node ./src/seeders/rbac.seeder.js"
+    "seed:prod": "NODE_ENV=PRODUCTION node ./src/seeders/rbac.seeder.js",
+    "migrate:profile": "NODE_ENV=DEVELOPMENT node ./src/seeders/profile-columns.migration.js",
+    "migrate:profile:prod": "NODE_ENV=PRODUCTION node ./src/seeders/profile-columns.migration.js"
   },
   "keywords": [],
   "author": "",

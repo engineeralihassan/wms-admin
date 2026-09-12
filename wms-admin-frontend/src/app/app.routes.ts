@@ -36,6 +36,13 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard.routes').then((m) => m.DASHBOARD_ROUTES),
       },
       {
+        // Self-service profile. No permission guard — any authenticated user may view
+        // and complete their OWN profile (served from /auth/me/*).
+        path: 'profile',
+        loadChildren: () =>
+          import('./features/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
+      },
+      {
         path: 'users',
         canActivate: [permissionGuard('user.read')],
         loadChildren: () => import('./features/users/users.routes').then((m) => m.USERS_ROUTES),

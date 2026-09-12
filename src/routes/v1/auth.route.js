@@ -4,6 +4,7 @@ const { authValidation } = require('../../validations');
 const authController = require('../../controllers/auth/auth.controller');
 const { authVerify } = require('../../middlewares/auth');
 const { loginRateLimiter } = require('../../middlewares/rate-limit');
+const uploadFiles = require('../../middlewares/upload');
 
 const router = express.Router();
 
@@ -48,6 +49,9 @@ router.get('/me/documents', authVerify, authController.getMyDocuments);
 router.post(
   '/me/documents',
   authVerify,
+  // Accept an optional multipart `file` part; the controller streams it to object
+  // storage. Runs before validate() so text fields (doc_type, etc.) reach req.body.
+  uploadFiles('file'),
   validate(authValidation.uploadOwnDocument),
   authController.uploadMyDocument
 );

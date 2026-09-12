@@ -1,11 +1,24 @@
 <header class="page-header">
   <a class="back-link" [routerLink]="usersHome">&larr; Back to users</a>
-  <h1 class="page-header__title">{{ isEdit() ? 'Edit user' : 'New user' }}</h1>
-  <p class="page-header__subtitle">
-    {{ isEdit()
-      ? 'Update this user\'s profile information.'
-      : 'Create a user. They\'ll get an email link to set their own password and can complete the rest of their profile after signing in.' }}
-  </p>
+  <div class="page-header__bar">
+    <div>
+      <h1 class="page-header__title">
+        {{ isView() ? 'User profile' : isEdit() ? 'Edit user' : 'New user' }}
+      </h1>
+      <p class="page-header__subtitle">
+        @if (isView()) {
+          Review this user's profile and approve or reject their documents and sections.
+        } @else if (isEdit()) {
+          Update this user's profile information.
+        } @else {
+          Create a user. They'll get an email link to set their own password and can complete the rest of their profile after signing in.
+        }
+      </p>
+    </div>
+    @if (isView()) {
+      <app-button variant="primary" (clicked)="goToEdit()">Edit</app-button>
+    }
+  </div>
 </header>
 
 @if (loading()) {
@@ -60,7 +73,7 @@
 
     <!-- Tab strip -->
     <nav class="tabs" role="tablist" aria-label="User profile sections">
-      @for (tab of tabs; track tab.id) {
+      @for (tab of tabs(); track tab.id) {
         <button
           type="button"
           role="tab"
@@ -115,7 +128,8 @@
 
       <!-- PRIVATE INFORMATION -->
       @if (activeTab() === 'private') {
-        <div formGroupName="private_information" class="tab-panel" role="tabpanel">
+        <div class="tab-panel" role="tabpanel">
+        <div formGroupName="private_information">
           <h3 class="section-title">Private contact</h3>
           <div formGroupName="private_address" class="grid grid--2">
             <label class="field field--full"><span class="field__label">Street</span>
@@ -162,7 +176,19 @@
               <input class="field__input" type="text" formControlName="country_of_birth" /></label>
           </div>
 
-          <h3 class="section-title">Emergency contact</h3>
+          <h3 class="section-title">
+            Emergency contact
+            @if (isView()) {
+              @if (isSectionLocked('emergency_contact')) {
+                <span class="verify-tag verify-tag--locked">🔒 Approved &amp; locked</span>
+                <app-button variant="secondary" [loading]="busySection() === 'emergency_contact'"
+                            (clicked)="unlockSection('emergency_contact')">Unlock</app-button>
+              } @else {
+                <app-button variant="primary" [loading]="busySection() === 'emergency_contact'"
+                            (clicked)="lockSection('emergency_contact')">Approve &amp; Lock</app-button>
+              }
+            }
+          </h3>
           <div formGroupName="emergency_contact" class="grid grid--2">
             <label class="field"><span class="field__label">Contact name</span>
               <input class="field__input" type="text" formControlName="contact_name" /></label>
@@ -184,8 +210,27 @@
               <input class="field__input" type="text" formControlName="school" /></label>
           </div>
 
-          <h3 class="section-title">Work permit</h3>
+          <h3 class="section-title">
+            Work permit
+            @if (isView()) {
+              @if (isSectionLocked('work_authorization')) {
+                <span class="verify-tag verify-tag--locked">🔒 Approved &amp; locked</span>
+                <app-button variant="secondary" [loading]="busySection() === 'work_authorization'"
+                            (clicked)="unlockSection('work_authorization')">Unlock</app-button>
+              } @else {
+                <app-button variant="primary" [loading]="busySection() === 'work_authorization'"
+                            (clicked)="lockSection('work_authorization')">Approve &amp; Lock</app-button>
+              }
+            }
+          </h3>
           <div formGroupName="work_permit" class="grid grid--2">
+            <label class="field"><span class="field__label">Visa status</span>
+              <select class="field__input" formControlName="visa_status">
+                <option value="">—</option>
+                @for (opt of visaStatusOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select></label>
             <label class="field"><span class="field__label">Visa No</span>
               <input class="field__input" type="text" formControlName="visa_no" /></label>
             <label class="field"><span class="field__label">Visa type</span>
@@ -197,6 +242,42 @@
             <label class="field"><span class="field__label">Work permit expiration date</span>
               <input class="field__input" type="date" formControlName="work_permit_expiration_date" /></label>
           </div>
+        </div><!-- /private_information -->
+
+          <h3 class="section-title">
+            Bank details
+            @if (isView()) {
+              @if (isSectionLocked('bank_details')) {
+                <span class="verify-tag verify-tag--locked">🔒 Approved &amp; locked</span>
+                <app-button variant="secondary" [loading]="busySection() === 'bank_details'"
+                            (clicked)="unlockSection('bank_details')">Unlock</app-button>
+              } @else {
+                <app-button variant="primary" [loading]="busySection() === 'bank_details'"
+                            (clicked)="lockSection('bank_details')">Approve &amp; Lock</app-button>
+              }
+            }
+          </h3>
+          <div formGroupName="bank_details" class="grid grid--2">
+            <label class="field"><span class="field__label">Bank name</span>
+              <input class="field__input" type="text" formControlName="bank_name" /></label>
+            <label class="field"><span class="field__label">Account holder name</span>
+              <input class="field__input" type="text" formControlName="account_holder_name" /></label>
+            <label class="field"><span class="field__label">Account type</span>
+              <select class="field__input" formControlName="account_type">
+                <option value="">—</option>
+                <option value="checking">Checking</option>
+                <option value="savings">Savings</option>
+              </select></label>
+            <label class="field"><span class="field__label">ABA / Routing number</span>
+              <input class="field__input" type="text" formControlName="routing_number"
+                     [placeholder]="isView() ? '' : 'Enter to update'" /></label>
+            <label class="field"><span class="field__label">Account number</span>
+              <input class="field__input" type="text" formControlName="account_number"
+                     [placeholder]="isView() ? '' : 'Enter to update'" /></label>
+          </div>
+          @if (isView()) {
+            <p class="field__hint">Account and routing numbers are masked for security (last 4 shown).</p>
+          }
         </div>
       }
 
@@ -268,30 +349,76 @@
         </div>
       }
 
-      <!-- DOCUMENTS (read-only checklist; the user uploads after logging in) -->
+      <!-- DOCUMENTS -->
       @if (activeTab() === 'documents') {
         <div class="tab-panel" role="tabpanel">
-          <p class="field__hint doc-note">
-            Documents are provided by the user after they sign in. This is the checklist they'll see.
-          </p>
-          @if (documents() && documents()!.length) {
-            <ul class="doc-list">
-              @for (doc of documents(); track doc.doc_type) {
-                <li class="doc-list__item">
-                  <span class="doc-list__label">{{ doc.label }}</span>
-                  <span class="doc-list__status doc-list__status--{{ doc.status }}">{{ doc.status }}</span>
-                </li>
-              }
-            </ul>
+          @if (isView()) {
+            <!-- Admin review: view + approve / reject / unlock each document. -->
+            @if (documents() && documents()!.length) {
+              <div class="doc-table">
+                <div class="doc-table__head">
+                  <span>Document</span><span>Status</span><span>File</span>
+                  <span class="doc-table__actions-col">Actions</span>
+                </div>
+                @for (doc of documents(); track doc.doc_type) {
+                  <div class="doc-table__row">
+                    <span class="doc-table__name">
+                      {{ doc.label }}
+                      @if (doc.required) { <span class="req" title="Required">*</span> }
+                      @if (doc.status === 'rejected' && doc.note) {
+                        <span class="doc-table__reason">Reason: {{ doc.note }}</span>
+                      }
+                    </span>
+                    <span>
+                      <span class="badge badge--{{ doc.status }}">
+                        @if (doc.locked) { 🔒 } {{ docBadge(doc.status) }}
+                      </span>
+                    </span>
+                    <span>
+                      @if (doc.file_url) {
+                        <a class="link" [href]="doc.file_url" target="_blank" rel="noopener">View</a>
+                      } @else { <span class="muted">—</span> }
+                    </span>
+                    <span class="doc-table__actions">
+                      @if (busyDoc() === doc.doc_type) {
+                        <app-spinner [size]="16" [borderWidth]="2" />
+                      } @else if (hasFile(doc)) {
+                        @if (doc.status === 'verified') {
+                          <button type="button" class="btn-link btn-link--warn" (click)="unlockDoc(doc)">Unlock</button>
+                        } @else {
+                          <button type="button" class="btn-link btn-link--ok" (click)="approveDoc(doc)">Approve</button>
+                          <button type="button" class="btn-link btn-link--danger" (click)="openReject(doc)">Reject</button>
+                        }
+                      } @else {
+                        <span class="muted">Awaiting upload</span>
+                      }
+                    </span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="field__hint doc-note">No documents for this user yet.</p>
+            }
           } @else {
-            <ul class="doc-list">
-              <li class="doc-list__item"><span class="doc-list__label">Offer Letter</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
-              <li class="doc-list__item"><span class="doc-list__label">ID Proof</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
-              <li class="doc-list__item"><span class="doc-list__label">Work Authorization</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
-              <li class="doc-list__item"><span class="doc-list__label">Resume / CV</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
-              <li class="doc-list__item"><span class="doc-list__label">Education Certificate</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
-              <li class="doc-list__item"><span class="doc-list__label">Bank Details</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
-            </ul>
+            <p class="field__hint doc-note">
+              Documents are provided by the user after they sign in. This is the checklist they'll see.
+            </p>
+            @if (documents() && documents()!.length) {
+              <ul class="doc-list">
+                @for (doc of documents(); track doc.doc_type) {
+                  <li class="doc-list__item">
+                    <span class="doc-list__label">{{ doc.label }}</span>
+                    <span class="doc-list__status doc-list__status--{{ doc.status }}">{{ doc.status }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <ul class="doc-list">
+                <li class="doc-list__item"><span class="doc-list__label">Offer Letter</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+                <li class="doc-list__item"><span class="doc-list__label">ID Proof</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+                <li class="doc-list__item"><span class="doc-list__label">Work Authorization</span><span class="doc-list__status doc-list__status--pending">pending</span></li>
+              </ul>
+            }
           }
         </div>
       }
@@ -371,11 +498,32 @@
       }
     </app-card>
 
-    <div class="form-actions">
-      <app-button type="button" variant="ghost" (clicked)="cancel()">Cancel</app-button>
-      <app-button type="submit" variant="primary" [loading]="submitting()">
-        {{ isEdit() ? 'Save changes' : 'Create user' }}
-      </app-button>
-    </div>
+    @if (!isView()) {
+      <div class="form-actions">
+        <app-button type="button" variant="ghost" (clicked)="cancel()">Cancel</app-button>
+        <app-button type="submit" variant="primary" [loading]="submitting()">
+          {{ isEdit() ? 'Save changes' : 'Create user' }}
+        </app-button>
+      </div>
+    }
   </form>
+
+  <!-- Reject-reason modal (view mode) -->
+  <app-modal [open]="rejectOpen()" [title]="'Reject ' + rejectDocLabel" (closed)="closeReject()">
+    <label class="reject-field">
+      <span class="reject-field__label">Reason for rejection</span>
+      <textarea
+        class="reject-field__input"
+        rows="4"
+        placeholder="Explain what's wrong so the user can fix and re-upload…"
+        [value]="rejectReason()"
+        (input)="rejectReason.set($any($event.target).value)"
+      ></textarea>
+      <span class="reject-field__hint">The user will see this reason on their profile.</span>
+    </label>
+    <div modal-footer>
+      <app-button variant="ghost" (clicked)="closeReject()">Cancel</app-button>
+      <app-button variant="danger" (clicked)="confirmReject()">Reject document</app-button>
+    </div>
+  </app-modal>
 }

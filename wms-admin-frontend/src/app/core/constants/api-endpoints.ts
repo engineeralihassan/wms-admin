@@ -12,6 +12,9 @@ export const API_ENDPOINTS = {
     verifyActivation: '/auth/activate/verify',
     activate: '/auth/activate',
     me: '/auth/me',
+    /** Self-service profile (the logged-in user's OWN profile + documents). */
+    myProfile: '/auth/me/profile',
+    myDocuments: '/auth/me/documents',
   },
   organizations: {
     root: '/organizations',
@@ -22,7 +25,10 @@ export const API_ENDPOINTS = {
     vendors: '/users/vendors',
     byUuid: (uuid: string) => `/users/${uuid}`,
     profile: (uuid: string) => `/users/${uuid}/profile`,
+    profileSections: (uuid: string) => `/users/${uuid}/profile/sections`,
     documents: (uuid: string) => `/users/${uuid}/documents`,
+    documentStatus: (uuid: string, docUuid: string) =>
+      `/users/${uuid}/documents/${docUuid}/status`,
     resendInvite: (uuid: string) => `/users/${uuid}/resend-invite`,
   },
   tickets: {

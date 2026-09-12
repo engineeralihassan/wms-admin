@@ -6,6 +6,8 @@ import type { ListQuery, PaginatedResult } from '../../../core/models/pagination
 import type { UserListItem } from '../models/user-list-item.model';
 import type {
   CreateUserPayload,
+  DocumentStatusPayload,
+  SectionStatusPayload,
   UserDetail,
   UserDocument,
   UserProfile,
@@ -69,5 +71,30 @@ export class UsersService {
   /** Resend the activation invite for an invited user. */
   resendInvite(uuid: string): Observable<null> {
     return this.api.post<null>(API_ENDPOINTS.users.resendInvite(uuid), {});
+  }
+
+  /**
+   * Admin review: approve / reject / unlock a single document.
+   *  - 'verified'  => approved and LOCKED (user can no longer replace it)
+   *  - 'rejected'  => rejected (user may re-upload)
+   *  - 'uploaded'  => unlock a previously approved doc (user may re-upload)
+   */
+  setDocumentStatus(
+    uuid: string,
+    docUuid: string,
+    payload: DocumentStatusPayload,
+  ): Observable<UserDocument> {
+    return this.api.patch<UserDocument>(
+      API_ENDPOINTS.users.documentStatus(uuid, docUuid),
+      payload,
+    );
+  }
+
+  /**
+   * Admin review: lock (verified) or unlock (unverified) a structured profile section
+   * (bank_details / work_authorization / emergency_contact).
+   */
+  setProfileSection(uuid: string, payload: SectionStatusPayload): Observable<UserDetail> {
+    return this.api.patch<UserDetail>(API_ENDPOINTS.users.profileSections(uuid), payload);
   }
 }
