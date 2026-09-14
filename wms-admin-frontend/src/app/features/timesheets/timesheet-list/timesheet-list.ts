@@ -92,7 +92,22 @@ export class TimesheetList {
     { sortBy: 'week_start_date', sortDir: 'desc', limit: 10 },
   );
 
-  protected readonly columns: ReadonlyArray<DataTableColumn<Timesheet>> = [
+  protected readonly columns = computed<ReadonlyArray<DataTableColumn<Timesheet>>>(() => {
+    const cols: DataTableColumn<Timesheet>[] = [];
+
+    if (this.isApprover()) {
+      cols.push({
+        key: 'owner',
+        label: 'Employee',
+        value: (t) => t.owner?.email ?? '—',
+      });
+    }
+
+    cols.push(...this.baseColumns);
+    return cols;
+  });
+
+  private readonly baseColumns: ReadonlyArray<DataTableColumn<Timesheet>> = [
     {
       key: 'week_start_date',
       label: 'Time Period',

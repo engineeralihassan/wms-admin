@@ -13,7 +13,7 @@
 <app-card title="All timesheets">
   <app-data-table
     caption="Timesheets"
-    [columns]="columns"
+    [columns]="columns()"
     [rows]="list.items()"
     [rowId]="t => t.uuid"
     [loading]="list.loading()"
