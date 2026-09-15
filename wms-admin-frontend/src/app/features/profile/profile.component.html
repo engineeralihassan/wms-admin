@@ -282,12 +282,12 @@
           <label class="field">
             <span class="field__label">ABA / Routing number</span>
             <input class="field__input" type="text" inputmode="numeric" formControlName="routing_number"
-                   placeholder="Enter to update" />
+                   placeholder="Enter routing number" />
           </label>
           <label class="field">
             <span class="field__label">Account number</span>
             <input class="field__input" type="text" inputmode="numeric" formControlName="account_number"
-                   placeholder="Enter to update" />
+                   placeholder="Enter account number" />
           </label>
           <div class="form-actions field--full">
             <app-button variant="ghost" (clicked)="cancelEdit()">Cancel</app-button>
@@ -306,10 +306,10 @@
             <dt>Account Type</dt><dd>{{ p.bank_details.account_type || '—' }}</dd>
           </div>
           <div class="read-grid__item">
-            <dt>ABA / Routing Number</dt><dd>{{ p.bank_details.routing_number_masked || '—' }}</dd>
+            <dt>ABA / Routing Number</dt><dd>{{ p.bank_details.routing_number || '—' }}</dd>
           </div>
           <div class="read-grid__item">
-            <dt>Account Number</dt><dd>{{ p.bank_details.account_number_masked || '—' }}</dd>
+            <dt>Account Number</dt><dd>{{ p.bank_details.account_number || '—' }}</dd>
           </div>
         </dl>
       }

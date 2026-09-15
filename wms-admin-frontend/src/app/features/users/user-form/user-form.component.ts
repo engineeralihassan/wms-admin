@@ -108,7 +108,6 @@ export class UserFormComponent {
   protected readonly sectionLocks = computed(
     () => this.detail()?.profile?.section_locks ?? null,
   );
-  protected readonly bankMasked = computed(() => this.detail()?.profile?.bank_details ?? null);
 
   // Reject-reason modal
   protected readonly rejectOpen = signal(false);
@@ -359,15 +358,16 @@ export class UserFormComponent {
         contract: u.profile.contract as never,
         settings: u.profile.settings as never,
       });
-      // Bank numbers arrive MASKED from the API; show them as-is (read-only).
+      // Bank numbers arrive in full from the API; pre-fill them so the admin can view
+      // and edit the real values.
       const bank = u.profile.bank_details;
       if (bank) {
         this.form.controls.bank_details.patchValue({
           bank_name: bank.bank_name ?? '',
           account_holder_name: bank.account_holder_name ?? '',
           account_type: bank.account_type ?? '',
-          routing_number: bank.routing_number_masked ?? '',
-          account_number: bank.account_number_masked ?? '',
+          routing_number: bank.routing_number ?? '',
+          account_number: bank.account_number ?? '',
         });
       }
     }
@@ -420,18 +420,13 @@ export class UserFormComponent {
       return;
     }
     const raw = this.form.getRawValue();
-    // Only send bank numbers the admin actually changed. Masked placeholders (•••1234)
-    // must never be written back, so drop any value containing a bullet char.
-    const bank = { ...raw.bank_details } as Record<string, string>;
-    for (const key of ['routing_number', 'account_number']) {
-      if (typeof bank[key] === 'string' && bank[key].includes('•')) delete bank[key];
-    }
+    // Bank numbers are shown in full and edited directly, so send them as-is.
     const profile = this.prune({
       work_information: raw.work_information,
       private_information: raw.private_information,
       contract: raw.contract,
       settings: raw.settings,
-      bank_details: bank,
+      bank_details: raw.bank_details,
     });
 
     this.submitting.set(true);

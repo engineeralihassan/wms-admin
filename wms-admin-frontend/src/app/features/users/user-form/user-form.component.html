@@ -270,14 +270,11 @@
               </select></label>
             <label class="field"><span class="field__label">ABA / Routing number</span>
               <input class="field__input" type="text" formControlName="routing_number"
-                     [placeholder]="isView() ? '' : 'Enter to update'" /></label>
+                     [placeholder]="isView() ? '' : 'Enter routing number'" /></label>
             <label class="field"><span class="field__label">Account number</span>
               <input class="field__input" type="text" formControlName="account_number"
-                     [placeholder]="isView() ? '' : 'Enter to update'" /></label>
+                     [placeholder]="isView() ? '' : 'Enter account number'" /></label>
           </div>
-          @if (isView()) {
-            <p class="field__hint">Account and routing numbers are masked for security (last 4 shown).</p>
-          }
         </div>
       }
 

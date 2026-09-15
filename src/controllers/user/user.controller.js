@@ -3,7 +3,7 @@ const catchAsync = require('../../utils/catchAsync');
 const { userService, userDocumentService } = require('../../services');
 const fileService = require('../../services/storage/file.service');
 const { UPLOAD_FOLDERS } = require('../../config/storage');
-const { maskNumber, PROFILE_SECTIONS } = require('../../config/profile.constants');
+const { PROFILE_SECTIONS } = require('../../config/profile.constants');
 
 /** Lock state for a structured section, derived from verified_sections. */
 const sectionLock = (p, key) => {
@@ -16,16 +16,12 @@ const sectionLock = (p, key) => {
   };
 };
 
-/**
- * Mask the bank block for client display: never echo raw account/routing numbers
- * back to the browser once stored. Only last 4 are shown.
- */
 const bankToDto = (bank = {}) => ({
   bank_name: bank.bank_name || null,
   account_holder_name: bank.account_holder_name || null,
   account_type: bank.account_type || null,
-  routing_number_masked: maskNumber(bank.routing_number),
-  account_number_masked: maskNumber(bank.account_number),
+  routing_number: bank.routing_number || null,
+  account_number: bank.account_number || null,
   cheque_document_id: bank.cheque_document_id || null,
   has_routing_number: !!bank.routing_number,
   has_account_number: !!bank.account_number,

@@ -57,13 +57,13 @@ export interface WorkPermit {
   work_permit_expiration_date?: string | null;
 }
 
-/** Bank block as returned by the backend (numbers masked). */
+/** Bank block as returned by the backend (full numbers, visible to admin + owner). */
 export interface BankDetailsDto {
   bank_name: string | null;
   account_holder_name: string | null;
   account_type: string | null;
-  routing_number_masked: string | null;
-  account_number_masked: string | null;
+  routing_number: string | null;
+  account_number: string | null;
   cheque_document_id: string | null;
   has_routing_number: boolean;
   has_account_number: boolean;

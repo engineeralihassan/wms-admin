@@ -266,8 +266,8 @@ export class ProfileComponent {
       bank_name: bank.bank_name ?? '',
       account_holder_name: bank.account_holder_name ?? '',
       account_type: bank.account_type ?? '',
-      routing_number: '',
-      account_number: '',
+      routing_number: bank.routing_number ?? '',
+      account_number: bank.account_number ?? '',
     });
 
     const ec = priv.emergency_contact || {};
@@ -336,10 +336,9 @@ export class ProfileComponent {
       bank_name: v.bank_name,
       account_holder_name: v.account_holder_name,
       account_type: (v.account_type || '') as '' | 'checking' | 'savings',
+      routing_number: v.routing_number,
+      account_number: v.account_number,
     };
-    // Only send numbers when the user actually typed new ones (fields start blank).
-    if (v.routing_number) bank.routing_number = v.routing_number;
-    if (v.account_number) bank.account_number = v.account_number;
     this.save({ bank_details: bank });
   }
 
