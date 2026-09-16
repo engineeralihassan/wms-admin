@@ -157,6 +157,24 @@ const deleteLeave = {
 };
 
 /**
+ * POST/GET /leaves/:uuid/attachments — real file upload/list. File type/size/count are
+ * enforced by multer (see config/storage); here we only validate the route param.
+ */
+const leaveAttachments = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+  }),
+};
+
+/** DELETE /leaves/:uuid/attachments/:attachmentUuid — remove one uploaded file. */
+const deleteLeaveAttachment = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+    attachmentUuid: Joi.string().uuid().required(),
+  }),
+};
+
+/**
  * GET /leaves/calendar — timesheet-facing read of leave days in a range.
  * `user` (uuid) is optional; approvers may query others, normal users only self.
  */
@@ -248,6 +266,8 @@ module.exports = {
   decideLeave,
   cancelLeave,
   deleteLeave,
+  leaveAttachments,
+  deleteLeaveAttachment,
   leaveCalendar,
   myBalances,
   listLeaveTypes,

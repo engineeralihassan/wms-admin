@@ -5,9 +5,10 @@ import {
   DestroyRef,
   inject,
   signal,
+  viewChildren,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
 import { UsersService } from '../../users/services/users.service';
@@ -20,6 +21,7 @@ import { ModalComponent } from '../../../shared/components/modal/modal.component
 import { FileUploadComponent } from '../../../shared/components/file-upload/file-upload.component';
 import {
   mb,
+  formatFileSize,
   type FileUploadConfig,
   type SelectedFile,
 } from '../../../shared/components/file-upload/file-upload.model';
@@ -42,6 +44,7 @@ import {
   STATUS_LABELS,
   type LeaveBalance,
   type LeaveDayPortion,
+  type LeaveFile,
   type LeaveRequest,
   type LeaveSaveAction,
   type LeaveStatus,
@@ -322,11 +325,32 @@ export class LeaveList {
   /** Files picked in the active form (names sent on submit; bytes ignored for now). */
   protected readonly attachments = signal<SelectedFile[]>([]);
 
+  /**
+   * When a create-with-attachments flow has to create a DRAFT first (files need the
+   * request id as their owner) but a later step fails, we remember that draft's uuid
+   * here. The next attempt reuses/updates it instead of creating another draft — this
+   * prevents orphan draft rows piling up on repeated submit failures.
+   */
+  private readonly pendingDraftUuid = signal<string | null>(null);
+
+  /**
+   * All rendered uploaders (create + edit). We clear their internal selection when a
+   * form opens/closes, since the component owns its own state and resetting the
+   * `attachments` signal alone does not empty the picker.
+   */
+  private readonly uploaders = viewChildren(FileUploadComponent);
+
   constructor() {
     this.list.init();
     this.loadLeaveTypes();
     this.loadMyBalances();
     this.wireUserSearch();
+  }
+
+  /** Empty the parent's tracked files AND every uploader's internal selection. */
+  private clearAttachments(): void {
+    this.attachments.set([]);
+    this.uploaders().forEach((u) => u.reset());
   }
 
   /**
@@ -433,6 +457,40 @@ export class LeaveList {
       : '—';
   }
 
+  // ---- Attachment presentation helpers (mirror the expenses page) ----
+
+  /** Human-readable file size (e.g. "2.4 MB"), or '' when size is unknown. */
+  protected fileSize(file: LeaveFile): string {
+    return file.file_size ? formatFileSize(file.file_size) : '';
+  }
+
+  /**
+   * A short kind key used to pick an icon + accent for a file, derived from its mime
+   * type (falling back to the extension). Keeps the template declarative.
+   */
+  protected fileKind(file: LeaveFile): 'image' | 'pdf' | 'sheet' | 'doc' | 'file' {
+    const mime = (file.file_mime || '').toLowerCase();
+    const name = (file.file_name || '').toLowerCase();
+    if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(name)) return 'image';
+    if (mime === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+    if (mime.includes('sheet') || mime.includes('excel') || /\.(xlsx?|csv)$/.test(name))
+      return 'sheet';
+    if (mime.includes('word') || /\.(docx?|txt)$/.test(name)) return 'doc';
+    return 'file';
+  }
+
+  /** The short label shown on the file badge (e.g. "PDF", "IMG"). */
+  protected fileBadge(file: LeaveFile): string {
+    return { image: 'IMG', pdf: 'PDF', sheet: 'XLS', doc: 'DOC', file: 'FILE' }[
+      this.fileKind(file)
+    ];
+  }
+
+  /** The raw File objects currently picked in the uploader. */
+  private pickedFiles(): File[] {
+    return this.attachments().map((f) => f.file);
+  }
+
   /** Today as YYYY-MM-DD, used to prevent selecting past dates in the date inputs. */
   protected readonly today = new Date().toISOString().slice(0, 10);
 
@@ -456,7 +514,8 @@ export class LeaveList {
       day_portion: 'full',
       reason: '',
     });
-    this.attachments.set([]);
+    this.clearAttachments();
+    this.pendingDraftUuid.set(null);
     this.openModal.set('create');
   }
 
@@ -521,7 +580,7 @@ export class LeaveList {
       day_portion: leave.day_portion,
       reason: leave.reason ?? '',
     });
-    this.attachments.set([]);
+    this.clearAttachments();
     this.openModal.set('edit');
   }
 
@@ -534,15 +593,23 @@ export class LeaveList {
   protected closeModal(): void {
     this.openModal.set(null);
     this.activeLeave.set(null);
-  }
-
-  private existingAttachmentNames(): { name: string }[] {
-    return (this.activeLeave()?.attachments ?? []).map((a) => ({ name: a.name }));
+    this.clearAttachments();
   }
 
   // ---- Submit handlers ----
 
-  /** Create: `action` decides draft vs submit-immediately. */
+  /**
+   * Create flow. Two paths, chosen to avoid orphan draft rows on submit failures:
+   *
+   *  - No attachments: do it in ONE atomic backend call — create({ action }). When the
+   *    user submits, the backend creates + submits (with the balance hold) inside a
+   *    single transaction, so a failed submit persists NOTHING. Nothing to clean up.
+   *
+   *  - With attachments: files need the request id as their owner, so we must create a
+   *    DRAFT first, then upload, then submit. If a step fails we REMEMBER that draft's
+   *    uuid (pendingDraftUuid) and the next attempt UPDATES + re-submits that same
+   *    draft instead of creating a new one — so retries never stack up extra drafts.
+   */
   protected submitCreate(action: LeaveSaveAction): void {
     if (this.createForm.invalid) {
       markAllAsTouched(this.createForm);
@@ -550,29 +617,74 @@ export class LeaveList {
     }
     const v = this.createForm.getRawValue();
     if (!this.validateRange(v.start_date, v.end_date)) return;
-    const attachments = this.attachments().map((f) => ({ name: f.name }));
+    const files = this.pickedFiles();
+    const content = {
+      leave_type: v.leave_type,
+      start_date: v.start_date,
+      end_date: v.end_date,
+      day_portion: v.day_portion,
+      reason: v.reason?.trim() || undefined,
+    };
 
-    this.submitting.set(true);
-    this.leaves
-      .create({
-        action,
-        leave_type: v.leave_type,
-        start_date: v.start_date,
-        end_date: v.end_date,
-        day_portion: v.day_portion,
-        reason: v.reason?.trim() || undefined,
-        attachments,
-      })
-      .subscribe({
+    // ── Simple path: no files AND no draft already created → single atomic create.
+    // (If a draft was created on a previous attempt, we must reuse it below, even when
+    // the picker is now empty, so we never leave/duplicate a draft.) ──
+    if (files.length === 0 && !this.pendingDraftUuid()) {
+      this.submitting.set(true);
+      this.leaves.create({ action, ...content }).subscribe({
         next: () => {
           this.notify.success(action === 'submit' ? 'Leave request submitted.' : 'Draft saved.');
           this.finishMutation();
         },
         error: () => this.submitting.set(false),
       });
+      return;
+    }
+
+    // ── Attachment path: create/reuse a single draft, upload, then optionally submit. ──
+    const existingDraft = this.pendingDraftUuid();
+    // Reuse the draft from a previous failed attempt (update it) instead of making a
+    // new one; otherwise create the draft for the first time.
+    const draft$ = existingDraft
+      ? this.leaves.update(existingDraft, content).pipe(switchMap(() => of({ uuid: existingDraft })))
+      : this.leaves.create({ action: 'draft', ...content });
+
+    this.submitting.set(true);
+    draft$
+      .pipe(
+        // Remember the draft immediately so a later failure reuses it, not recreates it.
+        switchMap((leave) => {
+          this.pendingDraftUuid.set(leave.uuid);
+          // Upload only files still pending in the picker. After a successful upload we
+          // clear the picker so that if a LATER step (submit) fails, the retry does NOT
+          // re-upload the same files onto the draft (which would duplicate them).
+          if (!files.length) return of(leave);
+          return this.leaves.uploadAttachments(leave.uuid, files).pipe(
+            switchMap(() => {
+              this.clearAttachments();
+              return of(leave);
+            }),
+          );
+        }),
+        switchMap((leave) =>
+          action === 'submit' ? this.leaves.submit(leave.uuid) : of(leave),
+        ),
+      )
+      .subscribe({
+        next: () => {
+          this.notify.success(action === 'submit' ? 'Leave request submitted.' : 'Draft saved.');
+          this.finishMutation();
+        },
+        // Keep pendingDraftUuid so the retry reuses the same draft (no duplicate).
+        error: () => this.submitting.set(false),
+      });
   }
 
-  /** Edit: save draft changes, or save-and-resubmit. */
+  /**
+   * Edit flow: save content, upload any newly-picked files, then optionally resubmit.
+   * Mirrors expenses — content update and submit are discrete steps so files always
+   * exist on the request before it is submitted.
+   */
   protected submitEdit(action: LeaveSaveAction): void {
     const leave = this.activeLeave();
     if (!leave) return;
@@ -582,20 +694,28 @@ export class LeaveList {
     }
     const v = this.editForm.getRawValue();
     if (!this.validateRange(v.start_date, v.end_date)) return;
-    const picked = this.attachments().map((f) => ({ name: f.name }));
-    const attachments = picked.length ? picked : this.existingAttachmentNames();
+    const files = this.pickedFiles();
 
     this.submitting.set(true);
     this.leaves
       .update(leave.uuid, {
-        action,
+        // Save content only; the submit is done as a discrete step after files upload.
         leave_type: v.leave_type,
         start_date: v.start_date,
         end_date: v.end_date,
         day_portion: v.day_portion,
         reason: v.reason?.trim() || undefined,
-        attachments,
       })
+      .pipe(
+        switchMap((updated) =>
+          files.length
+            ? this.leaves.uploadAttachments(leave.uuid, files).pipe(switchMap(() => of(updated)))
+            : of(updated),
+        ),
+        switchMap((updated) =>
+          action === 'submit' ? this.leaves.submit(leave.uuid) : of(updated),
+        ),
+      )
       .subscribe({
         next: () => {
           this.notify.success(
@@ -607,6 +727,25 @@ export class LeaveList {
         },
         error: () => this.submitting.set(false),
       });
+  }
+
+  /** Delete one already-uploaded file from the active request (in the edit modal). */
+  protected removeExistingAttachment(attachmentUuid: string): void {
+    const leave = this.activeLeave();
+    if (!leave) return;
+    this.leaves.deleteAttachment(leave.uuid, attachmentUuid).subscribe({
+      next: () => {
+        // Reflect the removal in the open modal without a full reload.
+        this.activeLeave.set({
+          ...leave,
+          leave_attachments: (leave.leave_attachments ?? []).filter(
+            (a) => a.uuid !== attachmentUuid,
+          ),
+        });
+        this.notify.success('Attachment removed.');
+        this.list.reload();
+      },
+    });
   }
 
   /** Approver approves or rejects the active submitted request. */
@@ -772,6 +911,7 @@ export class LeaveList {
   /** Shared post-mutation cleanup: close modal, reload list + balances. */
   private finishMutation(): void {
     this.submitting.set(false);
+    this.pendingDraftUuid.set(null);
     this.closeModal();
     this.list.reload();
     this.loadMyBalances();

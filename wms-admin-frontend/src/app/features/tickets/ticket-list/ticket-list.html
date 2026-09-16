@@ -99,6 +99,40 @@
       </select>
     </label>
   </form>
+
+  @if ((activeTicket()?.ticket_attachments ?? []).length) {
+    <div class="attachments-block">
+      <p class="attachments-block__title">
+        Current attachments <span class="dt-count">{{ (activeTicket()?.ticket_attachments ?? []).length }}</span>
+      </p>
+      <ul class="file-cards">
+        @for (a of activeTicket()?.ticket_attachments ?? []; track a.uuid) {
+          <li class="file-card file-card--{{ fileKind(a) }}">
+            <a class="file-card__link" [href]="a.url" target="_blank" rel="noopener"
+               [attr.title]="'Open ' + (a.file_name || 'file')">
+              <span class="file-card__badge">{{ fileBadge(a) }}</span>
+              <span class="file-card__meta">
+                <span class="file-card__name">{{ a.file_name || 'file' }}</span>
+                @if (fileSize(a)) { <span class="file-card__size">{{ fileSize(a) }}</span> }
+              </span>
+            </a>
+            <button
+              type="button"
+              class="file-card__remove"
+              [attr.aria-label]="'Remove ' + (a.file_name || 'file')"
+              (click)="removeExistingAttachment(a.uuid)"
+            >✕</button>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+  <app-file-upload
+    [config]="attachmentConfig"
+    label="Add attachments"
+    (filesChange)="attachments.set($event)"
+  />
+
   <div modal-footer>
     <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
     <app-button variant="primary" [loading]="submitting()" (clicked)="submitEdit()">Save</app-button>
@@ -189,5 +223,60 @@
   <div modal-footer>
     <app-button variant="ghost" (clicked)="closeModal()">Cancel</app-button>
     <app-button variant="primary" [loading]="submitting()" (clicked)="submitAssign()">Save</app-button>
+  </div>
+</app-modal>
+
+<!-- View details -->
+<app-modal
+  [open]="openModal() === 'view'"
+  [title]="activeTicket()?.ticket_number ?? 'Ticket'"
+  (closed)="closeModal()"
+>
+  @if (activeTicket(); as t) {
+    <dl class="ticket-details">
+      <div class="ticket-details__row"><dt>Subject</dt><dd>{{ t.subject }}</dd></div>
+      <div class="ticket-details__row"><dt>Priority</dt><dd>{{ priorityLabels[t.priority] }}</dd></div>
+      <div class="ticket-details__row"><dt>Status</dt><dd>{{ statusLabels[t.status] }}</dd></div>
+      <div class="ticket-details__row"><dt>Submitted by</dt><dd>{{ userName(t.created_by) }}</dd></div>
+      <div class="ticket-details__row"><dt>Assignee</dt><dd>{{ userName(t.assigned_to) }}</dd></div>
+      <div class="ticket-details__row"><dt>Created</dt><dd>{{ formatDate(t.created_at) }}</dd></div>
+      <div class="ticket-details__row ticket-details__row--stack">
+        <dt>Description</dt><dd>{{ t.description }}</dd>
+      </div>
+      @if (t.ticket_attachments.length) {
+        <div class="ticket-details__row ticket-details__row--stack">
+          <dt>Attachments <span class="dt-count">{{ t.ticket_attachments.length }}</span></dt>
+          <dd>
+            <ul class="file-cards">
+              @for (a of t.ticket_attachments; track a.uuid) {
+                <li class="file-card file-card--{{ fileKind(a) }}">
+                  <a class="file-card__link" [href]="a.url" target="_blank" rel="noopener"
+                     [attr.title]="'Open ' + (a.file_name || 'file')">
+                    <span class="file-card__badge">{{ fileBadge(a) }}</span>
+                    <span class="file-card__meta">
+                      <span class="file-card__name">{{ a.file_name || 'file' }}</span>
+                      @if (fileSize(a)) { <span class="file-card__size">{{ fileSize(a) }}</span> }
+                    </span>
+                    <span class="file-card__action" aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </dd>
+        </div>
+      } @else if (t.attachments.length) {
+        <div class="ticket-details__row">
+          <dt>Attachments</dt>
+          <dd>
+            <ul class="ticket-details__files">
+              @for (a of t.attachments; track a.name) { <li>{{ a.name }}</li> }
+            </ul>
+          </dd>
+        </div>
+      }
+    </dl>
+  }
+  <div modal-footer>
+    <app-button variant="ghost" (clicked)="closeModal()">Close</app-button>
   </div>
 </app-modal>

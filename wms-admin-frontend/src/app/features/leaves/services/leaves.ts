@@ -10,6 +10,7 @@ import type {
   DecideLeaveRequest,
   LeaveBalance,
   LeaveCalendarDay,
+  LeaveFile,
   LeaveRequest,
   LeaveType,
   MyBalancesResponse,
@@ -69,6 +70,34 @@ export class LeavesService {
 
   remove(uuid: string): Observable<null> {
     return this.api.delete<null>(API_ENDPOINTS.leaves.byUuid(uuid));
+  }
+
+  // ── Attachments (real file uploads) ────────────────────────────────────────
+
+  /**
+   * Upload one or more real files to a leave request as multipart/form-data.
+   *
+   * We build a FormData and post it through ApiService. Angular's HttpClient sets the
+   * correct `multipart/form-data; boundary=...` header automatically for FormData, and
+   * the auth interceptor only adds the Bearer token (it never sets Content-Type), so
+   * the multipart boundary is preserved. Returns the created attachment rows.
+   */
+  uploadAttachments(uuid: string, files: File[]): Observable<LeaveFile[]> {
+    const form = new FormData();
+    // The backend uses uploadFiles.any(), so the field name is free-form; the request
+    // owner is resolved server-side from the :uuid, never sent in the body.
+    files.forEach((file) => form.append('files', file, file.name));
+    return this.api.post<LeaveFile[]>(API_ENDPOINTS.leaves.attachments(uuid), form);
+  }
+
+  /** List a leave request's uploaded files. */
+  listAttachments(uuid: string): Observable<LeaveFile[]> {
+    return this.api.get<LeaveFile[]>(API_ENDPOINTS.leaves.attachments(uuid));
+  }
+
+  /** Delete one uploaded file from a leave request. */
+  deleteAttachment(uuid: string, attachmentUuid: string): Observable<null> {
+    return this.api.delete<null>(API_ENDPOINTS.leaves.attachment(uuid, attachmentUuid));
   }
 
   // ---- Balances (self) ----

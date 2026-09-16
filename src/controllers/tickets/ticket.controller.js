@@ -20,7 +20,16 @@ const toDto = (ticket) => ({
   description: ticket.description,
   priority: ticket.priority,
   status: ticket.status,
+  // Legacy name-only metadata kept for backward compatibility.
   attachments: Array.isArray(ticket.attachments) ? ticket.attachments : [],
+  // Real uploaded files (bytes in object storage). Populated by the service on reads
+  // via setDataValue('ticket_attachments', ...). It is NOT a defined model attribute,
+  // so read it from dataValues (getDataValue) instead of plain property access.
+  // Each: { uuid, url, file_name, file_mime, file_size, uploaded_at }.
+  ticket_attachments:
+    (typeof ticket.getDataValue === 'function'
+      ? ticket.getDataValue('ticket_attachments')
+      : ticket.ticket_attachments) || [],
   resolved_at: ticket.resolved_at,
   closed_at: ticket.closed_at,
   created_at: ticket.createdAt,
@@ -98,4 +107,42 @@ const remove = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('ticket_deleted'), data: null });
 });
 
-module.exports = { create, list, getOne, update, assign, assignableUsers, updateStatus, remove };
+/**
+ * POST /tickets/:uuid/attachments — upload one or more real files to a ticket.
+ * multipart/form-data; the multer middleware on the route parses the files first.
+ */
+const uploadAttachments = catchAsync(async (req, res) => {
+  const data = await ticketService.uploadTicketAttachments(req.params.uuid, req, res);
+  res.status(httpStatus.CREATED).send({ message: res.__('files_uploaded'), data });
+});
+
+/** GET /tickets/:uuid/attachments — list a ticket's uploaded files. */
+const listAttachments = catchAsync(async (req, res) => {
+  const data = await ticketService.listTicketAttachments(req.params.uuid, req, res);
+  res.status(httpStatus.OK).send({ message: res.__('success'), data });
+});
+
+/** DELETE /tickets/:uuid/attachments/:attachmentUuid — remove one uploaded file. */
+const deleteAttachment = catchAsync(async (req, res) => {
+  await ticketService.deleteTicketAttachment(
+    req.params.uuid,
+    req.params.attachmentUuid,
+    req,
+    res
+  );
+  res.status(httpStatus.OK).send({ message: res.__('file_deleted'), data: null });
+});
+
+module.exports = {
+  create,
+  list,
+  getOne,
+  update,
+  assign,
+  assignableUsers,
+  updateStatus,
+  remove,
+  uploadAttachments,
+  listAttachments,
+  deleteAttachment,
+};

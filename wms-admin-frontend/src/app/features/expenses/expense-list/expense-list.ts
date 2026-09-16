@@ -4,6 +4,7 @@ import {
   computed,
   inject,
   signal,
+  viewChildren,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { of, switchMap } from 'rxjs';
@@ -265,8 +266,15 @@ export class ExpenseList {
   /** Files picked in the active form (names sent on submit; bytes ignored for now). */
   protected readonly attachments = signal<SelectedFile[]>([]);
 
+  private readonly uploaders = viewChildren(FileUploadComponent);
+
   constructor() {
     this.list.init();
+  }
+
+  private clearAttachments(): void {
+    this.attachments.set([]);
+    this.uploaders().forEach((u) => u.reset());
   }
 
   // ---- Per-row policy (mirrors backend) ----
@@ -352,7 +360,7 @@ export class ExpenseList {
       amount: null,
       currency: 'USD',
     });
-    this.attachments.set([]);
+    this.clearAttachments();
     this.openModal.set('create');
   }
 
@@ -388,8 +396,8 @@ export class ExpenseList {
       amount: expense.amount,
       currency: expense.currency,
     });
-    // Pre-load existing attachment names so the count/rules reflect reality.
-    this.attachments.set([]);
+    // Start with an empty picker; existing attachments are shown separately.
+    this.clearAttachments();
     this.openModal.set('edit');
   }
 
@@ -402,6 +410,7 @@ export class ExpenseList {
   protected closeModal(): void {
     this.openModal.set(null);
     this.activeExpense.set(null);
+    this.clearAttachments();
   }
 
 

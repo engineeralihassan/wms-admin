@@ -1,11 +1,16 @@
 const httpStatus = require('http-status');
 const { Op } = require('sequelize');
-const { sequelize, Ticket, User, Organization } = require('../../models');
+const { sequelize, Ticket, User, Organization, Attachment } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const { PERMISSIONS } = require('../../config/rbac');
 const { paginate } = require('../../utils/query/paginate');
 const { TICKET_QUERY_CONFIG, USER_QUERY_CONFIG } = require('../../config/query-configs');
 const { TICKET_STATUSES } = require('../../utils/ticket.constants');
+const attachmentService = require('../storage/attachment.service');
+const { UPLOAD_FOLDERS } = require('../../config/storage');
+
+/** owner_type used to key ticket files in the polymorphic attachments table. */
+const TICKET_OWNER_TYPE = 'ticket';
 
 /** Columns returned for ticket list/detail. */
 const TICKET_ATTRIBUTES = [
@@ -112,15 +117,48 @@ const resolveAssignee = async (assigneeUuid, organizationId, res) => {
 };
 
 /**
+ * Attach the real uploaded-file rows (polymorphic attachments) onto ticket instances
+ * as `ticket_attachments`, batched by a single query. Because attachments are
+ * polymorphic (no Sequelize association), we load them here rather than via `include`.
+ * Mutates and returns the same instances for convenience. Mirrors the expense service.
+ */
+const withAttachments = async (tickets) => {
+  const list = Array.isArray(tickets) ? tickets : [tickets].filter(Boolean);
+  if (list.length === 0) return tickets;
+
+  const ids = list.map((t) => t.id);
+  const rows = await Attachment.findAll({
+    where: { owner_type: TICKET_OWNER_TYPE, owner_id: ids },
+    order: [['created_at', 'DESC']],
+  });
+
+  const byOwner = new Map();
+  rows.forEach((r) => {
+    const arr = byOwner.get(r.owner_id) || [];
+    arr.push(attachmentService.toDto(r));
+    byOwner.set(r.owner_id, arr);
+  });
+
+  list.forEach((t) => {
+    // setDataValue so the extra field survives toJSON/serialization.
+    t.setDataValue('ticket_attachments', byOwner.get(t.id) || []);
+  });
+  return tickets;
+};
+
+/**
  * Load a ticket by uuid within the caller's VISIBILITY scope. Returns null if the
  * caller cannot see it (so callers can turn that into a 404, never leaking existence).
  */
-const findVisibleTicket = async (uuid, req) =>
-  Ticket.findOne({
+const findVisibleTicket = async (uuid, req) => {
+  const ticket = await Ticket.findOne({
     where: { uuid, ...buildTicketScope(req) },
     attributes: TICKET_ATTRIBUTES,
     include: TICKET_INCLUDE,
   });
+  if (ticket) await withAttachments(ticket);
+  return ticket;
+};
 
 /**
  * Create a ticket. Every role may create (Create ticket: ✅ ✅ ✅).
@@ -185,11 +223,15 @@ const listTickets = async (req) => {
     scopeWhere.assigned_to_id = req.auth.userId;
   }
 
-  return paginate(Ticket, req.query, TICKET_QUERY_CONFIG, {
+  const result = await paginate(Ticket, req.query, TICKET_QUERY_CONFIG, {
     scopeWhere,
     attributes: TICKET_ATTRIBUTES,
     include: TICKET_INCLUDE,
   });
+
+  // Batch-load real uploaded attachments onto the page of rows (one extra query).
+  await withAttachments(result.data);
+  return result;
 };
 
 /** Fetch one ticket by uuid, visibility-scoped. */
@@ -320,6 +362,77 @@ const deleteTicket = async (uuid, req, res) => {
   return true;
 };
 
+// ── Attachments (real files, backed by the polymorphic attachments table) ────────
+//
+// These sit on top of the generic attachment.service and mirror the expense/leave
+// features. The ticket is always resolved WITHIN the caller's visibility scope first,
+// so owner_id is derived server-side and never trusted from the client. Uploading and
+// deleting mirror the ticket UPDATE rule (owner or org manager); listing follows read
+// visibility.
+
+/** True when the caller may add/remove files on this ticket (owner or manager). */
+const canModifyAttachments = (ticket, auth) =>
+  isOrgManager(auth) || ticket.created_by_id === auth.userId;
+
+/**
+ * Upload one or more files to a ticket (multipart already parsed onto req).
+ * Owner or manager only.
+ */
+const uploadTicketAttachments = async (uuid, req, res) => {
+  const ticket = await findVisibleTicket(uuid, req);
+  if (!ticket) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('ticket_not_found'));
+  }
+  if (!canModifyAttachments(ticket, req.auth)) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('forbidden'));
+  }
+
+  return attachmentService.uploadAndPersist(req, {
+    ownerType: TICKET_OWNER_TYPE,
+    ownerId: ticket.id,
+    organizationId: ticket.organization_id,
+    uploadedById: req.auth.userId,
+    folder: UPLOAD_FOLDERS.TICKETS,
+  });
+};
+
+/** List a ticket's uploaded files. Follows read visibility. */
+const listTicketAttachments = async (uuid, req, res) => {
+  const ticket = await findVisibleTicket(uuid, req);
+  if (!ticket) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('ticket_not_found'));
+  }
+  return attachmentService.listForOwner(TICKET_OWNER_TYPE, ticket.id, req.tenantWhere);
+};
+
+/**
+ * Delete one uploaded file from a ticket. Owner or manager only, and the attachment
+ * must actually belong to that ticket (guards against cross-ticket uuids).
+ */
+const deleteTicketAttachment = async (uuid, attachmentUuid, req, res) => {
+  const ticket = await findVisibleTicket(uuid, req);
+  if (!ticket) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('ticket_not_found'));
+  }
+  if (!canModifyAttachments(ticket, req.auth)) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('forbidden'));
+  }
+
+  const row = await Attachment.findOne({
+    where: {
+      uuid: attachmentUuid,
+      owner_type: TICKET_OWNER_TYPE,
+      owner_id: ticket.id,
+      ...req.tenantWhere,
+    },
+  });
+  if (!row) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('file_not_found'));
+  }
+  await attachmentService.deleteByUuid(attachmentUuid, req.tenantWhere);
+  return true;
+};
+
 module.exports = {
   createTicket,
   listTickets,
@@ -329,6 +442,10 @@ module.exports = {
   listAssignableUsers,
   updateStatus,
   deleteTicket,
+  uploadTicketAttachments,
+  listTicketAttachments,
+  deleteTicketAttachment,
   buildTicketScope,
   isOrgManager,
+  TICKET_OWNER_TYPE,
 };

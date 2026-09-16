@@ -42,6 +42,20 @@ export interface TicketAttachment {
   name: string;
 }
 
+/**
+ * A real uploaded ticket file (bytes stored in object storage, link kept in the DB).
+ * Returned on the ticket read path as `ticket_attachments`, and by the upload endpoint.
+ * `url` is the direct link to open/download the file. Mirrors the expense ExpenseFile.
+ */
+export interface TicketFile {
+  uuid: string;
+  url: string;
+  file_name: string | null;
+  file_mime: string | null;
+  file_size: number | null;
+  uploaded_at?: string;
+}
+
 /** Ticket row as returned by the backend list/detail endpoints. */
 export interface Ticket {
   uuid: string;
@@ -56,7 +70,10 @@ export interface Ticket {
   updated_at?: string;
   created_by: TicketUser | null;
   assigned_to: TicketUser | null;
+  /** Legacy name-only metadata (kept for compatibility). */
   attachments: TicketAttachment[];
+  /** Real uploaded files with links (the ones users open/download). */
+  ticket_attachments: TicketFile[];
   organization?: { uuid: string; name: string; slug: string };
 }
 

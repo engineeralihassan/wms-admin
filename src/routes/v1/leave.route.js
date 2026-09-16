@@ -1,5 +1,6 @@
 const express = require('express');
 const validate = require('../../middlewares/validate');
+const uploadFiles = require('../../middlewares/upload');
 const { leaveValidation } = require('../../validations');
 const leaveController = require('../../controllers/leaves/leave.controller');
 const { authVerify, requirePermission, tenantScope } = require('../../middlewares/auth');
@@ -160,6 +161,33 @@ router.patch(
   requirePermission(PERMISSIONS.LEAVE_APPROVE),
   validate(leaveValidation.cancelLeave),
   leaveController.cancel
+);
+
+router
+  .route('/:uuid/attachments')
+  .post(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.LEAVE_UPDATE),
+    uploadFiles.any(),
+    validate(leaveValidation.leaveAttachments),
+    leaveController.uploadAttachments
+  )
+  .get(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.LEAVE_READ),
+    validate(leaveValidation.leaveAttachments),
+    leaveController.listAttachments
+  );
+
+router.delete(
+  '/:uuid/attachments/:attachmentUuid',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.LEAVE_UPDATE),
+  validate(leaveValidation.deleteLeaveAttachment),
+  leaveController.deleteAttachment
 );
 
 module.exports = router;

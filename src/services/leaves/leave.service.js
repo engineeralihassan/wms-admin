@@ -8,10 +8,16 @@ const {
   LeaveBalanceLedger,
   User,
   Organization,
+  Attachment,
 } = require('../../models');
 const ApiError = require('../../utils/ApiError');
 const { PERMISSIONS } = require('../../config/rbac');
 const { paginate } = require('../../utils/query/paginate');
+const attachmentService = require('../storage/attachment.service');
+const { UPLOAD_FOLDERS } = require('../../config/storage');
+
+/** owner_type used to key leave files in the polymorphic attachments table. */
+const LEAVE_OWNER_TYPE = 'leave';
 const {
   LEAVE_QUERY_CONFIG,
   LEAVE_BALANCE_QUERY_CONFIG,
@@ -119,12 +125,45 @@ const nextLeaveNumber = async (transaction) => {
 const normalizeAttachments = (attachments) =>
   Array.isArray(attachments) ? attachments.map((a) => ({ name: String(a.name).trim() })) : [];
 
-const findVisibleLeave = async (uuid, req) =>
-  LeaveRequest.findOne({
+/**
+ * Attach the real uploaded-file rows (polymorphic attachments) onto leave instances
+ * as `leave_attachments`, batched by a single query. Because attachments are
+ * polymorphic (no Sequelize association), we load them here rather than via `include`.
+ * Mutates and returns the same instances for convenience. Mirrors the expense service.
+ */
+const withAttachments = async (leaves) => {
+  const list = Array.isArray(leaves) ? leaves : [leaves].filter(Boolean);
+  if (list.length === 0) return leaves;
+
+  const ids = list.map((l) => l.id);
+  const rows = await Attachment.findAll({
+    where: { owner_type: LEAVE_OWNER_TYPE, owner_id: ids },
+    order: [['created_at', 'DESC']],
+  });
+
+  const byOwner = new Map();
+  rows.forEach((r) => {
+    const arr = byOwner.get(r.owner_id) || [];
+    arr.push(attachmentService.toDto(r));
+    byOwner.set(r.owner_id, arr);
+  });
+
+  list.forEach((l) => {
+    // setDataValue so the extra field survives toJSON/serialization.
+    l.setDataValue('leave_attachments', byOwner.get(l.id) || []);
+  });
+  return leaves;
+};
+
+const findVisibleLeave = async (uuid, req) => {
+  const leave = await LeaveRequest.findOne({
     where: { uuid, ...buildLeaveScope(req) },
     attributes: LEAVE_ATTRIBUTES,
     include: LEAVE_INCLUDE,
   });
+  if (leave) await withAttachments(leave);
+  return leave;
+};
 
 /** Resolve a leave type uuid to an active type in the caller's organization. */
 const resolveLeaveType = async (leaveTypeUuid, organizationId, res, transaction) => {
@@ -349,11 +388,15 @@ const listLeaves = async (req) => {
 
   const query = { ...req.query, filters };
 
-  return paginate(LeaveRequest, query, LEAVE_QUERY_CONFIG, {
+  const result = await paginate(LeaveRequest, query, LEAVE_QUERY_CONFIG, {
     scopeWhere,
     attributes: LEAVE_ATTRIBUTES,
     include: LEAVE_INCLUDE,
   });
+
+  // Batch-load real uploaded attachments onto the page of rows (one extra query).
+  await withAttachments(result.data);
+  return result;
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1078,6 +1121,76 @@ const ensureDefaultLeaveTypes = async (organizationId, createdById = null, trans
   }
 };
 
+// ── Attachments (real files, backed by the polymorphic attachments table) ────────
+//
+// These sit on top of the generic attachment.service and mirror the expense feature.
+// The leave is always resolved WITHIN the caller's visibility scope first, so owner_id
+// is derived server-side and never trusted from the client. Uploading/deleting is an
+// owner action on an editable (draft/rejected) request; listing follows read visibility.
+
+/** True when the caller may add/remove files on this leave (owner + draft/rejected). */
+const canModifyAttachments = (leave, auth) =>
+  leave.created_by_id === auth.userId && isOwnerEditable(leave);
+
+/**
+ * Upload one or more files to a leave request (multipart already parsed onto req).
+ * Owner-only, and only while the request is a draft or rejected.
+ */
+const uploadLeaveAttachments = async (uuid, req, res) => {
+  const leave = await findVisibleLeave(uuid, req);
+  if (!leave) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('leave_not_found'));
+  }
+  if (!canModifyAttachments(leave, req.auth)) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('forbidden'));
+  }
+
+  return attachmentService.uploadAndPersist(req, {
+    ownerType: LEAVE_OWNER_TYPE,
+    ownerId: leave.id,
+    organizationId: leave.organization_id,
+    uploadedById: req.auth.userId,
+    folder: UPLOAD_FOLDERS.LEAVES,
+  });
+};
+
+/** List a leave request's uploaded files. Follows read visibility. */
+const listLeaveAttachments = async (uuid, req, res) => {
+  const leave = await findVisibleLeave(uuid, req);
+  if (!leave) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('leave_not_found'));
+  }
+  return attachmentService.listForOwner(LEAVE_OWNER_TYPE, leave.id, req.tenantWhere);
+};
+
+/**
+ * Delete one uploaded file from a leave request. Owner-only + draft/rejected, and the
+ * attachment must actually belong to that request (guards against cross-request uuids).
+ */
+const deleteLeaveAttachment = async (uuid, attachmentUuid, req, res) => {
+  const leave = await findVisibleLeave(uuid, req);
+  if (!leave) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('leave_not_found'));
+  }
+  if (!canModifyAttachments(leave, req.auth)) {
+    throw new ApiError(httpStatus.FORBIDDEN, res.__('forbidden'));
+  }
+
+  const row = await Attachment.findOne({
+    where: {
+      uuid: attachmentUuid,
+      owner_type: LEAVE_OWNER_TYPE,
+      owner_id: leave.id,
+      ...req.tenantWhere,
+    },
+  });
+  if (!row) {
+    throw new ApiError(httpStatus.NOT_FOUND, res.__('file_not_found'));
+  }
+  await attachmentService.deleteByUuid(attachmentUuid, req.tenantWhere);
+  return true;
+};
+
 module.exports = {
   createLeave,
   listLeaves,
@@ -1088,6 +1201,10 @@ module.exports = {
   decideLeave,
   cancelLeave,
   deleteLeave,
+  uploadLeaveAttachments,
+  listLeaveAttachments,
+  deleteLeaveAttachment,
+  LEAVE_OWNER_TYPE,
   getMyBalances,
   getLeaveDays,
   getCalendar,

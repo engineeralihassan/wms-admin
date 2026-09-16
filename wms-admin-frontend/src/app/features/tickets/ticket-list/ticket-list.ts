@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   signal,
+  viewChildren,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -14,7 +15,7 @@ import { CardComponent } from '../../../shared/components/card/card.component';
 import { ButtonComponent } from '../../../shared/components/button/button.component';
 import { ModalComponent } from '../../../shared/components/modal/modal.component';
 import { FileUploadComponent } from '../../../shared/components/file-upload/file-upload.component';
-import { mb, type FileUploadConfig, type SelectedFile } from '../../../shared/components/file-upload/file-upload.model';
+import { mb, formatFileSize, type FileUploadConfig, type SelectedFile } from '../../../shared/components/file-upload/file-upload.model';
 import {
   DataTableComponent,
   type BadgeVariant,
@@ -23,7 +24,7 @@ import {
   type DataTableDateRangeFilter,
   type DataTableFilter,
 } from '../../../shared/components/data-table/data-table.component';
-import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { markAllAsTouched } from '../../../shared/utils/form.utils';
 import { createListState } from '../../../shared/list/list-state';
@@ -35,13 +36,14 @@ import {
   TICKET_PRIORITIES,
   TICKET_STATUSES,
   type Ticket,
+  type TicketFile,
   type TicketUser,
   type TicketPriority,
   type TicketStatus,
 } from '../models/ticket.model';
 
 /** Which content modal is currently open on this page. */
-type OpenModal = 'create' | 'edit' | 'status' | 'assign' | null;
+type OpenModal = 'create' | 'edit' | 'status' | 'assign' | 'view' | null;
 
 /**
  * Tickets list page.
@@ -190,6 +192,7 @@ export class TicketList {
   /** Row actions, filtered by capability + per-row policy. */
   protected readonly actions = computed<ReadonlyArray<DataTableAction<Ticket>>>(() => {
     const acts: DataTableAction<Ticket>[] = [
+      { id: 'view', label: 'View', icon: 'view' },
       {
         id: 'edit',
         label: 'Edit',
@@ -233,6 +236,13 @@ export class TicketList {
   };
   /** Files picked in the create form (names sent on submit; bytes ignored for now). */
   protected readonly attachments = signal<SelectedFile[]>([]);
+
+  /**
+   * All rendered uploaders. We clear their internal selection when a form opens/closes,
+   * since the component owns its own state and resetting the `attachments` signal alone
+   * does not empty the picker.
+   */
+  private readonly uploaders = viewChildren(FileUploadComponent);
 
   protected readonly editForm = this.fb.nonNullable.group({
     subject: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(500)]],
@@ -280,6 +290,12 @@ export class TicketList {
       });
   }
 
+  /** Empty the parent's tracked files AND every uploader's internal selection. */
+  private clearAttachments(): void {
+    this.attachments.set([]);
+    this.uploaders().forEach((u) => u.reset());
+  }
+
   // ---- Per-row policy (mirrors backend) ----
   private canEdit(ticket: Ticket): boolean {
     if (this.isManager()) return true;
@@ -301,6 +317,40 @@ export class TicketList {
       : '—';
   }
 
+  // ---- Attachment presentation helpers (mirror the expenses page) ----
+
+  /** Human-readable file size (e.g. "2.4 MB"), or '' when size is unknown. */
+  protected fileSize(file: TicketFile): string {
+    return file.file_size ? formatFileSize(file.file_size) : '';
+  }
+
+  /**
+   * A short kind key used to pick an icon + accent for a file, derived from its mime
+   * type (falling back to the extension). Keeps the template declarative.
+   */
+  protected fileKind(file: TicketFile): 'image' | 'pdf' | 'sheet' | 'doc' | 'file' {
+    const mime = (file.file_mime || '').toLowerCase();
+    const name = (file.file_name || '').toLowerCase();
+    if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(name)) return 'image';
+    if (mime === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+    if (mime.includes('sheet') || mime.includes('excel') || /\.(xlsx?|csv)$/.test(name))
+      return 'sheet';
+    if (mime.includes('word') || /\.(docx?|txt)$/.test(name)) return 'doc';
+    return 'file';
+  }
+
+  /** The short label shown on the file badge (e.g. "PDF", "IMG"). */
+  protected fileBadge(file: TicketFile): string {
+    return { image: 'IMG', pdf: 'PDF', sheet: 'XLS', doc: 'DOC', file: 'FILE' }[
+      this.fileKind(file)
+    ];
+  }
+
+  /** The raw File objects currently picked in the uploader. */
+  private pickedFiles(): File[] {
+    return this.attachments().map((f) => f.file);
+  }
+
   protected onSearch(value: string): void {
     this.searchValue.set(value);
     this.list.onSearch(value);
@@ -315,12 +365,15 @@ export class TicketList {
   // ---- Open modals ----
   protected openCreate(): void {
     this.createForm.reset({ priority: 'medium' });
-    this.attachments.set([]);
+    this.clearAttachments();
     this.openModal.set('create');
   }
 
   protected onAction(event: { actionId: string; row: Ticket }): void {
     switch (event.actionId) {
+      case 'view':
+        this.openView(event.row);
+        break;
       case 'edit':
         this.openEdit(event.row);
         break;
@@ -336,6 +389,11 @@ export class TicketList {
     }
   }
 
+  private openView(ticket: Ticket): void {
+    this.activeTicket.set(ticket);
+    this.openModal.set('view');
+  }
+
   private openEdit(ticket: Ticket): void {
     this.activeTicket.set(ticket);
     this.editForm.reset({
@@ -343,6 +401,8 @@ export class TicketList {
       description: ticket.description,
       priority: ticket.priority,
     });
+    // Start with an empty picker; existing attachments are shown separately.
+    this.clearAttachments();
     this.openModal.set('edit');
   }
 
@@ -378,6 +438,7 @@ export class TicketList {
   protected closeModal(): void {
     this.openModal.set(null);
     this.activeTicket.set(null);
+    this.clearAttachments();
   }
 
   // ---- Submit handlers (action logic lives here, in the parent) ----
@@ -387,18 +448,23 @@ export class TicketList {
       return;
     }
     const v = this.createForm.getRawValue();
-    // For now we persist only the file NAMES (no bytes/storage yet). When S3 lands,
-    // this is where we'd upload and swap in the returned keys — the uploader and form
-    // stay unchanged.
-    const attachments = this.attachments().map((f) => ({ name: f.name }));
+    // Files are real now (bytes in object storage), mirroring expenses/leave: create
+    // the ticket first (files need its id as their owner), then upload any picked files.
+    const files = this.pickedFiles();
     this.submitting.set(true);
     this.tickets
       .create({
         subject: v.subject.trim(),
         description: v.description.trim(),
         priority: v.priority,
-        attachments,
       })
+      .pipe(
+        switchMap((ticket) =>
+          files.length
+            ? this.tickets.uploadAttachments(ticket.uuid, files).pipe(switchMap(() => of(ticket)))
+            : of(ticket),
+        ),
+      )
       .subscribe({
         next: () => {
           this.notify.success('Ticket created.');
@@ -418,6 +484,7 @@ export class TicketList {
       return;
     }
     const v = this.editForm.getRawValue();
+    const files = this.pickedFiles();
     this.submitting.set(true);
     this.tickets
       .update(ticket.uuid, {
@@ -425,6 +492,13 @@ export class TicketList {
         description: v.description.trim(),
         priority: v.priority,
       })
+      .pipe(
+        switchMap((updated) =>
+          files.length
+            ? this.tickets.uploadAttachments(ticket.uuid, files).pipe(switchMap(() => of(updated)))
+            : of(updated),
+        ),
+      )
       .subscribe({
         next: () => {
           this.notify.success(`Ticket ${ticket.ticket_number} updated.`);
@@ -434,6 +508,25 @@ export class TicketList {
         },
         error: () => this.submitting.set(false),
       });
+  }
+
+  /** Delete one already-uploaded file from the active ticket (in the edit modal). */
+  protected removeExistingAttachment(attachmentUuid: string): void {
+    const ticket = this.activeTicket();
+    if (!ticket) return;
+    this.tickets.deleteAttachment(ticket.uuid, attachmentUuid).subscribe({
+      next: () => {
+        // Reflect the removal in the open modal without a full reload.
+        this.activeTicket.set({
+          ...ticket,
+          ticket_attachments: (ticket.ticket_attachments ?? []).filter(
+            (a) => a.uuid !== attachmentUuid,
+          ),
+        });
+        this.notify.success('Attachment removed.');
+        this.list.reload();
+      },
+    });
   }
 
   protected submitStatus(): void {

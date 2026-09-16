@@ -159,14 +159,36 @@
     </label>
   </form>
 
-  @if (activeLeave()?.attachments?.length) {
-    <p class="attachments-hint">
-      Current attachments: {{ activeLeave()?.attachments?.length }}. Add files below to replace them.
-    </p>
+  @if ((activeLeave()?.leave_attachments ?? []).length) {
+    <div class="attachments-block">
+      <p class="attachments-block__title">
+        Current attachments <span class="dt-count">{{ (activeLeave()?.leave_attachments ?? []).length }}</span>
+      </p>
+      <ul class="file-cards">
+        @for (a of activeLeave()?.leave_attachments ?? []; track a.uuid) {
+          <li class="file-card file-card--{{ fileKind(a) }}">
+            <a class="file-card__link" [href]="a.url" target="_blank" rel="noopener"
+               [attr.title]="'Open ' + (a.file_name || 'file')">
+              <span class="file-card__badge">{{ fileBadge(a) }}</span>
+              <span class="file-card__meta">
+                <span class="file-card__name">{{ a.file_name || 'file' }}</span>
+                @if (fileSize(a)) { <span class="file-card__size">{{ fileSize(a) }}</span> }
+              </span>
+            </a>
+            <button
+              type="button"
+              class="file-card__remove"
+              [attr.aria-label]="'Remove ' + (a.file_name || 'file')"
+              (click)="removeExistingAttachment(a.uuid)"
+            >✕</button>
+          </li>
+        }
+      </ul>
+    </div>
   }
   <app-file-upload
     [config]="attachmentConfig"
-    label="Attachments (optional)"
+    label="Add attachments"
     (filesChange)="attachments.set($event)"
   />
 
@@ -358,7 +380,28 @@
           <dt>Rejection reason</dt><dd>{{ l.rejection_reason }}</dd>
         </div>
       }
-      @if (l.attachments.length) {
+      @if (l.leave_attachments.length) {
+        <div class="leave-details__row leave-details__row--stack">
+          <dt>Attachments <span class="dt-count">{{ l.leave_attachments.length }}</span></dt>
+          <dd>
+            <ul class="file-cards">
+              @for (a of l.leave_attachments; track a.uuid) {
+                <li class="file-card file-card--{{ fileKind(a) }}">
+                  <a class="file-card__link" [href]="a.url" target="_blank" rel="noopener"
+                     [attr.title]="'Open ' + (a.file_name || 'file')">
+                    <span class="file-card__badge">{{ fileBadge(a) }}</span>
+                    <span class="file-card__meta">
+                      <span class="file-card__name">{{ a.file_name || 'file' }}</span>
+                      @if (fileSize(a)) { <span class="file-card__size">{{ fileSize(a) }}</span> }
+                    </span>
+                    <span class="file-card__action" aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </dd>
+        </div>
+      } @else if (l.attachments.length) {
         <div class="leave-details__row">
           <dt>Attachments</dt>
           <dd>

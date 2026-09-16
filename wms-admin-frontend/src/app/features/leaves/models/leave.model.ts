@@ -46,6 +46,20 @@ export interface LeaveAttachment {
   name: string;
 }
 
+/**
+ * A real uploaded leave file (bytes stored in object storage, link kept in the DB).
+ * Returned on the leave read path as `leave_attachments`, and by the upload endpoint.
+ * `url` is the direct link to open/download the file. Mirrors the expense ExpenseFile.
+ */
+export interface LeaveFile {
+  uuid: string;
+  url: string;
+  file_name: string | null;
+  file_mime: string | null;
+  file_size: number | null;
+  uploaded_at?: string;
+}
+
 /** A leave type as returned by the backend (per-organization catalog). */
 export interface LeaveType {
   uuid: string;
@@ -69,7 +83,10 @@ export interface LeaveRequest {
   total_days: number;
   reason: string | null;
   status: LeaveStatus;
+  /** Legacy name-only metadata (kept for compatibility). */
   attachments: LeaveAttachment[];
+  /** Real uploaded files with links (the ones users open/download). */
+  leave_attachments: LeaveFile[];
   submitted_at: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;

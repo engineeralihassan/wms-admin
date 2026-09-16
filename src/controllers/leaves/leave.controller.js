@@ -36,6 +36,10 @@ const toDto = (leave) => ({
   reason: leave.reason,
   status: leave.status,
   attachments: Array.isArray(leave.attachments) ? leave.attachments : [],
+  leave_attachments:
+    (typeof leave.getDataValue === 'function'
+      ? leave.getDataValue('leave_attachments')
+      : leave.leave_attachments) || [],
   submitted_at: leave.submitted_at,
   reviewed_at: leave.reviewed_at,
   rejection_reason: leave.rejection_reason,
@@ -143,6 +147,32 @@ const remove = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('leave_deleted'), data: null });
 });
 
+/**
+ * POST /leaves/:uuid/attachments — upload one or more real files to a leave request.
+ * multipart/form-data; the multer middleware on the route parses the files first.
+ */
+const uploadAttachments = catchAsync(async (req, res) => {
+  const data = await leaveService.uploadLeaveAttachments(req.params.uuid, req, res);
+  res.status(httpStatus.CREATED).send({ message: res.__('files_uploaded'), data });
+});
+
+/** GET /leaves/:uuid/attachments — list a leave request's uploaded files. */
+const listAttachments = catchAsync(async (req, res) => {
+  const data = await leaveService.listLeaveAttachments(req.params.uuid, req, res);
+  res.status(httpStatus.OK).send({ message: res.__('success'), data });
+});
+
+/** DELETE /leaves/:uuid/attachments/:attachmentUuid — remove one uploaded file. */
+const deleteAttachment = catchAsync(async (req, res) => {
+  await leaveService.deleteLeaveAttachment(
+    req.params.uuid,
+    req.params.attachmentUuid,
+    req,
+    res
+  );
+  res.status(httpStatus.OK).send({ message: res.__('file_deleted'), data: null });
+});
+
 /** GET /leaves/balances/me — the caller's own balances. */
 const myBalances = catchAsync(async (req, res) => {
   const { year, balances } = await leaveService.getMyBalances(req);
@@ -202,6 +232,9 @@ module.exports = {
   decide,
   cancel,
   remove,
+  uploadAttachments,
+  listAttachments,
+  deleteAttachment,
   myBalances,
   calendar,
   listTypes,

@@ -139,6 +139,24 @@ const deleteTicket = {
   }),
 };
 
+/**
+ * POST/GET /tickets/:uuid/attachments — real file upload/list. File type/size/count
+ * are enforced by multer (see config/storage); here we only validate the route param.
+ */
+const ticketAttachments = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+  }),
+};
+
+/** DELETE /tickets/:uuid/attachments/:attachmentUuid — remove one uploaded file. */
+const deleteTicketAttachment = {
+  params: Joi.object().keys({
+    uuid: Joi.string().uuid().required(),
+    attachmentUuid: Joi.string().uuid().required(),
+  }),
+};
+
 module.exports = {
   createTicket,
   listTickets,
@@ -148,4 +166,6 @@ module.exports = {
   assignTicket,
   updateStatus,
   deleteTicket,
+  ticketAttachments,
+  deleteTicketAttachment,
 };

@@ -5,6 +5,7 @@ import { API_ENDPOINTS } from '../../../core/constants/api-endpoints';
 import type { ListQuery, PaginatedResult } from '../../../core/models/pagination.model';
 import type {
   Ticket,
+  TicketFile,
   TicketUser,
   CreateTicketRequest,
   UpdateTicketRequest,
@@ -52,6 +53,34 @@ export class TicketsService {
 
   remove(uuid: string): Observable<null> {
     return this.api.delete<null>(API_ENDPOINTS.tickets.byUuid(uuid));
+  }
+
+  // ── Attachments (real file uploads) ────────────────────────────────────────
+
+  /**
+   * Upload one or more real files to a ticket as multipart/form-data.
+   *
+   * We build a FormData and post it through ApiService. Angular's HttpClient sets the
+   * correct `multipart/form-data; boundary=...` header automatically for FormData, and
+   * the auth interceptor only adds the Bearer token (it never sets Content-Type), so
+   * the multipart boundary is preserved. Returns the created attachment rows.
+   */
+  uploadAttachments(uuid: string, files: File[]): Observable<TicketFile[]> {
+    const form = new FormData();
+    // The backend uses uploadFiles.any(), so the field name is free-form; the ticket
+    // owner is resolved server-side from the :uuid, never sent in the body.
+    files.forEach((file) => form.append('files', file, file.name));
+    return this.api.post<TicketFile[]>(API_ENDPOINTS.tickets.attachments(uuid), form);
+  }
+
+  /** List a ticket's uploaded files. */
+  listAttachments(uuid: string): Observable<TicketFile[]> {
+    return this.api.get<TicketFile[]>(API_ENDPOINTS.tickets.attachments(uuid));
+  }
+
+  /** Delete one uploaded file from a ticket. */
+  deleteAttachment(uuid: string, attachmentUuid: string): Observable<null> {
+    return this.api.delete<null>(API_ENDPOINTS.tickets.attachment(uuid, attachmentUuid));
   }
 
   /**

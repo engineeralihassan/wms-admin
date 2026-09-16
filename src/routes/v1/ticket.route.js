@@ -1,5 +1,6 @@
 const express = require('express');
 const validate = require('../../middlewares/validate');
+const uploadFiles = require('../../middlewares/upload');
 const { ticketValidation } = require('../../validations');
 const ticketController = require('../../controllers/tickets/ticket.controller');
 const { authVerify, requirePermission, tenantScope } = require('../../middlewares/auth');
@@ -83,6 +84,37 @@ router.patch(
   requirePermission(PERMISSIONS.TICKET_STATUS_UPDATE),
   validate(ticketValidation.updateStatus),
   ticketController.updateStatus
+);
+
+// ── Attachments (real file uploads) ──────────────────────────────────────────
+// Owner or manager uploads/removes files (re-checked in the service), so it holds
+// ticket.update. uploadFiles.any() runs BEFORE validate so the multipart parts are
+// parsed; it accepts single OR multiple files under any field.
+router
+  .route('/:uuid/attachments')
+  .post(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.TICKET_UPDATE),
+    uploadFiles.any(),
+    validate(ticketValidation.ticketAttachments),
+    ticketController.uploadAttachments
+  )
+  .get(
+    authVerify,
+    tenantScope,
+    requirePermission(PERMISSIONS.TICKET_READ),
+    validate(ticketValidation.ticketAttachments),
+    ticketController.listAttachments
+  );
+
+router.delete(
+  '/:uuid/attachments/:attachmentUuid',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.TICKET_UPDATE),
+  validate(ticketValidation.deleteTicketAttachment),
+  ticketController.deleteAttachment
 );
 
 module.exports = router;

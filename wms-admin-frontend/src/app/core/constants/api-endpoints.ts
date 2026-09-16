@@ -37,6 +37,9 @@ export const API_ENDPOINTS = {
     assignee: (uuid: string) => `/tickets/${uuid}/assignee`,
     assignableUsers: (uuid: string) => `/tickets/${uuid}/assignable-users`,
     status: (uuid: string) => `/tickets/${uuid}/status`,
+    attachments: (uuid: string) => `/tickets/${uuid}/attachments`,
+    attachment: (uuid: string, attachmentUuid: string) =>
+      `/tickets/${uuid}/attachments/${attachmentUuid}`,
   },
   expenses: {
     root: '/expenses',
@@ -73,6 +76,9 @@ export const API_ENDPOINTS = {
     types: '/leaves/types',
     typeByUuid: (uuid: string) => `/leaves/types/${uuid}`,
     balances: '/leaves/balances',
+    attachments: (uuid: string) => `/leaves/${uuid}/attachments`,
+    attachment: (uuid: string, attachmentUuid: string) =>
+      `/leaves/${uuid}/attachments/${attachmentUuid}`,
   },
   timesheets: {
     root: '/timesheets',
