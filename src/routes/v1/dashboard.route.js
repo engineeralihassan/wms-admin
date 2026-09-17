@@ -78,6 +78,17 @@ router.get(
   dashboardController.organizationChart
 );
 
+// Timesheets chart — status breakdown over recent weeks. Requires timesheet.read; the
+// service scopes it to the caller's own sheets unless they hold timesheet.approve
+// (org-wide), mirroring the timesheet list page.
+router.get(
+  '/charts/timesheets',
+  authVerify,
+  tenantScope,
+  requirePermission(PERMISSIONS.TIMESHEET_READ),
+  dashboardController.timesheetChart
+);
+
 // ── Actionable summary cards + recent side-panel lists ─────────────────────────
 //
 // The summary card values and recent lists are each scoped by the service to what the
@@ -96,6 +107,13 @@ router.get(
   ),
   dashboardController.summary
 );
+
+// To-dos — the caller's personal action list. Like /me, it exposes the caller's OWN
+// data (their expiring visa, their unsubmitted sheets) with no module permission
+// required; the service ADDITIONALLY widens each source to org-wide only for callers
+// who already hold the relevant read permission (user.read for others' visas,
+// timesheet.approve for others' sheets). So authenticate + tenant-scope is enough here.
+router.get('/todos', authVerify, tenantScope, dashboardController.todos);
 
 router.get(
   '/recent-projects',

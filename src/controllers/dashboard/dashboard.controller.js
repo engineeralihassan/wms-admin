@@ -97,8 +97,23 @@ const organizationChart = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ message: res.__('dashboard_loaded'), data });
 });
 
+const timesheetChart = catchAsync(async (req, res) => {
+  const data = await dashboardService.getTimesheetChart(req);
+  res.status(httpStatus.OK).send({ message: res.__('dashboard_loaded'), data });
+});
+
 const summary = catchAsync(async (req, res) => {
   const data = await dashboardService.getSummary(req);
+  res.status(httpStatus.OK).send({ message: res.__('dashboard_loaded'), data });
+});
+
+/**
+ * GET /dashboard/todos — the caller's personal, actionable list (visa expiry +
+ * unsubmitted timesheets today; more sources can be added service-side). Already
+ * shaped by the service; the controller just forwards the { items, overflow } payload.
+ */
+const todos = catchAsync(async (req, res) => {
+  const data = await dashboardService.getTodos(req);
   res.status(httpStatus.OK).send({ message: res.__('dashboard_loaded'), data });
 });
 
@@ -120,7 +135,9 @@ module.exports = {
   projectChart,
   userChart,
   organizationChart,
+  timesheetChart,
   summary,
+  todos,
   recentProjects,
   recentUrgentTickets,
 };

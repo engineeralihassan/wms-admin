@@ -20,6 +20,7 @@ const { LEAVE_STATUSES } = require('./leave.constants');
 const { TICKET_STATUSES, TICKET_PRIORITIES } = require('./ticket.constants');
 const { EXPENSE_STATUSES } = require('./expense.constants');
 const { PROJECT_STATUSES, PROJECT_PRIORITIES } = require('./project.constants');
+const { TIMESHEET_STATUSES } = require('./timesheet.constants');
 
 /** Bucket "kinds" — lets a mixed chart segment status vs priority bars. */
 const BUCKET_KINDS = Object.freeze({
@@ -36,6 +37,7 @@ const DASHBOARD_MODULES = Object.freeze({
   PROJECTS: 'projects',
   USERS: 'users',
   ORGANIZATIONS: 'organizations',
+  TIMESHEETS: 'timesheets',
 });
 
 /**
@@ -130,6 +132,63 @@ const ORGANIZATION_METRIC_BUCKETS = Object.freeze([
   { key: 'new', label: 'New This Month', color: '#3b82f6', kind: BUCKET_KINDS.METRIC },
 ]);
 
+/**
+ * TIMESHEETS — 5 status bars mirroring the timesheet lifecycle. Counted by CURRENT
+ * state within a recent window (see TIMESHEET_CHART_WEEKS) rather than "created this
+ * month", because a timesheet's status is a live attribute that matters per week.
+ * Unsubmitted is highlighted amber because it's the actionable state (someone hasn't
+ * submitted yet); the rest follow the same palette as the list page's status pills.
+ */
+const TIMESHEET_STATUS_BUCKETS = Object.freeze([
+  { key: TIMESHEET_STATUSES.UNSUBMITTED, label: 'Unsubmitted', color: '#f59e0b', kind: BUCKET_KINDS.STATUS },
+  { key: TIMESHEET_STATUSES.SUBMITTED, label: 'Submitted', color: '#3b82f6', kind: BUCKET_KINDS.STATUS },
+  { key: TIMESHEET_STATUSES.APPROVED, label: 'Approved', color: '#16a34a', kind: BUCKET_KINDS.STATUS },
+  { key: TIMESHEET_STATUSES.REJECTED, label: 'Rejected', color: '#dc2626', kind: BUCKET_KINDS.STATUS },
+  { key: TIMESHEET_STATUSES.LOCKED, label: 'Locked', color: '#6366f1', kind: BUCKET_KINDS.STATUS },
+]);
+
+/** How many recent weeks the timesheet chart aggregates over (rolling window). */
+const TIMESHEET_CHART_WEEKS = Number(process.env.DASHBOARD_TIMESHEET_WEEKS) || 8;
+
+/**
+ * How many days ahead we start nudging about an unsubmitted timesheet whose due date
+ * (Saturday) or lock date (following Tuesday) is approaching. "Due soon" is a gentle
+ * warning; "locking soon" is urgent because after the lock the owner is frozen out.
+ */
+const TIMESHEET_DUE_SOON_DAYS = Number(process.env.DASHBOARD_TIMESHEET_DUE_SOON_DAYS) || 3;
+
+/**
+ * TO-DOS — a personal, actionable list distinct from the count-only "summary" cards.
+ * Each todo declares a `type` (what it's about) and a `severity` (how urgent):
+ *   warning — needs attention soon (e.g. visa expiring within the window, timesheet
+ *             due soon).
+ *   danger  — already overdue/expired and must be acted on now.
+ */
+const TODO_TYPES = Object.freeze({
+  VISA_EXPIRY: 'visa_expiry',
+  TIMESHEET_UNSUBMITTED: 'timesheet_unsubmitted',
+});
+
+const TODO_SEVERITIES = Object.freeze({
+  WARNING: 'warning',
+  DANGER: 'danger',
+});
+
+/**
+ * How many days before a visa expiration date we start surfacing the "renew your work
+ * authorization" todo ("one month before" by default). Env-overridable so the whole
+ * alerting window is a single knob.
+ */
+const VISA_EXPIRY_WARN_DAYS = Number(process.env.DASHBOARD_VISA_EXPIRY_WARN_DAYS) || 30;
+
+/**
+ * Cap on how many rows a single todo source returns (org admins can have many people
+ * with expiring visas / unsubmitted sheets). The todo list is an action list, not a
+ * report — the full list lives on the module's own page. We return up to this many and
+ * an `overflow` count so the UI can show "+N more".
+ */
+const TODO_SOURCE_LIMIT = Number(process.env.DASHBOARD_TODO_LIMIT) || 50;
+
 /** Frontend deep-link targets for each chart's "View details" button. */
 const DASHBOARD_DETAIL_PATHS = Object.freeze({
   [DASHBOARD_MODULES.LEAVES]: '/leaves',
@@ -138,6 +197,7 @@ const DASHBOARD_DETAIL_PATHS = Object.freeze({
   [DASHBOARD_MODULES.PROJECTS]: '/projects',
   [DASHBOARD_MODULES.USERS]: '/users',
   [DASHBOARD_MODULES.ORGANIZATIONS]: '/organizations',
+  [DASHBOARD_MODULES.TIMESHEETS]: '/timesheets',
 });
 
 /** How many rows the "recent" side-panel lists return. */
@@ -169,6 +229,13 @@ module.exports = {
   PROJECT_PRIORITY_BUCKETS,
   USER_METRIC_BUCKETS,
   ORGANIZATION_METRIC_BUCKETS,
+  TIMESHEET_STATUS_BUCKETS,
+  TIMESHEET_CHART_WEEKS,
+  TIMESHEET_DUE_SOON_DAYS,
+  TODO_TYPES,
+  TODO_SEVERITIES,
+  VISA_EXPIRY_WARN_DAYS,
+  TODO_SOURCE_LIMIT,
   DASHBOARD_DETAIL_PATHS,
   RECENT_LIST_LIMIT,
   currentMonthUtcRange,

@@ -25,6 +25,21 @@ const {
   isSectionLocked,
 } = require('./user-profile.mapper');
 const { PROFILE_SECTIONS } = require('../../config/profile.constants');
+const { USER_DOCUMENT_TYPES } = require('../../config/user-documents');
+const syncVisaDocumentExpiry = async (userId, profilePayload) => {
+  const workPermit = profilePayload
+    && profilePayload.private_information
+    && profilePayload.private_information.work_permit;
+  if (!workPermit || !('visa_expiration_date' in workPermit)) return;
+
+  const raw = workPermit.visa_expiration_date;
+  const expiresOn = raw === '' || raw === null || raw === undefined ? null : raw;
+
+  await UserDocument.update(
+    { expires_on: expiresOn },
+    { where: { user_id: userId, doc_type: USER_DOCUMENT_TYPES.WORK_AUTHORIZATION } }
+  );
+};
 
 /** Columns returned for user list/detail (never password/salt). */
 const USER_PUBLIC_ATTRIBUTES = [
@@ -381,6 +396,7 @@ const updateUserProfile = async (uuid, profilePayload, req, res) => {
       organization_id: user.organization_id,
     });
   }
+  await syncVisaDocumentExpiry(user.id, profilePayload);
   return getUserByUuid(uuid, req, res);
 };
 
@@ -451,14 +467,9 @@ const updateOwnProfile = async (userId, profilePayload, res = null) => {
       organization_id: user.organization_id,
     });
   }
+  await syncVisaDocumentExpiry(user.id, profilePayload);
   return getOwnProfile(userId);
 };
-
-/**
- * Admin locks/unlocks a structured profile section. 'verified' writes a lock marker
- * into verified_sections; 'unverified' removes it (letting the user edit again).
- * Tenant + ownership scoped through the parent user.
- */
 const setProfileSectionStatus = async (uuid, { section, status, note }, req, res) => {
   const user = await findScopedUserOrThrow(uuid, req, res, {
     include: [{ model: UserProfile, as: 'profile' }],

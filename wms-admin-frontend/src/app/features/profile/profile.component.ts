@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CardComponent } from '../../shared/components/card/card.component';
@@ -85,9 +86,31 @@ export class ProfileComponent {
     return `${u.first_name?.[0] ?? ''}${u.last_name?.[0] ?? ''}`.toUpperCase();
   });
 
+  /**
+   * Work Authorization edit form. Declared up here (before the signals below) so the
+   * field-initializer order is valid: `visaStatusValue` reads this control.
+   */
+  protected readonly workAuthForm = this.fb.nonNullable.group({
+    visa_status: [''],
+    visa_no: [''],
+    visa_expiration_date: [''],
+  });
+
+  /**
+   * The live visa status selected in the edit form, as a SIGNAL. A reactive form
+   * control's `.value` is NOT reactive to `computed()`, so deriving `showVisaExpiry`
+   * straight from the control made the expiration field appear only intermittently
+   * (it re-evaluated only when some unrelated signal changed). Bridging the control's
+   * valueChanges into a signal makes the conditional field deterministic.
+   */
+  protected readonly visaStatusValue = toSignal(
+    this.workAuthForm.controls.visa_status.valueChanges,
+    { initialValue: this.workAuthForm.controls.visa_status.value },
+  );
+
   /** True while the selected visa status needs an expiration date. */
   protected readonly showVisaExpiry = computed(() =>
-    visaRequiresExpiry(this.workAuthForm.controls.visa_status.value),
+    visaRequiresExpiry(this.visaStatusValue()),
   );
 
   /** The visa status currently SAVED on the profile (drives the read-view + doc list). */
@@ -210,12 +233,6 @@ export class ProfileComponent {
     contact_email: ['', [Validators.email]],
   });
 
-  protected readonly workAuthForm = this.fb.nonNullable.group({
-    visa_status: [''],
-    visa_no: [''],
-    visa_expiration_date: [''],
-  });
-
   constructor() {
     this.load();
   }
@@ -282,8 +299,25 @@ export class ProfileComponent {
     this.workAuthForm.reset({
       visa_status: wp.visa_status ?? '',
       visa_no: wp.visa_no ?? '',
-      visa_expiration_date: wp.visa_expiration_date ?? '',
+      // <input type="date"> needs an exact YYYY-MM-DD; the stored value may carry a
+      // time component (e.g. 2026-09-19T00:00:00.000Z), which the input silently
+      // rejects and shows blank. Normalize so the saved date pre-fills on edit.
+      visa_expiration_date: this.toDateInputValue(wp.visa_expiration_date),
     });
+  }
+
+  /** Coerce any date-ish value to the YYYY-MM-DD an <input type="date"> expects. */
+  private toDateInputValue(value?: string | null): string {
+    if (!value) return '';
+    // Already a plain date.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    // Use UTC parts so a date-only value doesn't shift a day across timezones.
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 
   // ── Lock helpers ──────────────────────────────────────────────────────────
@@ -359,6 +393,11 @@ export class ProfileComponent {
   protected saveWorkAuth(): void {
     const v = this.workAuthForm.getRawValue();
     const needsExpiry = visaRequiresExpiry(v.visa_status);
+    // Mirror the backend guard: a time-bound status must carry an expiration date.
+    if (v.visa_status && needsExpiry && !v.visa_expiration_date) {
+      this.notify.error('Please provide the visa expiration date for this status.');
+      return;
+    }
     this.save({
       private_information: {
         work_permit: {

@@ -5,6 +5,7 @@ const {
   VISA_STATUS_KEYS,
   BANK_ACCOUNT_TYPES,
   PROFILE_SECTION_KEYS,
+  visaRequiresExpiry,
 } = require('../../config/profile.constants');
 const { listQuery } = require('../common.validation');
 
@@ -56,16 +57,37 @@ const privateInformationSchema = Joi.object().keys({
     field_of_study: Joi.string().allow('').max(150),
     school: Joi.string().allow('').max(200),
   }),
-  work_permit: Joi.object().keys({
-    visa_status: Joi.string()
-      .allow('')
-      .valid(...VISA_STATUS_KEYS, ''),
-    visa_no: Joi.string().allow('').max(80),
-    visa_type: Joi.string().allow('').max(80),
-    work_permit_no: Joi.string().allow('').max(80),
-    visa_expiration_date: Joi.date().iso().allow(null),
-    work_permit_expiration_date: Joi.date().iso().allow(null),
-  }),
+  work_permit: Joi.object()
+    .keys({
+      visa_status: Joi.string()
+        .allow('')
+        .valid(...VISA_STATUS_KEYS, ''),
+      visa_no: Joi.string().allow('').max(80),
+      visa_type: Joi.string().allow('').max(80),
+      work_permit_no: Joi.string().allow('').max(80),
+      visa_expiration_date: Joi.date().iso().allow(null, ''),
+      work_permit_expiration_date: Joi.date().iso().allow(null, ''),
+    })
+    // Time-bound statuses (everything except U.S. Citizen / Green Card) MUST carry an
+    // expiration date. Permanent statuses must NOT (the FE clears it). This is the
+    // single server-side guard that keeps expiry alerting reliable — the FE mirrors it.
+    .custom((value, helpers) => {
+      const status = value.visa_status;
+      // Only enforce when a status was actually provided in this write.
+      if (!status) return value;
+      const hasExpiry = value.visa_expiration_date !== undefined
+        && value.visa_expiration_date !== null
+        && value.visa_expiration_date !== '';
+      if (visaRequiresExpiry(status) && !hasExpiry) {
+        return helpers.error('any.custom', {
+          message: 'An expiration date is required for this visa status.',
+        });
+      }
+      return value;
+    })
+    .messages({
+      'any.custom': 'An expiration date is required for this visa status.',
+    }),
 });
 
 // Bank details block (its own section). Numbers are stored raw, masked on read.

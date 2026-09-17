@@ -358,6 +358,10 @@ export class UserFormComponent {
         contract: u.profile.contract as never,
         settings: u.profile.settings as never,
       });
+      // Date values arrive from the API as ISO datetimes (e.g. 2026-09-19T00:00:00.000Z),
+      // which <input type="date"> silently rejects and renders BLANK. Re-patch every
+      // date control with a normalized YYYY-MM-DD so the saved dates actually show up.
+      this.normalizeDateControls(u.profile);
       // Bank numbers arrive in full from the API; pre-fill them so the admin can view
       // and edit the real values.
       const bank = u.profile.bank_details;
@@ -381,6 +385,48 @@ export class UserFormComponent {
       this.form.controls.email.disable();
       this.form.controls.role.disable();
     }
+  }
+
+  /** Coerce any date-ish value to the YYYY-MM-DD an <input type="date"> expects. */
+  private toDateInputValue(value?: string | null): string {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    // UTC parts so a date-only value doesn't shift a day across timezones.
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  /**
+   * Re-patch every date control from the loaded profile with a normalized YYYY-MM-DD.
+   * Covers all <input type="date"> fields so none of them render blank when the API
+   * returns an ISO datetime string.
+   */
+  private normalizeDateControls(profile: UserDetail['profile']): void {
+    if (!profile) return;
+    const priv = profile.private_information ?? {};
+    const wp = priv.work_permit ?? {};
+    const cit = priv.citizenship ?? {};
+    const contract = profile.contract ?? {};
+    const settings = profile.settings ?? {};
+
+    this.form.controls.private_information.controls.work_permit.patchValue({
+      visa_expiration_date: this.toDateInputValue(wp.visa_expiration_date),
+      work_permit_expiration_date: this.toDateInputValue(wp.work_permit_expiration_date),
+    });
+    this.form.controls.private_information.controls.citizenship.patchValue({
+      date_of_birth: this.toDateInputValue(cit.date_of_birth),
+    });
+    this.form.controls.contract.patchValue({
+      contract_start_date: this.toDateInputValue(contract.contract_start_date),
+      contract_end_date: this.toDateInputValue(contract.contract_end_date),
+    });
+    this.form.controls.settings.patchValue({
+      joining_date: this.toDateInputValue(settings.joining_date),
+    });
   }
 
   /** Strip empty strings/nulls so we never send noise; keeps the payload clean. */

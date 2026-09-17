@@ -12,6 +12,7 @@ import type {
   RecentProject,
   RecentTicket,
   SummaryCard,
+  TodosResponse,
 } from './models/dashboard.model';
 
 /**
@@ -47,6 +48,9 @@ export class DashboardComponent {
   protected readonly canReadExpenses = computed(() => this.auth.hasPermission('expense.read'));
   protected readonly canReadProjects = computed(() => this.auth.hasPermission('project.read'));
   protected readonly canReadUsers = computed(() => this.auth.hasPermission('user.read'));
+  protected readonly canReadTimesheets = computed(() =>
+    this.auth.hasPermission('timesheet.read'),
+  );
   protected readonly canReadSummary = computed(() =>
     this.auth.hasAnyPermission([
       'leave.read',
@@ -72,10 +76,55 @@ export class DashboardComponent {
   protected readonly projects = createWidget<ChartData>();
   protected readonly users = createWidget<ChartData>();
   protected readonly organizations = createWidget<ChartData>();
+  protected readonly timesheets = createWidget<ChartData>();
 
   protected readonly summary = createWidget<SummaryCard[]>();
+  protected readonly todos = createWidget<TodosResponse>();
   protected readonly recentProjects = createWidget<RecentProject[]>();
   protected readonly recentTickets = createWidget<RecentTicket[]>();
+
+  /** The todo items (empty array when none), for clean template access. */
+  protected readonly todoItems = computed(() => this.todos.data()?.items ?? []);
+
+  /** Whether the full todo list is expanded (vs. the compact capped view). */
+  protected readonly todosExpanded = signal(false);
+
+  /** How many todos to show before "Show all" (keeps the panel from eating the page). */
+  private readonly TODO_COLLAPSED_COUNT = 4;
+
+  /** Urgent (danger) todos first, then upcoming (warning) — the display order. */
+  protected readonly sortedTodos = computed(() => {
+    const rank: Record<string, number> = { danger: 0, warning: 1 };
+    return [...this.todoItems()].sort(
+      (a, b) => (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9),
+    );
+  });
+
+  /** The todos actually rendered: capped when collapsed, everything when expanded. */
+  protected readonly visibleTodos = computed(() =>
+    this.todosExpanded()
+      ? this.sortedTodos()
+      : this.sortedTodos().slice(0, this.TODO_COLLAPSED_COUNT),
+  );
+
+  /** Count of urgent (danger) items — drives the header summary + blink. */
+  protected readonly dangerCount = computed(
+    () => this.todoItems().filter((t) => t.severity === 'danger').length,
+  );
+
+  /** Count of upcoming (warning) items. */
+  protected readonly warningCount = computed(
+    () => this.todoItems().filter((t) => t.severity === 'warning').length,
+  );
+
+  /** How many todos are hidden in the collapsed view (for the "Show all (N)" label). */
+  protected readonly hiddenTodoCount = computed(() =>
+    Math.max(0, this.sortedTodos().length - this.TODO_COLLAPSED_COUNT),
+  );
+
+  protected toggleTodos(): void {
+    this.todosExpanded.update((v) => !v);
+  }
 
   constructor() {
     this.loadAll();
@@ -94,7 +143,11 @@ export class DashboardComponent {
     if (this.canReadTickets()) this.reloadTickets();
     if (this.canReadExpenses()) this.reloadExpenses();
     if (this.canReadUsers()) this.reloadUsers();
+    if (this.canReadTimesheets()) this.reloadTimesheets();
     if (this.canReadSummary()) this.reloadSummary();
+    // To-dos always load: every user has at least their OWN (visa/timesheet) to act on;
+    // the backend widens the sources per-permission.
+    this.reloadTodos();
     if (this.canReadProjects()) this.reloadRecentProjects();
     if (this.canReadTickets()) this.reloadRecentTickets();
   }
@@ -129,8 +182,14 @@ export class DashboardComponent {
   protected reloadOrganizations(): void {
     this.load(this.organizations, () => this.api.organizationChart());
   }
+  protected reloadTimesheets(): void {
+    this.load(this.timesheets, () => this.api.timesheetChart());
+  }
   protected reloadSummary(): void {
     this.load(this.summary, () => this.api.summary());
+  }
+  protected reloadTodos(): void {
+    this.load(this.todos, () => this.api.todos());
   }
   protected reloadRecentProjects(): void {
     this.load(this.recentProjects, () => this.api.recentProjects());

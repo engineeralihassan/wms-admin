@@ -6,6 +6,8 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { startWith } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { FormArray, FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -80,6 +82,18 @@ export class TimesheetDetail {
     return this.weekForm.controls.entries;
   }
 
+  /**
+   * A SIGNAL mirror of the week form's value. A reactive form is not a signal, so a
+   * `computed()` (like liveTotal) can't react to hours being edited or the form being
+   * rebuilt after save/submit/withdraw — the total stayed stale until a manual refresh
+   * (this component is OnPush). Bridging valueChanges into a signal makes every
+   * form-derived value recompute correctly.
+   */
+  private readonly weekFormValue = toSignal(
+    this.weekForm.valueChanges.pipe(startWith(this.weekForm.getRawValue())),
+    { initialValue: this.weekForm.getRawValue() },
+  );
+
   /** Approver review form. */
   protected readonly reviewForm = this.fb.nonNullable.group({
     decision: ['approve' as 'approve' | 'reject', [Validators.required]],
@@ -121,13 +135,18 @@ export class TimesheetDetail {
   /** Approvers can correct any sheet (including locked) to backfill hours. */
   protected readonly canCorrect = computed(() => this.isApprover());
 
-  /** Live total from the current form values (before saving). */
+  /**
+   * Live total from the current form values. Driven by the weekFormValue signal so it
+   * updates immediately as hours are edited and after every save/submit/withdraw (which
+   * rebuild the form). Rounded to 2 dp to match the backend's denormalized total.
+   */
   protected readonly liveTotal = computed(() => {
-    // Recomputed on each render; the form isn't a signal, so read raw values.
-    return this.entriesForm.controls.reduce(
-      (sum, row) => sum + (Number(row.controls.hours.value) || 0),
+    const rows = this.weekFormValue()?.entries ?? [];
+    const sum = rows.reduce(
+      (acc: number, row: { hours?: number | null }) => acc + (Number(row?.hours) || 0),
       0,
     );
+    return Math.round(sum * 100) / 100;
   });
 
   ngOnInit(): void {

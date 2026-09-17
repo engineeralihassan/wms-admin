@@ -8,6 +8,7 @@ import type {
   RecentProject,
   RecentTicket,
   SummaryCard,
+  TodosResponse,
 } from '../models/dashboard.model';
 
 /**
@@ -54,10 +55,20 @@ export class DashboardService {
     return this.api.get<ChartData>(API_ENDPOINTS.dashboard.charts.organizations);
   }
 
+  /** Timesheets chart — own sheets, or org-wide for approvers (backend scopes it). */
+  timesheetChart(): Observable<ChartData> {
+    return this.api.get<ChartData>(API_ENDPOINTS.dashboard.charts.timesheets);
+  }
+
   // ---- Cards + recent lists ----
 
   summary(): Observable<SummaryCard[]> {
     return this.api.get<SummaryCard[]>(API_ENDPOINTS.dashboard.summary);
+  }
+
+  /** Personal action list (visa expiry + unsubmitted timesheets), scoped by the backend. */
+  todos(): Observable<TodosResponse> {
+    return this.api.get<TodosResponse>(API_ENDPOINTS.dashboard.todos);
   }
 
   recentProjects(): Observable<RecentProject[]> {

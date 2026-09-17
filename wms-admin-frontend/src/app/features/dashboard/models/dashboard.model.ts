@@ -13,7 +13,8 @@ export type DashboardModule =
   | 'expenses'
   | 'projects'
   | 'users'
-  | 'organizations';
+  | 'organizations'
+  | 'timesheets';
 
 /** A bucket kind — lets a mixed chart segment status vs priority bars if needed. */
 export type BucketKind = 'status' | 'priority' | 'metric';
@@ -70,6 +71,34 @@ export interface SummaryCard {
   label: string;
   value: number;
   detailPath: string;
+}
+
+/** What a to-do is about (mirrors backend TODO_TYPES). */
+export type TodoType = 'visa_expiry' | 'timesheet_unsubmitted';
+
+/** How urgent a to-do is (mirrors backend TODO_SEVERITIES). */
+export type TodoSeverity = 'warning' | 'danger';
+
+/**
+ * One actionable to-do. Unlike a SummaryCard (a navigational count), a to-do is a
+ * single thing the user must act on, with a title, description, severity and a CTA
+ * that deep-links to where the action happens (e.g. /profile for visa renewal).
+ */
+export interface TodoItem {
+  key: string;
+  type: TodoType;
+  severity: TodoSeverity;
+  title: string;
+  description: string;
+  actionLabel: string;
+  actionPath: string;
+  meta: Record<string, unknown>;
+}
+
+/** The /dashboard/todos payload: the capped item list plus a "+N more" overflow count. */
+export interface TodosResponse {
+  items: TodoItem[];
+  overflow: number;
 }
 
 /** A recent active project (side panel). */
