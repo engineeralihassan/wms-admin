@@ -1,16 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { LoadingService } from '../../core/services/loading.service';
+import { BreakpointService } from '../../core/layout/breakpoint';
 import { APP_ROUTES } from '../../core/constants/app-routes';
 import { environment } from '../../../environments/environment';
 import { NAV_ITEMS, type NavItem } from './nav-items';
 import { TopbarComponent } from '../topbar/topbar.component';
 
-/**
- * Main authenticated shell: sidebar + topbar + routed content.
- * The sidebar is permission/role filtered; the topbar is its own component.
- */
 @Component({
   selector: 'app-admin-layout',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,24 +28,42 @@ import { TopbarComponent } from '../topbar/topbar.component';
 export class AdminLayoutComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly breakpoints = inject(BreakpointService);
   protected readonly loading = inject(LoadingService);
 
   protected readonly appName = environment.appName;
-  protected readonly sidebarOpen = signal(true);
   protected readonly user = this.auth.currentUser;
+  protected readonly isMobile = this.breakpoints.isMobile;
+  protected readonly sidebarOpen = signal(!this.isMobile());
 
   /** Nav items the current user is allowed to see (permission/role filtered). */
-  protected readonly navItems = computed<NavItem[]>(() => {
-    this.user();
-    return NAV_ITEMS.filter((item) => {
+  protected readonly navItems = computed<NavItem[]>(() =>
+    NAV_ITEMS.filter((item) => {
       if (item.roles && !this.auth.hasRole(...item.roles)) return false;
       if (item.permissions && !this.auth.hasAnyPermission(item.permissions)) return false;
       return true;
-    });
-  });
+    }),
+  );
+
+  constructor() {
+    effect(() => this.sidebarOpen.set(!this.isMobile()));
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        if (this.isMobile()) this.sidebarOpen.set(false);
+      });
+  }
 
   protected toggleSidebar(): void {
     this.sidebarOpen.update((open) => !open);
+  }
+
+  protected closeSidebar(): void {
+    this.sidebarOpen.set(false);
   }
 
   protected logout(): void {

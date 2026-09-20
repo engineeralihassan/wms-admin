@@ -1,4 +1,8 @@
 @use 'abstractions' as *;
+:host {
+  display: block;
+  min-width: 0;
+}
 
 .card {
   @include card-surface;

@@ -1,9 +1,24 @@
 <a class="skip-link" href="#main-content">Skip to content</a>
 
-<div class="layout" [class.layout--collapsed]="!sidebarOpen()">
+<div
+  class="layout"
+  [class.layout--collapsed]="!sidebarOpen()"
+  [class.layout--mobile]="isMobile()"
+  [class.layout--drawer-open]="isMobile() && sidebarOpen()"
+>
   <!-- Global loading bar -->
   @if (loading.isLoading()) {
     <div class="layout__progress" role="progressbar" aria-label="Loading" aria-live="polite"></div>
+  }
+
+  <!-- Backdrop: only on mobile when the drawer is open; tap to close. -->
+  @if (isMobile() && sidebarOpen()) {
+    <button
+      class="layout__backdrop"
+      type="button"
+      aria-label="Close navigation menu"
+      (click)="closeSidebar()"
+    ></button>
   }
 
   <!-- Sidebar -->

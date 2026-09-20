@@ -1,6 +1,6 @@
 @use 'abstractions' as *;
 
-:host { display: block; }
+:host { display: block; min-width: 0; }
 
 .data-table {
   // The whole filter area is one grouped surface panel so the controls read as
@@ -14,10 +14,25 @@
     background: var(--color-surface-alt);
     border: 1px solid var(--color-border);
     border-radius: radius('lg');
+
+    @include respond-below('lg') {
+      flex-direction: column;
+      align-items: stretch;
+      gap: spacing('4');
+    }
   }
 
   // Search leads the bar on the left.
-  &__search-wrap { flex: 1 1 16rem; min-width: 14rem; max-width: 24rem; }
+  &__search-wrap {
+    flex: 1 1 16rem;
+    min-width: 14rem;
+    max-width: 24rem;
+
+    @include respond-below('lg') {
+      flex: none;
+      max-width: none;
+    }
+  }
 
   // Right-hand group: every filter + rows-per-page + clear all, pushed right.
   &__right {
@@ -26,6 +41,16 @@
     flex: 1 1 auto;
     justify-content: flex-end;
     margin-left: auto;
+
+    // Stacked: no right-push; groups fill the width and sit left-to-right naturally.
+    // Reset flex-grow (see search-wrap) so this group doesn't stretch vertically.
+    @include respond-below('lg') {
+      flex: none;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-left: 0;
+      gap: spacing('4');
+    }
   }
 
   // Filters keep consistent widths and wrap in a tidy row.
@@ -37,6 +62,13 @@
     flex-wrap: wrap;
     padding-left: spacing('4');
     border-left: 1px solid var(--color-border);
+
+    // Stacked: drop the divider/inset and align to the start so it reads as its own row.
+    @include respond-below('lg') {
+      padding-left: 0;
+      border-left: 0;
+      justify-content: flex-start;
+    }
   }
 
   &__filter, &__page-size, &__search-wrap { @include flex(column, stretch, flex-start, spacing('1')); }
@@ -86,10 +118,26 @@
   &__date-range input { width: 8.8rem; }
   &__range-separator { color: var(--color-text-subtle); align-self: center; height: $control-height; display: grid; place-items: center; }
 
+  // Phones: let each filter grow to fill the row and stop the fixed field widths
+  // (selects, date inputs) from overflowing a narrow viewport.
+  @include respond-below('sm') {
+    &__filter,
+    &__page-size {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+    &__filter select { width: 100%; min-width: 0; }
+    // Date range fills the row with equal-width fields either side of the separator.
+    &__date-range { grid-template-columns: 1fr auto 1fr; }
+    &__date-range input { width: 100%; min-width: 0; }
+  }
+
   // Clear all matches the exact control height too.
   &__reset { @include flex(row, center, flex-start, spacing('2')); box-sizing: border-box; height: $control-height; padding: 0 spacing('3'); border: 1px solid var(--color-border); border-radius: radius('md'); background: var(--color-surface); color: var(--color-text-muted); font-size: font-size('sm'); font-weight: font-weight('semibold'); white-space: nowrap; @include focus-ring; &:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-050); } }
   &__reset-icon { display: grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 1px solid currentColor; border-radius: radius('circle'); font-size: 1rem; font-weight: font-weight('normal'); line-height: 1; }
-  &__scroll { overflow-x: auto; border: 1px solid var(--color-border); border-radius: radius('md'); @include focus-ring; }
+  // The table's min-width makes this container the horizontal scroll boundary. max-width
+  // pins it to the card so it can't push the page wide; it scrolls the table internally.
+  &__scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: radius('md'); @include focus-ring; }
   table { width: 100%; min-width: 44rem; border-collapse: collapse; font-size: font-size('sm'); }
   caption { @include visually-hidden; }
   th { padding: spacing('3') spacing('4'); background: var(--color-surface-alt); color: var(--color-text-muted); text-align: left; text-transform: uppercase; letter-spacing: .04em; font-size: font-size('xs'); white-space: nowrap; }

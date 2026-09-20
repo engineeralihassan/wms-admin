@@ -231,8 +231,15 @@
   gap: spacing('4');
   align-items: start;
 
-  @include respond-below('md') {
+  @include respond-below('lg') {
     grid-template-columns: 1fr;
+  }
+
+  // Grid/flex children default to `min-width: auto`, which lets long ticket/project
+  // titles force the card wider than its track and spill into an x-axis scroll. Allow
+  // the cards to shrink to their track so the inner `truncate` styles take over.
+  > * {
+    min-width: 0;
   }
 }
 
@@ -644,9 +651,21 @@
   }
 }
 
-/* Single column on narrow screens. */
-@media (max-width: 720px) {
+@media (max-width: 1023.98px) {
   .todo-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .todo {
+    flex-wrap: wrap;
+
+    &__cta {
+      flex-basis: 100%;
+      width: 100%;
+      text-align: center;
+      margin-top: spacing('2');
+    }
   }
 }
