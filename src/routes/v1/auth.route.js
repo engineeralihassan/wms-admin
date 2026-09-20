@@ -37,6 +37,14 @@ router.post(
 // Protected: returns the current user + resolved authorization context.
 router.get('/me', authVerify, authController.getMe);
 
+// Self-service password change (session-authenticated; requires the current password).
+router.post(
+  '/me/password',
+  authVerify,
+  validate(authValidation.changePassword),
+  authController.changePassword
+);
+
 // Self-service profile: a logged-in user views/completes their OWN profile + docs.
 router.get('/me/profile', authVerify, authController.getMyProfile);
 router.patch(

@@ -56,7 +56,7 @@ export class BarChartCardComponent {
     const d = this.data();
     const series = d?.series ?? [];
     return {
-      grid: { top: 24, right: 16, bottom: 40, left: 40, containLabel: true },
+      grid: { top: 24, right: 12, bottom: 12, left: 8, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
@@ -65,7 +65,13 @@ export class BarChartCardComponent {
         type: 'category',
         data: series.map((s) => s.label),
         axisTick: { alignWithLabel: true },
-        axisLabel: { interval: 0, hideOverlap: true, fontSize: 11 },
+        axisLabel: {
+          interval: 0,
+          hideOverlap: false,
+          rotate: 25,
+          fontSize: 11,
+          margin: 8,
+        },
       },
       yAxis: {
         type: 'value',
@@ -75,6 +81,7 @@ export class BarChartCardComponent {
       series: [
         {
           type: 'bar',
+          barWidth: '55%',
           barMaxWidth: 44,
           itemStyle: { borderRadius: [6, 6, 0, 0] },
           label: { show: true, position: 'top', fontSize: 11 },

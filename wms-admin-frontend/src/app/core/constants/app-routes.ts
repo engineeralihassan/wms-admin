@@ -8,6 +8,9 @@ export const APP_ROUTES = {
   activate: '/auth/activate',
   dashboard: '/dashboard',
   profile: '/profile',
+  settings: '/settings',
+  /** Change-password section within Settings. */
+  settingsPassword: '/settings/password',
   users: '/users',
   organizations: '/organizations',
   tickets: '/tickets',

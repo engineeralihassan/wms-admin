@@ -121,6 +121,23 @@ const activate = catchAsync(async (req, res) => {
 });
 
 /**
+ * POST /auth/me/password  (protected)
+ * Body: { current_password, new_password }
+ * Self-service password change for the logged-in user. Requires the current password;
+ * on success all of the user's other sessions are invalidated.
+ */
+const changePassword = catchAsync(async (req, res) => {
+  await authService.changePassword(
+    req.auth.userId,
+    req.body.current_password,
+    req.body.new_password,
+    res
+  );
+  clearRefreshCookie(res);
+  res.status(httpStatus.OK).send({ message: res.__('password_changed'), data: null });
+});
+
+/**
  * GET /auth/me  (protected)
  * Returns the authenticated user + their resolved authorization context.
  */
@@ -204,6 +221,7 @@ module.exports = {
   resetPassword,
   verifyActivation,
   activate,
+  changePassword,
   getMe,
   getMyProfile,
   updateMyProfile,

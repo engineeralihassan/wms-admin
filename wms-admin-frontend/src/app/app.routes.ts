@@ -43,6 +43,13 @@ export const routes: Routes = [
           import('./features/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
       },
       {
+        // Account settings (change password, and future theme/notification prefs). No
+        // permission guard — any authenticated user manages their OWN account.
+        path: 'settings',
+        loadChildren: () =>
+          import('./features/settings/settings.routes').then((m) => m.SETTINGS_ROUTES),
+      },
+      {
         path: 'users',
         canActivate: [permissionGuard('user.read')],
         loadChildren: () => import('./features/users/users.routes').then((m) => m.USERS_ROUTES),

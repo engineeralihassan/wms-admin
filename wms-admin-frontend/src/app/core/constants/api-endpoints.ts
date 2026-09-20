@@ -12,6 +12,8 @@ export const API_ENDPOINTS = {
     verifyActivation: '/auth/activate/verify',
     activate: '/auth/activate',
     me: '/auth/me',
+    /** Self-service password change (session-authenticated). */
+    changePassword: '/auth/me/password',
     /** Self-service profile (the logged-in user's OWN profile + documents). */
     myProfile: '/auth/me/profile',
     myDocuments: '/auth/me/documents',

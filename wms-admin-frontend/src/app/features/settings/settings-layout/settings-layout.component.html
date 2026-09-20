@@ -1,0 +1,35 @@
+<header class="page-header">
+  <h1 class="page-header__title">Settings</h1>
+  <p class="page-header__subtitle">Manage your account and preferences.</p>
+</header>
+
+<div class="settings">
+  <nav class="settings__nav" aria-label="Settings sections">
+    <ul class="settings-nav" role="list">
+      @for (item of navItems; track item.path) {
+        <li>
+          <a
+            class="settings-nav__item"
+            [routerLink]="item.path"
+            routerLinkActive="settings-nav__item--active"
+            [attr.aria-current]="null"
+          >
+            <span class="settings-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path [attr.d]="item.iconPath" />
+              </svg>
+            </span>
+            <span class="settings-nav__text">
+              <span class="settings-nav__label">{{ item.label }}</span>
+              <span class="settings-nav__desc">{{ item.description }}</span>
+            </span>
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+
+  <section class="settings__content">
+    <router-outlet />
+  </section>
+</div>

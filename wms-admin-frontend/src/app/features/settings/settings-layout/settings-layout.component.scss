@@ -1,0 +1,107 @@
+@use 'abstractions' as *;
+
+:host {
+  display: block;
+}
+
+.page-header{
+  margin-bottom: spacing('10');
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: spacing('5');
+  align-items: start;
+
+  // Below lg (tablets like iPad Mini) the fixed 260px rail + form is too cramped
+  // inside the admin shell, so stack: pill rail on top, form below.
+  @include respond-below('lg') {
+    grid-template-columns: 1fr;
+    gap: spacing('4');
+  }
+}
+
+.settings__nav {
+  position: sticky;
+  top: spacing('4');
+
+  @include respond-below('lg') {
+    position: static;
+  }
+}
+
+.settings-nav {
+  @include flex(column, stretch, flex-start, spacing('1'));
+
+  // Stacked layout: the rail becomes a row of content-width pills that wrap.
+  @include respond-below('lg') {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: spacing('2');
+  }
+
+  &__item {
+    @include flex(row, center, flex-start, spacing('3'));
+    padding: spacing('3');
+    border-radius: radius('md');
+    color: var(--color-text);
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: background-color 0.14s ease, border-color 0.14s ease;
+    @include focus-ring;
+
+    &:hover {
+      background: var(--color-surface-muted, #f1f5f9);
+    }
+
+    &--active {
+      background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+      border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+
+      .settings-nav__label {
+        color: var(--color-primary);
+      }
+      .settings-nav__icon {
+        color: var(--color-primary);
+      }
+    }
+
+    // In the stacked rail size to content (don't stretch) and add a subtle border
+    // so each section still reads as a distinct, tappable tab.
+    @include respond-below('lg') {
+      white-space: nowrap;
+      border-color: var(--color-border);
+    }
+  }
+
+  &__icon {
+    display: grid;
+    place-items: center;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+  }
+
+  &__text {
+    @include flex(column, stretch, flex-start, 2px);
+  }
+
+  &__label {
+    font-size: font-size('sm');
+    font-weight: font-weight('semibold');
+  }
+
+  &__desc {
+    font-size: font-size('xs');
+    color: var(--color-text-muted);
+
+    // Hide the helper line in the compact stacked pills.
+    @include respond-below('lg') {
+      display: none;
+    }
+  }
+}
+
+.settings__content {
+  min-width: 0;
+}

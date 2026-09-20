@@ -55,6 +55,16 @@ const activate = {
   }),
 };
 
+// Authenticated self-service password change. The caller must prove they know the
+// current password (defense against a hijacked session silently changing it), and
+// the new password must meet the same strength rules as every other set-password path.
+const changePassword = {
+  body: Joi.object().keys({
+    current_password: Joi.string().required(),
+    new_password: Joi.string().required().custom(password),
+  }),
+};
+
 module.exports = {
   signIn,
   refresh,
@@ -63,6 +73,7 @@ module.exports = {
   resetPassword,
   verifyActivation,
   activate,
+  changePassword,
   updateOwnProfile,
   uploadOwnDocument,
 };

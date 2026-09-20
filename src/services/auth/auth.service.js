@@ -241,6 +241,49 @@ const activateAccount = async (token, newPassword, res) => {
   return true;
 };
 
+/**
+ * Change the authenticated user's password (self-service, session-authenticated).
+ *
+ * Unlike resetPassword (which trusts a one-time token), this path requires the caller
+ * to prove they still know the CURRENT password — so a stolen access token alone can't
+ * silently lock the real owner out. Verification is timing-safe (mirrors signIn).
+ *
+ * On success it rotates all credentials the same way a reset does: bump token_version
+ * to kill every outstanding ACCESS token and revoke every refresh token, forcing all
+ * other sessions to re-authenticate with the new password.
+ */
+const changePassword = async (userId, currentPassword, newPassword, res) => {
+  const user = await User.findByPk(userId);
+  if (!user || !user.salt) {
+    // Should not happen for an authenticated caller, but fail safe rather than crash.
+    throw new ApiError(httpStatus.UNAUTHORIZED, res.__('invalid_credentials'));
+  }
+
+  const hashedCurrent = await Encrypter.password_dec(currentPassword, user.salt);
+  if (!constantTimeEquals(hashedCurrent, user.password)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('current_password_incorrect'));
+  }
+
+  // Reject a no-op change: the new password hashed under the SAME salt must differ.
+  const hashedNew = await Encrypter.password_dec(newPassword, user.salt);
+  if (constantTimeEquals(hashedNew, user.password)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, res.__('new_password_same_as_current'));
+  }
+
+  const enc = await Encrypter.password_enc(newPassword);
+  user.password = enc.encr;
+  user.salt = enc.salt;
+  // Reset security counters and invalidate all existing access tokens.
+  user.failed_login_attempts = 0;
+  user.locked_until = null;
+  user.token_version = (user.token_version || 0) + 1;
+  await user.save();
+
+  // Revoke every refresh token so no other session can be silently kept alive.
+  await tokenService.revokeAllUserTokens(user.id);
+  return true;
+};
+
 /** Load the safe profile fields for the authenticated user (used by /auth/me). */
 const getProfile = async (userId) => {
   return User.findByPk(userId, {
@@ -256,5 +299,6 @@ module.exports = {
   resetPassword,
   verifyActivationToken,
   activateAccount,
+  changePassword,
   getProfile,
 };

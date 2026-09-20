@@ -44,6 +44,11 @@
     @include flex(column, center, center, spacing('3'));
     height: 260px;
     text-align: center;
+
+    &__empty {
+      width: 120px;
+      height: 120px;
+    }
   }
 
   &__state-text {
