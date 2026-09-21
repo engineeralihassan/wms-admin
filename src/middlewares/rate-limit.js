@@ -45,4 +45,26 @@ const careersRateLimiter = rateLimit({
   },
 });
 
-module.exports = { loginRateLimiter, careersRateLimiter };
+/**
+ * Rate limiter for sending chat messages. Bounds spam/abuse per authenticated user
+ * (keyed by user id, since many users may share one office IP). Runs AFTER authVerify,
+ * so req.auth is available. Generous enough for natural conversation.
+ */
+const chatSendWindowSeconds = Number(process.env.CHAT_SEND_RATE_WINDOW_SECONDS || 10);
+const chatSendMax = Number(process.env.CHAT_SEND_RATE_MAX || 20);
+
+const chatSendRateLimiter = rateLimit({
+  windowMs: chatSendWindowSeconds * 1000,
+  max: chatSendMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.auth && req.auth.userId ? `u:${req.auth.userId}` : req.ip),
+  handler: (req, res) => {
+    res.status(httpStatus.TOO_MANY_REQUESTS).send({
+      code: httpStatus.TOO_MANY_REQUESTS,
+      message: res.__ ? res.__('too_many_attempts') : 'Slow down a moment before sending more.',
+    });
+  },
+});
+
+module.exports = { loginRateLimiter, careersRateLimiter, chatSendRateLimiter };

@@ -175,6 +175,26 @@ const INTERVIEW_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
+const CONVERSATION_QUERY_CONFIG = Object.freeze({
+  sortable: ['last_message_at', 'created_at'],
+  searchable: [],
+  filterable: [],
+  rangeFilterable: ['created_at'],
+  defaultSort: 'last_message_at',
+  maxLimit: 50,
+  mode: 'offset',
+});
+
+const CHAT_MESSAGE_QUERY_CONFIG = Object.freeze({
+  sortable: ['id', 'created_at'],
+  searchable: [],
+  filterable: [],
+  rangeFilterable: ['created_at'],
+  defaultSort: 'id',
+  maxLimit: 50,
+  mode: 'keyset',
+});
+
 module.exports = {
   USER_QUERY_CONFIG,
   ORGANIZATION_QUERY_CONFIG,
@@ -187,4 +207,6 @@ module.exports = {
   JOB_QUERY_CONFIG,
   APPLICATION_QUERY_CONFIG,
   INTERVIEW_QUERY_CONFIG,
+  CONVERSATION_QUERY_CONFIG,
+  CHAT_MESSAGE_QUERY_CONFIG,
 };

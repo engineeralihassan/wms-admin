@@ -15,3 +15,5 @@ module.exports.emailService = require('./email/email.service');
 module.exports.jobService = require('./ats/job.service');
 module.exports.applicationService = require('./ats/application.service');
 module.exports.interviewService = require('./ats/interview.service');
+module.exports.conversationService = require('./chat/conversation.service');
+module.exports.messageService = require('./chat/message.service');

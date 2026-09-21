@@ -11,3 +11,4 @@ module.exports.jobValidation = require('./ats/job.validation');
 module.exports.applicationValidation = require('./ats/application.validation');
 module.exports.interviewValidation = require('./ats/interview.validation');
 module.exports.careersValidation = require('./ats/careers.validation');
+module.exports.chatValidation = require('./chat/chat.validation');

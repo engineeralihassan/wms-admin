@@ -133,6 +133,11 @@ const PERMISSIONS = Object.freeze({
   INTERVIEW_UPDATE: 'interview.update',
   INTERVIEW_DELETE: 'interview.delete',
 
+  // Chat / direct messaging. Everyone in an org may read and send; isolation is
+  // enforced at the org boundary in the service/socket layer (not by permission).
+  CHAT_READ: 'chat.read',
+  CHAT_SEND: 'chat.send',
+
   // Example domain resource (warehouse/orders will follow this pattern)
   ORDER_CREATE: 'order.create',
   ORDER_READ: 'order.read',
@@ -206,6 +211,9 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.INTERVIEW_READ,
     PERMISSIONS.INTERVIEW_UPDATE,
     PERMISSIONS.INTERVIEW_DELETE,
+    // Chat: org admins can message anyone in their org.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
   ],
 
   // Recruiter: owns the ATS at the org level but scoped to their OWN jobs. Can create
@@ -256,6 +264,9 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,
+    // Chat within the organization.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
   ],
 
   // A vendor manages their own consultants: create/read/update users (scoped by
@@ -291,6 +302,9 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.FILE_DELETE,
     PERMISSIONS.ORDER_READ,
     PERMISSIONS.ORDER_CREATE,
+    // Chat within the organization.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
   ],
 
   // "Normal User" tier for tickets: may create, read (scoped to their own
@@ -324,6 +338,9 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,
+    // Chat within the organization.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
   ],
 
   // W2 consultants are direct employees; permission-wise identical to other
@@ -352,6 +369,9 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,
+    // Chat within the organization.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
   ],
 
   [ROLES.CONSULTANT_C2C]: [
@@ -380,6 +400,9 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.FILE_UPLOAD,
     PERMISSIONS.FILE_READ,
     PERMISSIONS.FILE_DELETE,
+    // Chat within the organization.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
   ],
 });
 

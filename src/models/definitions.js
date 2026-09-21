@@ -26,6 +26,9 @@ const InterviewParticipant = require('./interview-participant.model');
 const Timesheet = require('./timesheet.model');
 const TimesheetEntry = require('./timesheet-entry.model');
 const TimesheetJob = require('./timesheet-job.model');
+const Conversation = require('./conversation.model');
+const ConversationParticipant = require('./conversation-participant.model');
+const Message = require('./message.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -81,6 +84,9 @@ const definitions = (sequelize, Sequelize) => {
   db.Timesheet = Timesheet(sequelize);
   db.TimesheetEntry = TimesheetEntry(sequelize);
   db.TimesheetJob = TimesheetJob(sequelize);
+  db.Conversation = Conversation(sequelize);
+  db.ConversationParticipant = ConversationParticipant(sequelize);
+  db.Message = Message(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -405,6 +411,58 @@ const definitions = (sequelize, Sequelize) => {
   // platform-wide sweeps). Mirrors the ResumeScreeningJob wiring.
   db.Organization.hasMany(db.TimesheetJob, { foreignKey: 'organization_id', as: 'timesheetJobs' });
   db.TimesheetJob.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // ── Chat / Messaging ─────────────────────────────────────────────────────────
+  // A Conversation is tenant-scoped (org nullable for cross-org platform-admin
+  // threads). It owns its participant rows and messages (cascade on delete). Each
+  // participant + message links back to a user and (denormalized) an organization.
+
+  // Organization <-> Conversation (tenant scope; null = cross-org)
+  db.Organization.hasMany(db.Conversation, {
+    foreignKey: 'organization_id',
+    as: 'conversations',
+  });
+  db.Conversation.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+
+  // Conversation <-> ConversationParticipant (membership; cascade)
+  db.Conversation.hasMany(db.ConversationParticipant, {
+    foreignKey: 'conversation_id',
+    as: 'participants',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+  db.ConversationParticipant.belongsTo(db.Conversation, {
+    foreignKey: 'conversation_id',
+    as: 'conversation',
+  });
+
+  // User <-> ConversationParticipant
+  db.User.hasMany(db.ConversationParticipant, {
+    foreignKey: 'user_id',
+    as: 'conversationMemberships',
+  });
+  db.ConversationParticipant.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  db.ConversationParticipant.belongsTo(db.Organization, {
+    foreignKey: 'organization_id',
+    as: 'organization',
+  });
+
+  // Conversation <-> Message (cascade)
+  db.Conversation.hasMany(db.Message, {
+    foreignKey: 'conversation_id',
+    as: 'messages',
+    onDelete: 'CASCADE',
+    hooks: true,
+  });
+  db.Message.belongsTo(db.Conversation, { foreignKey: 'conversation_id', as: 'conversation' });
+
+  // User(sender) <-> Message
+  db.User.hasMany(db.Message, { foreignKey: 'sender_id', as: 'sentMessages' });
+  db.Message.belongsTo(db.User, { foreignKey: 'sender_id', as: 'sender' });
+  db.Message.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
 
   return db;
 };

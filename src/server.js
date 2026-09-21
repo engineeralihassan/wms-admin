@@ -98,12 +98,15 @@ app.use((req, res, next) => {
 const emailWorker = require('./services/email/email.worker');
 const resumeWorker = require('./services/ats/resume/resume.worker');
 const timesheetWorker = require('./services/timesheets/timesheet.worker');
+const chatWorker = require('./services/chat/chat.worker');
+const { initChatGateway } = require('./sockets/chat.gateway');
 
 db.sequelize.sync({ force: false }).then(() => {
   console.log('Database connected');
   emailWorker.start();
   resumeWorker.start();
   timesheetWorker.start();
+  chatWorker.start();
 });
 
 // Start server
@@ -111,6 +114,11 @@ const port = process.env.PORT || 8080;
 const server = app.listen(port, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${port}`);
 });
+
+// Attach the Socket.IO chat gateway to the SAME HTTP server (shares the port). The
+// REST controllers fan out realtime events through the emitter stored on the app.
+const chatGateway = initChatGateway(server);
+app.set('chatEvents', chatGateway.chatEvents);
 
 /**
  * Graceful shutdown (important under Docker/PM2/Kubernetes): stop accepting new
@@ -127,9 +135,11 @@ const shutdown = async (signal) => {
 
   server.close(async () => {
     try {
+      await chatGateway.close();
       await emailWorker.stop();
       await resumeWorker.stop();
       await timesheetWorker.stop();
+      await chatWorker.stop();
       await db.sequelize.close();
     } catch (err) {
       console.error('Error during shutdown:', err.message);

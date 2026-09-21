@@ -18,3 +18,4 @@ config.PRODUCTION.env
 
 # Google OAuth client secret JSON (never commit)
 client_secret*.json
+.vercel

@@ -16,6 +16,7 @@ const jobRoute = require('./job.route');
 const applicationRoute = require('./application.route');
 const interviewRoute = require('./interview.route');
 const careersRoute = require('./careers.route');
+const chatRoute = require('./chat.route');
 const docsRoute = require('./docs.route');
 
 const devRoutes = [
@@ -41,6 +42,7 @@ const routes = [
   { path: '/applications', route: applicationRoute },
   { path: '/interviews', route: interviewRoute },
   { path: '/careers', route: careersRoute },
+  { path: '/chat', route: chatRoute },
 ];
 
 routes.forEach((route) => {
