@@ -33,6 +33,12 @@ const ROLES = Object.freeze({
   // Recruiter: owns the ATS. Creates job openings and manages the candidates who
   // apply to their own jobs. Org-scoped like the other org roles.
   RECRUITER: 'recruiter',
+  // Sales rep: a member of the sales team. Owns their own leads/accounts/contacts/deals
+  // and activities; no cross-rep visibility. Org-scoped.
+  SALES_REP: 'sales_rep',
+  // Sales manager: runs the org's sales. Sees ALL sales data in the org (the *.manage_all
+  // overlay), manages pipelines/teams/targets/commissions, and configures the module.
+  SALES_MANAGER: 'sales_manager',
 });
 
 /**
@@ -143,6 +149,66 @@ const PERMISSIONS = Object.freeze({
   ORDER_READ: 'order.read',
   ORDER_UPDATE: 'order.update',
   ORDER_DELETE: 'order.delete',
+
+  // ── Sales & CRM ──────────────────────────────────────────────────────────
+  // Leads. A sales_rep gets create/read/update/delete + convert scoped to their OWN
+  // leads (service layer). lead.manage_all is the manager overlay (see ALL org leads,
+  // analogous to job.manage_all); lead.assign lets a manager (re)assign a lead's owner.
+  LEAD_CREATE: 'lead.create',
+  LEAD_READ: 'lead.read',
+  LEAD_UPDATE: 'lead.update',
+  LEAD_DELETE: 'lead.delete',
+  LEAD_CONVERT: 'lead.convert',
+  LEAD_MANAGE_ALL: 'lead.manage_all',
+  LEAD_ASSIGN: 'lead.assign',
+
+  // Accounts (companies). account.manage_all = manager overlay (whole-org visibility).
+  ACCOUNT_CREATE: 'account.create',
+  ACCOUNT_READ: 'account.read',
+  ACCOUNT_UPDATE: 'account.update',
+  ACCOUNT_DELETE: 'account.delete',
+  ACCOUNT_MANAGE_ALL: 'account.manage_all',
+
+  // Contacts (people). Visibility inherits from their account (or owner for B2C).
+  CONTACT_CREATE: 'contact.create',
+  CONTACT_READ: 'contact.read',
+  CONTACT_UPDATE: 'contact.update',
+  CONTACT_DELETE: 'contact.delete',
+
+  // Deals (opportunities). deal.manage_all = manager overlay; deal.reassign = change owner.
+  DEAL_CREATE: 'deal.create',
+  DEAL_READ: 'deal.read',
+  DEAL_UPDATE: 'deal.update',
+  DEAL_DELETE: 'deal.delete',
+  DEAL_MANAGE_ALL: 'deal.manage_all',
+  DEAL_REASSIGN: 'deal.reassign',
+
+  // Sales activities (calls/meetings/emails/notes/tasks/follow-ups).
+  ACTIVITY_CREATE: 'activity.create',
+  ACTIVITY_READ: 'activity.read',
+  ACTIVITY_UPDATE: 'activity.update',
+  ACTIVITY_DELETE: 'activity.delete',
+
+  // Sales configuration surface: pipelines, lead sources, custom fields, feature flags.
+  SALES_CONFIGURE: 'sales.configure',
+
+  // Sales teams.
+  SALES_TEAM_READ: 'sales_team.read',
+  SALES_TEAM_MANAGE: 'sales_team.manage',
+
+  // ── Sales Phase 2 (declared now, granted to managers/admins later) ─────────
+  PRODUCT_CREATE: 'product.create',
+  PRODUCT_READ: 'product.read',
+  PRODUCT_UPDATE: 'product.update',
+  PRODUCT_DELETE: 'product.delete',
+  QUOTE_CREATE: 'quote.create',
+  QUOTE_READ: 'quote.read',
+  QUOTE_UPDATE: 'quote.update',
+  QUOTE_DELETE: 'quote.delete',
+  TARGET_READ: 'target.read',
+  TARGET_MANAGE: 'target.manage',
+  COMMISSION_READ: 'commission.read',
+  COMMISSION_MANAGE: 'commission.manage',
 });
 
 /** Flat list of all permission strings, used by the seeder. */
@@ -212,6 +278,180 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.INTERVIEW_UPDATE,
     PERMISSIONS.INTERVIEW_DELETE,
     // Chat: org admins can message anyone in their org.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
+    // Sales: org admins have top-level oversight of the whole sales module — every
+    // lead/account/contact/deal/activity in the org, plus configuration and teams.
+    PERMISSIONS.LEAD_CREATE,
+    PERMISSIONS.LEAD_READ,
+    PERMISSIONS.LEAD_UPDATE,
+    PERMISSIONS.LEAD_DELETE,
+    PERMISSIONS.LEAD_CONVERT,
+    PERMISSIONS.LEAD_MANAGE_ALL,
+    PERMISSIONS.LEAD_ASSIGN,
+    PERMISSIONS.ACCOUNT_CREATE,
+    PERMISSIONS.ACCOUNT_READ,
+    PERMISSIONS.ACCOUNT_UPDATE,
+    PERMISSIONS.ACCOUNT_DELETE,
+    PERMISSIONS.ACCOUNT_MANAGE_ALL,
+    PERMISSIONS.CONTACT_CREATE,
+    PERMISSIONS.CONTACT_READ,
+    PERMISSIONS.CONTACT_UPDATE,
+    PERMISSIONS.CONTACT_DELETE,
+    PERMISSIONS.DEAL_CREATE,
+    PERMISSIONS.DEAL_READ,
+    PERMISSIONS.DEAL_UPDATE,
+    PERMISSIONS.DEAL_DELETE,
+    PERMISSIONS.DEAL_MANAGE_ALL,
+    PERMISSIONS.DEAL_REASSIGN,
+    PERMISSIONS.ACTIVITY_CREATE,
+    PERMISSIONS.ACTIVITY_READ,
+    PERMISSIONS.ACTIVITY_UPDATE,
+    PERMISSIONS.ACTIVITY_DELETE,
+    PERMISSIONS.SALES_CONFIGURE,
+    PERMISSIONS.SALES_TEAM_READ,
+    PERMISSIONS.SALES_TEAM_MANAGE,
+    // Sales Phase 2 (available to org admins from the start).
+    PERMISSIONS.PRODUCT_CREATE,
+    PERMISSIONS.PRODUCT_READ,
+    PERMISSIONS.PRODUCT_UPDATE,
+    PERMISSIONS.PRODUCT_DELETE,
+    PERMISSIONS.QUOTE_CREATE,
+    PERMISSIONS.QUOTE_READ,
+    PERMISSIONS.QUOTE_UPDATE,
+    PERMISSIONS.QUOTE_DELETE,
+    PERMISSIONS.TARGET_READ,
+    PERMISSIONS.TARGET_MANAGE,
+    PERMISSIONS.COMMISSION_READ,
+    PERMISSIONS.COMMISSION_MANAGE,
+  ],
+
+  // ── Sales roles ────────────────────────────────────────────────────────────
+  // Sales rep: owns their OWN leads/accounts/contacts/deals/activities (the service
+  // narrows reads/writes to owner_id = self — no *.manage_all). They can convert their
+  // own leads and log activities, and read teams they belong to. Like a recruiter, a
+  // sales rep is ALSO a regular employee: own tickets/expenses/leave/timesheets + own
+  // attachments, all scoped to "own only". They get NO user/role/org management perms.
+  [ROLES.SALES_REP]: [
+    // Sales core (own-scoped at the service layer)
+    PERMISSIONS.LEAD_CREATE,
+    PERMISSIONS.LEAD_READ,
+    PERMISSIONS.LEAD_UPDATE,
+    PERMISSIONS.LEAD_DELETE,
+    PERMISSIONS.LEAD_CONVERT,
+    PERMISSIONS.ACCOUNT_CREATE,
+    PERMISSIONS.ACCOUNT_READ,
+    PERMISSIONS.ACCOUNT_UPDATE,
+    PERMISSIONS.CONTACT_CREATE,
+    PERMISSIONS.CONTACT_READ,
+    PERMISSIONS.CONTACT_UPDATE,
+    PERMISSIONS.DEAL_CREATE,
+    PERMISSIONS.DEAL_READ,
+    PERMISSIONS.DEAL_UPDATE,
+    PERMISSIONS.ACTIVITY_CREATE,
+    PERMISSIONS.ACTIVITY_READ,
+    PERMISSIONS.ACTIVITY_UPDATE,
+    PERMISSIONS.ACTIVITY_DELETE,
+    PERMISSIONS.SALES_TEAM_READ,
+    // Employee self-service — tickets (own), like a consultant/recruiter.
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
+    // Employee self-service — expenses (own).
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
+    // Employee self-service — leave (own).
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
+    // Employee self-service — timesheets (own).
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
+    // Own attachments.
+    PERMISSIONS.FILE_UPLOAD,
+    PERMISSIONS.FILE_READ,
+    PERMISSIONS.FILE_DELETE,
+    // Chat within the organization.
+    PERMISSIONS.CHAT_READ,
+    PERMISSIONS.CHAT_SEND,
+  ],
+
+  // Sales manager: everything a rep has, PLUS the whole-org visibility overlays
+  // (*.manage_all), (re)assignment, delete, team/target/commission management, and the
+  // configuration surface (pipelines, sources, custom fields, feature flags). Sees ALL
+  // of the org's sales data (product-owner decision §0.6). Still an employee (own
+  // self-service). No user/role/org management perms (that stays with org_admin).
+  [ROLES.SALES_MANAGER]: [
+    // Sales core — full org visibility + management
+    PERMISSIONS.LEAD_CREATE,
+    PERMISSIONS.LEAD_READ,
+    PERMISSIONS.LEAD_UPDATE,
+    PERMISSIONS.LEAD_DELETE,
+    PERMISSIONS.LEAD_CONVERT,
+    PERMISSIONS.LEAD_MANAGE_ALL,
+    PERMISSIONS.LEAD_ASSIGN,
+    PERMISSIONS.ACCOUNT_CREATE,
+    PERMISSIONS.ACCOUNT_READ,
+    PERMISSIONS.ACCOUNT_UPDATE,
+    PERMISSIONS.ACCOUNT_DELETE,
+    PERMISSIONS.ACCOUNT_MANAGE_ALL,
+    PERMISSIONS.CONTACT_CREATE,
+    PERMISSIONS.CONTACT_READ,
+    PERMISSIONS.CONTACT_UPDATE,
+    PERMISSIONS.CONTACT_DELETE,
+    PERMISSIONS.DEAL_CREATE,
+    PERMISSIONS.DEAL_READ,
+    PERMISSIONS.DEAL_UPDATE,
+    PERMISSIONS.DEAL_DELETE,
+    PERMISSIONS.DEAL_MANAGE_ALL,
+    PERMISSIONS.DEAL_REASSIGN,
+    PERMISSIONS.ACTIVITY_CREATE,
+    PERMISSIONS.ACTIVITY_READ,
+    PERMISSIONS.ACTIVITY_UPDATE,
+    PERMISSIONS.ACTIVITY_DELETE,
+    PERMISSIONS.SALES_CONFIGURE,
+    PERMISSIONS.SALES_TEAM_READ,
+    PERMISSIONS.SALES_TEAM_MANAGE,
+    // Sales Phase 2
+    PERMISSIONS.PRODUCT_CREATE,
+    PERMISSIONS.PRODUCT_READ,
+    PERMISSIONS.PRODUCT_UPDATE,
+    PERMISSIONS.PRODUCT_DELETE,
+    PERMISSIONS.QUOTE_CREATE,
+    PERMISSIONS.QUOTE_READ,
+    PERMISSIONS.QUOTE_UPDATE,
+    PERMISSIONS.QUOTE_DELETE,
+    PERMISSIONS.TARGET_READ,
+    PERMISSIONS.TARGET_MANAGE,
+    PERMISSIONS.COMMISSION_READ,
+    PERMISSIONS.COMMISSION_MANAGE,
+    // Employee self-service (still an employee).
+    PERMISSIONS.TICKET_CREATE,
+    PERMISSIONS.TICKET_READ,
+    PERMISSIONS.TICKET_UPDATE,
+    PERMISSIONS.TICKET_STATUS_UPDATE,
+    PERMISSIONS.EXPENSE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_UPDATE,
+    PERMISSIONS.EXPENSE_DELETE,
+    PERMISSIONS.LEAVE_CREATE,
+    PERMISSIONS.LEAVE_READ,
+    PERMISSIONS.LEAVE_UPDATE,
+    PERMISSIONS.LEAVE_DELETE,
+    PERMISSIONS.TIMESHEET_CREATE,
+    PERMISSIONS.TIMESHEET_READ,
+    PERMISSIONS.TIMESHEET_UPDATE,
+    PERMISSIONS.TIMESHEET_DELETE,
+    PERMISSIONS.FILE_UPLOAD,
+    PERMISSIONS.FILE_READ,
+    PERMISSIONS.FILE_DELETE,
+    // Chat within the organization.
     PERMISSIONS.CHAT_READ,
     PERMISSIONS.CHAT_SEND,
   ],
@@ -415,6 +655,8 @@ const ROLE_DEFINITIONS = Object.freeze({
   [ROLES.CONSULTANT_1099]: { name: 'Consultant (1099)', scope: ROLE_SCOPES.ORGANIZATION },
   [ROLES.CONSULTANT_C2C]: { name: 'Consultant (C2C)', scope: ROLE_SCOPES.ORGANIZATION },
   [ROLES.RECRUITER]: { name: 'Recruiter', scope: ROLE_SCOPES.ORGANIZATION },
+  [ROLES.SALES_REP]: { name: 'Sales Representative', scope: ROLE_SCOPES.ORGANIZATION },
+  [ROLES.SALES_MANAGER]: { name: 'Sales Manager', scope: ROLE_SCOPES.ORGANIZATION },
 });
 
 /** Consultant roles (the "owned" roles a vendor manages). */
@@ -439,6 +681,9 @@ const ASSIGNABLE_ROLES_BY_ROLE = Object.freeze({
     ROLES.CONSULTANT_C2C,
     // Org admins create recruiters (who then run the ATS).
     ROLES.RECRUITER,
+    // Org admins create the sales team.
+    ROLES.SALES_REP,
+    ROLES.SALES_MANAGER,
   ],
   [ROLES.VENDOR]: [ROLES.CONSULTANT_W2, ROLES.CONSULTANT_1099, ROLES.CONSULTANT_C2C],
 });
@@ -454,6 +699,8 @@ const ORG_ASSIGNABLE_ROLES = Object.freeze([
   ROLES.CONSULTANT_1099,
   ROLES.CONSULTANT_C2C,
   ROLES.RECRUITER,
+  ROLES.SALES_REP,
+  ROLES.SALES_MANAGER,
 ]);
 
 module.exports = {

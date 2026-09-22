@@ -22,7 +22,7 @@ dotenv.config({
 
 const db = require('../models');
 const Encrypter = require('../helper/encrypter');
-const { leaveService } = require('../services');
+const { leaveService, salesConfigService } = require('../services');
 const {
   ROLES,
   ROLE_DEFINITIONS,
@@ -104,6 +104,19 @@ async function ensureSearchIndexes() {
     'CREATE INDEX IF NOT EXISTS job_applications_candidate_name_trgm ON job_applications USING gin (candidate_name gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS job_applications_candidate_email_trgm ON job_applications USING gin (candidate_email gin_trgm_ops)',
     'CREATE INDEX IF NOT EXISTS job_applications_application_number_trgm ON job_applications USING gin (application_number gin_trgm_ops)',
+    // Sales: fast substring search on lead/account/contact/deal list pages.
+    'CREATE INDEX IF NOT EXISTS leads_first_name_trgm ON leads USING gin (first_name gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS leads_last_name_trgm ON leads USING gin (last_name gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS leads_email_trgm ON leads USING gin (email gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS leads_company_name_trgm ON leads USING gin (company_name gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS leads_lead_number_trgm ON leads USING gin (lead_number gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS accounts_name_trgm ON accounts USING gin (name gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS accounts_account_number_trgm ON accounts USING gin (account_number gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS contacts_first_name_trgm ON contacts USING gin (first_name gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS contacts_last_name_trgm ON contacts USING gin (last_name gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS contacts_email_trgm ON contacts USING gin (email gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS deals_title_trgm ON deals USING gin (title gin_trgm_ops)',
+    'CREATE INDEX IF NOT EXISTS deals_deal_number_trgm ON deals USING gin (deal_number gin_trgm_ops)',
   ];
   for (const sql of statements) {
     // eslint-disable-next-line no-await-in-loop
@@ -185,6 +198,23 @@ async function seedDefaultLeaveTypes(transaction) {
   console.log(`  leave types: defaults ensured for ${count} organization(s)`);
 }
 
+/**
+ * Ensure a SalesConfig + default pipeline exists for every organization (idempotent).
+ * New organizations should also call salesConfigService.ensureSalesConfig on creation;
+ * this backfills any orgs that predate the sales module.
+ */
+async function seedSalesConfigs(transaction) {
+  const { Organization } = db;
+  const orgs = await Organization.findAll({ attributes: ['id'], transaction });
+  let count = 0;
+  for (const org of orgs) {
+    // eslint-disable-next-line no-await-in-loop
+    await salesConfigService.ensureSalesConfig(org.id, null, transaction);
+    count += 1;
+  }
+  console.log(`  sales config: ensured for ${count} organization(s)`);
+}
+
 function humanize(permissionKey) {
   return permissionKey.replace('.', ' ').replace('_', ' ');
 }
@@ -203,6 +233,7 @@ async function run() {
     await syncRolePermissions(roles, permissions);
     await seedSuperAdmin(roles);
     await seedDefaultLeaveTypes(transaction);
+    await seedSalesConfigs(transaction);
     await ensureSearchIndexes();
 
     await transaction.commit();

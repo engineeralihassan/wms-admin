@@ -29,6 +29,17 @@ const TimesheetJob = require('./timesheet-job.model');
 const Conversation = require('./conversation.model');
 const ConversationParticipant = require('./conversation-participant.model');
 const Message = require('./message.model');
+const SalesConfig = require('./sales-config.model');
+const SalesPipeline = require('./sales-pipeline.model');
+const Lead = require('./lead.model');
+const Account = require('./account.model');
+const Contact = require('./contact.model');
+const Deal = require('./deal.model');
+const DealEvent = require('./deal-event.model');
+const LeadEvent = require('./lead-event.model');
+const SalesActivity = require('./sales-activity.model');
+const SalesTeam = require('./sales-team.model');
+const SalesTeamMember = require('./sales-team-member.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -87,6 +98,17 @@ const definitions = (sequelize, Sequelize) => {
   db.Conversation = Conversation(sequelize);
   db.ConversationParticipant = ConversationParticipant(sequelize);
   db.Message = Message(sequelize);
+  db.SalesConfig = SalesConfig(sequelize);
+  db.SalesPipeline = SalesPipeline(sequelize);
+  db.Lead = Lead(sequelize);
+  db.Account = Account(sequelize);
+  db.Contact = Contact(sequelize);
+  db.Deal = Deal(sequelize);
+  db.DealEvent = DealEvent(sequelize);
+  db.LeadEvent = LeadEvent(sequelize);
+  db.SalesActivity = SalesActivity(sequelize);
+  db.SalesTeam = SalesTeam(sequelize);
+  db.SalesTeamMember = SalesTeamMember(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -463,6 +485,113 @@ const definitions = (sequelize, Sequelize) => {
   db.User.hasMany(db.Message, { foreignKey: 'sender_id', as: 'sentMessages' });
   db.Message.belongsTo(db.User, { foreignKey: 'sender_id', as: 'sender' });
   db.Message.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // ── Sales & CRM ──────────────────────────────────────────────────────────────
+  // Every sales entity is tenant-scoped (organization_id) and layered with an
+  // owner/manager visibility overlay at the service layer (buildSalesScope), mirroring
+  // the ATS. Money is DECIMAL(14,2); pipelines/custom-fields are JSONB config.
+
+  // Organization <-> SalesConfig (1-to-1: per-org feature flags + defaults + custom fields)
+  db.Organization.hasOne(db.SalesConfig, { foreignKey: 'organization_id', as: 'salesConfig' });
+  db.SalesConfig.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // Organization <-> SalesPipeline (tenant scope)
+  db.Organization.hasMany(db.SalesPipeline, { foreignKey: 'organization_id', as: 'salesPipelines' });
+  db.SalesPipeline.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.SalesPipeline.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+
+  // Organization <-> Lead (tenant scope) + owner/creator
+  db.Organization.hasMany(db.Lead, { foreignKey: 'organization_id', as: 'leads' });
+  db.Lead.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.User.hasMany(db.Lead, { foreignKey: 'owner_id', as: 'ownedLeads' });
+  db.Lead.belongsTo(db.User, { foreignKey: 'owner_id', as: 'owner' });
+  db.Lead.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+  // Lead conversion pointers (nullable, set on convert).
+  db.Lead.belongsTo(db.Account, { foreignKey: 'converted_account_id', as: 'convertedAccount' });
+  db.Lead.belongsTo(db.Contact, { foreignKey: 'converted_contact_id', as: 'convertedContact' });
+  db.Lead.belongsTo(db.Deal, { foreignKey: 'converted_deal_id', as: 'convertedDeal' });
+
+  // Organization <-> Account (tenant scope) + owner/creator
+  db.Organization.hasMany(db.Account, { foreignKey: 'organization_id', as: 'accounts' });
+  db.Account.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.User.hasMany(db.Account, { foreignKey: 'owner_id', as: 'ownedAccounts' });
+  db.Account.belongsTo(db.User, { foreignKey: 'owner_id', as: 'owner' });
+  db.Account.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+
+  // Organization <-> Contact (tenant scope) + account (nullable, B2C) + owner/creator
+  db.Organization.hasMany(db.Contact, { foreignKey: 'organization_id', as: 'contacts' });
+  db.Contact.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.Account.hasMany(db.Contact, { foreignKey: 'account_id', as: 'contacts' });
+  db.Contact.belongsTo(db.Account, { foreignKey: 'account_id', as: 'account' });
+  db.User.hasMany(db.Contact, { foreignKey: 'owner_id', as: 'ownedContacts' });
+  db.Contact.belongsTo(db.User, { foreignKey: 'owner_id', as: 'owner' });
+  db.Contact.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+
+  // Organization <-> Deal (tenant scope) + pipeline + links + owner/creator
+  db.Organization.hasMany(db.Deal, { foreignKey: 'organization_id', as: 'deals' });
+  db.Deal.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.SalesPipeline.hasMany(db.Deal, { foreignKey: 'pipeline_id', as: 'deals' });
+  db.Deal.belongsTo(db.SalesPipeline, { foreignKey: 'pipeline_id', as: 'pipeline' });
+  db.Account.hasMany(db.Deal, { foreignKey: 'account_id', as: 'deals' });
+  db.Deal.belongsTo(db.Account, { foreignKey: 'account_id', as: 'account' });
+  db.Contact.hasMany(db.Deal, { foreignKey: 'contact_id', as: 'deals' });
+  db.Deal.belongsTo(db.Contact, { foreignKey: 'contact_id', as: 'contact' });
+  db.Lead.hasMany(db.Deal, { foreignKey: 'source_lead_id', as: 'deals' });
+  db.Deal.belongsTo(db.Lead, { foreignKey: 'source_lead_id', as: 'sourceLead' });
+  db.User.hasMany(db.Deal, { foreignKey: 'owner_id', as: 'ownedDeals' });
+  db.Deal.belongsTo(db.User, { foreignKey: 'owner_id', as: 'owner' });
+  db.Deal.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+
+  // Deal <-> DealEvent (append-only audit trail)
+  db.Organization.hasMany(db.DealEvent, { foreignKey: 'organization_id', as: 'dealEvents' });
+  db.DealEvent.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.Deal.hasMany(db.DealEvent, { foreignKey: 'deal_id', as: 'events' });
+  db.DealEvent.belongsTo(db.Deal, { foreignKey: 'deal_id', as: 'deal' });
+  db.User.hasMany(db.DealEvent, { foreignKey: 'created_by_id', as: 'dealEvents' });
+  db.DealEvent.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'actor' });
+
+  // Lead <-> LeadEvent (append-only audit trail)
+  db.Organization.hasMany(db.LeadEvent, { foreignKey: 'organization_id', as: 'leadEvents' });
+  db.LeadEvent.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.Lead.hasMany(db.LeadEvent, { foreignKey: 'lead_id', as: 'events' });
+  db.LeadEvent.belongsTo(db.Lead, { foreignKey: 'lead_id', as: 'lead' });
+  db.User.hasMany(db.LeadEvent, { foreignKey: 'created_by_id', as: 'leadEvents' });
+  db.LeadEvent.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'actor' });
+
+  // SalesActivity: polymorphic parent (related_type/related_id) — NO FK association,
+  // resolved at the service layer, like Attachment. Only tenant + owner associations.
+  db.Organization.hasMany(db.SalesActivity, { foreignKey: 'organization_id', as: 'salesActivities' });
+  db.SalesActivity.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.User.hasMany(db.SalesActivity, { foreignKey: 'owner_id', as: 'ownedActivities' });
+  db.SalesActivity.belongsTo(db.User, { foreignKey: 'owner_id', as: 'owner' });
+  db.SalesActivity.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+
+  // Organization <-> SalesTeam (tenant scope) + lead user
+  db.Organization.hasMany(db.SalesTeam, { foreignKey: 'organization_id', as: 'salesTeams' });
+  db.SalesTeam.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.SalesTeam.belongsTo(db.User, { foreignKey: 'lead_user_id', as: 'teamLead' });
+  db.SalesTeam.belongsTo(db.User, { foreignKey: 'created_by_id', as: 'creator' });
+
+  // SalesTeam <-> User (many-to-many membership through sales_team_members)
+  db.SalesTeam.belongsToMany(db.User, {
+    through: db.SalesTeamMember,
+    foreignKey: 'team_id',
+    otherKey: 'user_id',
+    as: 'members',
+  });
+  db.User.belongsToMany(db.SalesTeam, {
+    through: db.SalesTeamMember,
+    foreignKey: 'user_id',
+    otherKey: 'team_id',
+    as: 'salesTeams',
+  });
+  // Direct access to the join rows (needed to read member_role / audit fields).
+  db.SalesTeam.hasMany(db.SalesTeamMember, { foreignKey: 'team_id', as: 'memberships' });
+  db.SalesTeamMember.belongsTo(db.SalesTeam, { foreignKey: 'team_id', as: 'team' });
+  db.User.hasMany(db.SalesTeamMember, { foreignKey: 'user_id', as: 'salesTeamMemberships' });
+  db.SalesTeamMember.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
+  db.SalesTeamMember.belongsTo(db.User, { foreignKey: 'added_by_id', as: 'addedBy' });
+  db.SalesTeamMember.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
 
   return db;
 };

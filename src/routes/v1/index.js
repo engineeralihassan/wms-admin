@@ -17,6 +17,7 @@ const applicationRoute = require('./application.route');
 const interviewRoute = require('./interview.route');
 const careersRoute = require('./careers.route');
 const chatRoute = require('./chat.route');
+const salesRoute = require('./sales.route');
 const docsRoute = require('./docs.route');
 
 const devRoutes = [
@@ -43,6 +44,8 @@ const routes = [
   { path: '/interviews', route: interviewRoute },
   { path: '/careers', route: careersRoute },
   { path: '/chat', route: chatRoute },
+  // Sales & CRM (leads, and — as Phase 1 lands — accounts/contacts/deals/etc.).
+  { path: '/sales', route: salesRoute },
 ];
 
 routes.forEach((route) => {

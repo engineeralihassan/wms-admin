@@ -195,6 +195,63 @@ const CHAT_MESSAGE_QUERY_CONFIG = Object.freeze({
   mode: 'keyset',
 });
 
+// ── Sales & CRM ──────────────────────────────────────────────────────────────
+// Allow-lists mirroring APPLICATION_QUERY_CONFIG. Owner/tenant scope is applied
+// separately by buildSalesScope; these only govern client-controllable sort/search/
+// filter. owner_id is filterable so a manager can filter by rep.
+
+const LEAD_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'lead_number', 'first_name', 'status', 'estimated_value', 'ai_score'],
+  searchable: ['first_name', 'last_name', 'email', 'company_name', 'lead_number'],
+  filterable: ['status', 'source', 'owner_id', 'currency'],
+  rangeFilterable: ['created_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+const ACCOUNT_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'account_number', 'name', 'annual_revenue'],
+  searchable: ['name', 'account_number', 'email'],
+  filterable: ['owner_id', 'industry', 'account_type'],
+  rangeFilterable: ['created_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+const CONTACT_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'first_name', 'last_name'],
+  searchable: ['first_name', 'last_name', 'email'],
+  // account_id resolved from the account's public uuid in the service (ids never exposed).
+  filterable: ['owner_id', 'account_id', 'is_primary'],
+  rangeFilterable: ['created_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+const DEAL_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'deal_number', 'title', 'amount', 'probability', 'expected_close_date', 'status'],
+  searchable: ['title', 'deal_number'],
+  // pipeline_id / account_id resolved from public uuids in the service.
+  filterable: ['status', 'stage_key', 'pipeline_id', 'owner_id', 'account_id', 'currency'],
+  rangeFilterable: ['created_at', 'expected_close_date'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
+const SALES_ACTIVITY_QUERY_CONFIG = Object.freeze({
+  sortable: ['created_at', 'updated_at', 'due_at', 'completed_at'],
+  searchable: ['subject'],
+  filterable: ['activity_type', 'status', 'owner_id', 'related_type', 'related_id'],
+  rangeFilterable: ['created_at', 'due_at'],
+  defaultSort: 'created_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
 module.exports = {
   USER_QUERY_CONFIG,
   ORGANIZATION_QUERY_CONFIG,
@@ -209,4 +266,9 @@ module.exports = {
   INTERVIEW_QUERY_CONFIG,
   CONVERSATION_QUERY_CONFIG,
   CHAT_MESSAGE_QUERY_CONFIG,
+  LEAD_QUERY_CONFIG,
+  ACCOUNT_QUERY_CONFIG,
+  CONTACT_QUERY_CONFIG,
+  DEAL_QUERY_CONFIG,
+  SALES_ACTIVITY_QUERY_CONFIG,
 };
