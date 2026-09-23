@@ -252,9 +252,23 @@ const SALES_ACTIVITY_QUERY_CONFIG = Object.freeze({
   mode: 'offset',
 });
 
+// Opportunities (Sales discovery). Owner-scoped for reps at the service layer; this
+// config only governs safe sort/search/filter. status/type/is_remote are filterable so
+// users can quickly narrow to e.g. remote, saved opportunities.
+const OPPORTUNITY_QUERY_CONFIG = Object.freeze({
+  sortable: ['discovered_at', 'posted_at', 'last_seen_at', 'title', 'company_name', 'status', 'salary_max'],
+  searchable: ['title', 'company_name', 'location', 'publisher'],
+  filterable: ['status', 'opportunity_type', 'is_remote', 'source'],
+  rangeFilterable: ['discovered_at', 'posted_at'],
+  defaultSort: 'discovered_at',
+  maxLimit: 100,
+  mode: 'offset',
+});
+
 module.exports = {
   USER_QUERY_CONFIG,
   ORGANIZATION_QUERY_CONFIG,
+  OPPORTUNITY_QUERY_CONFIG,
   TICKET_QUERY_CONFIG,
   EXPENSE_QUERY_CONFIG,
   PROJECT_QUERY_CONFIG,

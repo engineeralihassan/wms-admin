@@ -209,6 +209,17 @@ const PERMISSIONS = Object.freeze({
   TARGET_MANAGE: 'target.manage',
   COMMISSION_READ: 'commission.read',
   COMMISSION_MANAGE: 'commission.manage',
+
+  // ── Opportunity discovery (Sales) ──────────────────────────────────────────
+  // Discovering, reviewing and converting external opportunities into Sales Leads.
+  // opportunity.read = see the org's discovered opportunities (owner-scoped for reps);
+  // opportunity.discover = run a new external search (consumes API credits);
+  // opportunity.convert = turn an opportunity into a Lead;
+  // opportunity.delete = remove a discovered opportunity.
+  OPPORTUNITY_READ: 'opportunity.read',
+  OPPORTUNITY_DISCOVER: 'opportunity.discover',
+  OPPORTUNITY_CONVERT: 'opportunity.convert',
+  OPPORTUNITY_DELETE: 'opportunity.delete',
 });
 
 /** Flat list of all permission strings, used by the seeder. */
@@ -324,6 +335,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.TARGET_MANAGE,
     PERMISSIONS.COMMISSION_READ,
     PERMISSIONS.COMMISSION_MANAGE,
+    // Opportunity discovery — org admins oversee the whole feature.
+    PERMISSIONS.OPPORTUNITY_READ,
+    PERMISSIONS.OPPORTUNITY_DISCOVER,
+    PERMISSIONS.OPPORTUNITY_CONVERT,
+    PERMISSIONS.OPPORTUNITY_DELETE,
   ],
 
   // ── Sales roles ────────────────────────────────────────────────────────────
@@ -353,6 +369,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.ACTIVITY_UPDATE,
     PERMISSIONS.ACTIVITY_DELETE,
     PERMISSIONS.SALES_TEAM_READ,
+    // Opportunity discovery — a rep can discover, review and convert (their OWN;
+    // the service scopes reads to owner_id). No delete (a manager cleans up).
+    PERMISSIONS.OPPORTUNITY_READ,
+    PERMISSIONS.OPPORTUNITY_DISCOVER,
+    PERMISSIONS.OPPORTUNITY_CONVERT,
     // Employee self-service — tickets (own), like a consultant/recruiter.
     PERMISSIONS.TICKET_CREATE,
     PERMISSIONS.TICKET_READ,
@@ -431,6 +452,11 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.TARGET_MANAGE,
     PERMISSIONS.COMMISSION_READ,
     PERMISSIONS.COMMISSION_MANAGE,
+    // Opportunity discovery — managers discover, review and convert across the org.
+    PERMISSIONS.OPPORTUNITY_READ,
+    PERMISSIONS.OPPORTUNITY_DISCOVER,
+    PERMISSIONS.OPPORTUNITY_CONVERT,
+    PERMISSIONS.OPPORTUNITY_DELETE,
     // Employee self-service (still an employee).
     PERMISSIONS.TICKET_CREATE,
     PERMISSIONS.TICKET_READ,

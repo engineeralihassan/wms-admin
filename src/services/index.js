@@ -26,3 +26,4 @@ module.exports.activityService = require('./sales/activity.service');
 module.exports.teamService = require('./sales/team.service');
 module.exports.pipelineService = require('./sales/pipeline.service');
 module.exports.salesDashboardService = require('./sales/sales-dashboard.service');
+module.exports.opportunityService = require('./opportunity/opportunity.service');

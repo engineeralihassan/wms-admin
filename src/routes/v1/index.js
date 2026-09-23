@@ -18,6 +18,7 @@ const interviewRoute = require('./interview.route');
 const careersRoute = require('./careers.route');
 const chatRoute = require('./chat.route');
 const salesRoute = require('./sales.route');
+const opportunityRoute = require('./opportunity.route');
 const docsRoute = require('./docs.route');
 
 const devRoutes = [
@@ -46,6 +47,8 @@ const routes = [
   { path: '/chat', route: chatRoute },
   // Sales & CRM (leads, and — as Phase 1 lands — accounts/contacts/deals/etc.).
   { path: '/sales', route: salesRoute },
+  // Opportunity discovery (Sales): "Get latest opportunities" → convert to leads.
+  { path: '/opportunities', route: opportunityRoute },
 ];
 
 routes.forEach((route) => {

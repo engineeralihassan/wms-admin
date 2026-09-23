@@ -20,3 +20,4 @@ module.exports.salesActivityValidation = require('./sales/activity.validation');
 module.exports.salesTeamValidation = require('./sales/team.validation');
 module.exports.salesPipelineValidation = require('./sales/pipeline.validation');
 module.exports.salesConfigValidation = require('./sales/sales-config.validation');
+module.exports.opportunityValidation = require('./opportunity/opportunity.validation');

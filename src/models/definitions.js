@@ -40,6 +40,7 @@ const LeadEvent = require('./lead-event.model');
 const SalesActivity = require('./sales-activity.model');
 const SalesTeam = require('./sales-team.model');
 const SalesTeamMember = require('./sales-team-member.model');
+const Opportunity = require('./opportunity.model');
 
 /**
  * Registers all models and their associations on the shared sequelize instance.
@@ -109,6 +110,7 @@ const definitions = (sequelize, Sequelize) => {
   db.SalesActivity = SalesActivity(sequelize);
   db.SalesTeam = SalesTeam(sequelize);
   db.SalesTeamMember = SalesTeamMember(sequelize);
+  db.Opportunity = Opportunity(sequelize);
 
   // Organization <-> User
   db.Organization.hasMany(db.User, { foreignKey: 'organization_id', as: 'users' });
@@ -592,6 +594,15 @@ const definitions = (sequelize, Sequelize) => {
   db.SalesTeamMember.belongsTo(db.User, { foreignKey: 'user_id', as: 'user' });
   db.SalesTeamMember.belongsTo(db.User, { foreignKey: 'added_by_id', as: 'addedBy' });
   db.SalesTeamMember.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+
+  // ── Opportunities (Sales discovery via external job-search API) ───────────────
+  // An Opportunity is tenant-scoped and owned by the user who discovered it. On
+  // conversion it points at the Lead it produced (converted_lead_id, nullable).
+  db.Organization.hasMany(db.Opportunity, { foreignKey: 'organization_id', as: 'opportunities' });
+  db.Opportunity.belongsTo(db.Organization, { foreignKey: 'organization_id', as: 'organization' });
+  db.User.hasMany(db.Opportunity, { foreignKey: 'discovered_by_id', as: 'discoveredOpportunities' });
+  db.Opportunity.belongsTo(db.User, { foreignKey: 'discovered_by_id', as: 'discoverer' });
+  db.Opportunity.belongsTo(db.Lead, { foreignKey: 'converted_lead_id', as: 'convertedLead' });
 
   return db;
 };

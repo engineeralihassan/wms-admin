@@ -12,7 +12,9 @@
     "migrate:profile": "NODE_ENV=DEVELOPMENT node ./src/seeders/profile-columns.migration.js",
     "migrate:profile:prod": "NODE_ENV=PRODUCTION node ./src/seeders/profile-columns.migration.js",
     "migrate:org-logo": "NODE_ENV=DEVELOPMENT node ./src/seeders/organization-logo-columns.migration.js",
-    "migrate:org-logo:prod": "NODE_ENV=PRODUCTION node ./src/seeders/organization-logo-columns.migration.js"
+    "migrate:org-logo:prod": "NODE_ENV=PRODUCTION node ./src/seeders/organization-logo-columns.migration.js",
+    "migrate:opportunities": "NODE_ENV=DEVELOPMENT node ./src/seeders/opportunities-table.migration.js",
+    "migrate:opportunities:prod": "NODE_ENV=PRODUCTION node ./src/seeders/opportunities-table.migration.js"
   },
   "keywords": [],
   "author": "",
