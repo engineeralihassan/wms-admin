@@ -36,6 +36,17 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: true,
       },
+      // Optional brand logo. `logo_url` is the client-facing delivery URL (rendered
+      // in the sidebar); `logo_storage_key` is the provider object key, kept so the
+      // object can be removed/replaced later without leaking storage internals.
+      logo_url: {
+        type: DataTypes.STRING(1024),
+        allowNull: true,
+      },
+      logo_storage_key: {
+        type: DataTypes.STRING(1024),
+        allowNull: true,
+      },
     },
     {
       tableName: 'organizations',

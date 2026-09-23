@@ -33,6 +33,8 @@ const UPLOAD_FOLDERS = Object.freeze({
   LEAVES: 'leaves',
   // ATS: candidate CVs / résumés and their supporting documents (public uploads).
   RESUMES: 'resumes',
+  // Organization brand logos.
+  ORGANIZATIONS: 'organizations',
   MISC: 'misc',
 });
 

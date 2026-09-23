@@ -20,9 +20,32 @@ const createOrganization = {
   }),
 };
 
+// Edit an organization: only `name` and the logo are editable. `slug` and identity
+// are intentionally omitted (locked). `remove_logo` clears an existing logo; both
+// text fields are optional so a request can update just one thing. On the multipart
+// path the `logo` file lands on req.file (not validated by Joi).
+const updateOrganization = {
+  params: Joi.object().keys({ uuid: Joi.string().uuid().required() }),
+  body: Joi.object().keys({
+    name: Joi.string().min(2).max(150),
+    remove_logo: Joi.boolean(),
+  }),
+};
+
 const updateOrganizationStatus = {
   params: Joi.object().keys({ uuid: Joi.string().uuid().required() }),
   body: Joi.object().keys({ is_active: Joi.boolean().required() }),
 };
 
-module.exports = { createOrganization, listOrganizations, updateOrganizationStatus };
+// Resend the org admin's activation email. Only the org uuid is needed.
+const resendOrgInvite = {
+  params: Joi.object().keys({ uuid: Joi.string().uuid().required() }),
+};
+
+module.exports = {
+  createOrganization,
+  listOrganizations,
+  updateOrganization,
+  resendOrgInvite,
+  updateOrganizationStatus,
+};

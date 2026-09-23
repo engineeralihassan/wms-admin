@@ -29,6 +29,21 @@ const clearRefreshCookie = (res) => {
 /** Read the refresh token from the httpOnly cookie, falling back to the body. */
 const readRefreshToken = (req) => req.cookies?.[REFRESH_COOKIE] || req.body?.refreshToken || null;
 
+/**
+ * Shape the user's organization for the client (used by the sidebar to show the
+ * tenant name + optional logo). Returns null for the platform super admin, who has
+ * no organization.
+ */
+const orgToDto = (organization) =>
+  organization
+    ? {
+        uuid: organization.uuid,
+        name: organization.name,
+        slug: organization.slug,
+        logo_url: organization.logo_url || null,
+      }
+    : null;
+
 /** Shape a user row into a safe, client-facing object (no password/salt). */
 const sanitizeUser = (user, authContext) => ({
   id: user.id,
@@ -37,6 +52,7 @@ const sanitizeUser = (user, authContext) => ({
   last_name: user.last_name,
   email: user.email,
   organization_id: user.organization_id,
+  organization: orgToDto(user.organization),
   role: authContext?.role,
   permissions: authContext?.permissions,
 });
@@ -152,6 +168,7 @@ const getMe = catchAsync(async (req, res) => {
       last_name: profile.last_name,
       email: profile.email,
       organization_id: req.auth.organizationId,
+      organization: orgToDto(profile.organization),
       role: req.auth.role,
       permissions: req.auth.permissions,
     },

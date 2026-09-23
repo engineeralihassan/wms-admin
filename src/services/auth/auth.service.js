@@ -25,7 +25,13 @@ const signIn = async (body, res) => {
   const { email, password } = body;
   const user = await User.findOne({
     where: { email },
-    include: [{ model: Organization, as: 'organization', attributes: ['is_active'] }],
+    include: [
+      {
+        model: Organization,
+        as: 'organization',
+        attributes: ['uuid', 'name', 'slug', 'logo_url', 'is_active'],
+      },
+    ],
   });
 
   // Uniform failure to avoid revealing whether the email exists.
@@ -288,6 +294,13 @@ const changePassword = async (userId, currentPassword, newPassword, res) => {
 const getProfile = async (userId) => {
   return User.findByPk(userId, {
     attributes: ['id', 'uuid', 'first_name', 'last_name', 'email', 'organization_id'],
+    include: [
+      {
+        model: Organization,
+        as: 'organization',
+        attributes: ['uuid', 'name', 'slug', 'logo_url'],
+      },
+    ],
   });
 };
 

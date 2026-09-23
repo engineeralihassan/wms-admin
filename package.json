@@ -10,7 +10,9 @@
     "seed": "NODE_ENV=DEVELOPMENT node ./src/seeders/rbac.seeder.js",
     "seed:prod": "NODE_ENV=PRODUCTION node ./src/seeders/rbac.seeder.js",
     "migrate:profile": "NODE_ENV=DEVELOPMENT node ./src/seeders/profile-columns.migration.js",
-    "migrate:profile:prod": "NODE_ENV=PRODUCTION node ./src/seeders/profile-columns.migration.js"
+    "migrate:profile:prod": "NODE_ENV=PRODUCTION node ./src/seeders/profile-columns.migration.js",
+    "migrate:org-logo": "NODE_ENV=DEVELOPMENT node ./src/seeders/organization-logo-columns.migration.js",
+    "migrate:org-logo:prod": "NODE_ENV=PRODUCTION node ./src/seeders/organization-logo-columns.migration.js"
   },
   "keywords": [],
   "author": "",
